@@ -21,7 +21,7 @@ func TestApp(t *testing.T) {
 	assert := assert.New(t)
 
 	logger := log.NewTMLogger(os.Stdout)
-	var dbProvider = tmDBProvider
+	var dbProvider = DefaultDBProvider
 	runner := NewAppRunner(logger, dbProvider)
 	stub := compat.MakeFakeStub()
 	msg := makeMsgCreateClient()
