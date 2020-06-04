@@ -20,6 +20,7 @@ var (
 	NewChaincodeInfo   = types.NewChaincodeInfo
 	NewChaincodeHeader = types.NewChaincodeHeader
 	NewClientState     = types.NewClientState
+	RegisterCodec      = types.RegisterCodec
 
 	Fabric           = types.Fabric
 	ClientTypeFabric = types.ClientTypeFabric

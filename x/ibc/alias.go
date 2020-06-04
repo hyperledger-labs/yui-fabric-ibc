@@ -7,8 +7,8 @@ package ibc
 
 import (
 	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
-	"github.com/cosmos/cosmos-sdk/x/ibc/types"
 	"github.com/datachainlab/fabric-ibc/x/ibc/keeper"
+	"github.com/datachainlab/fabric-ibc/x/ibc/types"
 )
 
 const (

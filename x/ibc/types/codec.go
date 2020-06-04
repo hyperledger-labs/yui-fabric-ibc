@@ -9,6 +9,7 @@ import (
 	localhosttypes "github.com/cosmos/cosmos-sdk/x/ibc/09-localhost/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
+	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 )
 
 // RegisterCodec registers the necessary x/ibc interfaces and concrete types
@@ -19,6 +20,7 @@ func RegisterCodec(cdc *codec.Codec) {
 	channel.RegisterCodec(cdc)
 	ibctmtypes.RegisterCodec(cdc)
 	localhosttypes.RegisterCodec(cdc)
+	fabric.RegisterCodec(cdc)
 	commitmenttypes.RegisterCodec(cdc)
 }
 
