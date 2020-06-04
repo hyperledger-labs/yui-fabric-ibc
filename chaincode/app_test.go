@@ -11,6 +11,7 @@ import (
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/stretchr/testify/assert"
+	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/log"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
@@ -47,7 +48,9 @@ func makeMsgCreateClient() string {
 	ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 
 	h := fabric.NewHeader(ch, ci)
-	signer := sdk.AccAddress("signer0")
+	prv := secp256k1.GenPrivKey()
+	addr := prv.PubKey().Address()
+	signer := sdk.AccAddress(addr)
 	msg := fabric.NewMsgCreateClient(clientID, h, signer)
 	if err := msg.ValidateBasic(); err != nil {
 		panic(err)
@@ -56,6 +59,12 @@ func makeMsgCreateClient() string {
 
 	tx := auth.StdTx{
 		Msgs: []sdk.Msg{msg},
+		Signatures: []auth.StdSignature{
+			{PubKey: prv.PubKey().Bytes(), Signature: make([]byte, 64)}, // FIXME set valid signature
+		},
+	}
+	if err := tx.ValidateBasic(); err != nil {
+		panic(err)
 	}
 
 	bz, err := cdc.MarshalJSON(tx)
