@@ -9,6 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/std"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -59,15 +60,25 @@ func NewAppRunner(logger log.Logger, dbProvider DBProvider) AppRunner {
 	}
 }
 
+// FIXME load this value from store
+var height int64 = 1
+
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) error {
 	// FIXME can we reuse single instance instead of making new app per request?
 	db := r.dbProvider(stub)
-	app, err := NewApp(r.logger, db, r.traceStore, true)
+	app, err := NewApp(r.logger, db, r.traceStore, true, bam.SetPruning(storetypes.PruneEverything))
 	if err != nil {
 		return err
 	}
 
-	_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
+	if height == 1 {
+		_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
+		_ = app.Commit()
+		height++
+		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
+	} else {
+		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
+	}
 
 	res := app.DeliverTx(
 		abci.RequestDeliverTx{
@@ -77,7 +88,9 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) erro
 	if res.IsErr() {
 		return errors.New(res.String())
 	}
+	app.EndBlock(abci.RequestEndBlock{Height: height})
 	_ = app.Commit()
+	height++
 	return nil
 }
 
