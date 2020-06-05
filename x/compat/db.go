@@ -1,6 +1,7 @@
 package compat
 
 import (
+	"encoding/hex"
 	"reflect"
 
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -18,8 +19,18 @@ func NewDB(stub shim.ChaincodeStubInterface) *DB {
 	return &DB{stub: stub}
 }
 
+// We defensively turn nil keys or values into []byte{} for
+// most operations.
+func nonNilBytes(bz []byte) []byte {
+	if bz == nil {
+		return []byte{}
+	}
+	return bz
+}
+
 func (db *DB) Get(key []byte) ([]byte, error) {
-	return db.stub.GetState(string(key))
+	hexStr := hex.EncodeToString(key)
+	return db.stub.GetState(hexStr)
 }
 
 func (db *DB) Has(key []byte) (bool, error) {
@@ -33,7 +44,9 @@ func (db *DB) Has(key []byte) (bool, error) {
 }
 
 func (db *DB) Set(key, value []byte) error {
-	return db.stub.PutState(string(key), value)
+	hexStr := hex.EncodeToString(key)
+	value = nonNilBytes(value)
+	return db.stub.PutState(hexStr, value)
 }
 
 func (db *DB) SetSync(key, value []byte) error {
@@ -41,7 +54,8 @@ func (db *DB) SetSync(key, value []byte) error {
 }
 
 func (db *DB) Delete(key []byte) error {
-	return db.stub.DelState(string(key))
+	hexStr := hex.EncodeToString(key)
+	return db.stub.DelState(hexStr)
 }
 
 func (db *DB) DeleteSync(key []byte) error {
@@ -49,7 +63,9 @@ func (db *DB) DeleteSync(key []byte) error {
 }
 
 func (db *DB) Iterator(start, end []byte) (dbm.Iterator, error) {
-	iter, err := db.stub.GetStateByRange(string(start), string(end))
+	s := hex.EncodeToString(start)
+	e := hex.EncodeToString(end)
+	iter, err := db.stub.GetStateByRange(s, e)
 	if err != nil {
 		return nil, err
 	}
@@ -84,33 +100,54 @@ func (db *DB) Stats() map[string]string {
 type BatchDB struct { // FIXME fix this poor impl
 	db       *DB
 	commands []command
+	closed   bool
 }
 
-func (db *BatchDB) Close() {}
+func (db *BatchDB) Close() {
+	db.closed = true
+}
 
 func (db *BatchDB) Write() error {
+	if db.closed {
+		panic("closed")
+	}
+
 	for _, cmd := range db.commands {
 		if err := cmd.Exec(db.db, false); err != nil {
 			return err
 		}
 	}
+	db.closed = true
 	return nil
 }
 
 func (db *BatchDB) WriteSync() error {
+	if db.closed {
+		panic("closed")
+	}
+
 	for _, cmd := range db.commands {
 		if err := cmd.Exec(db.db, true); err != nil {
 			return err
 		}
 	}
+	db.closed = true
 	return nil
 }
 
 func (db *BatchDB) Set(key, value []byte) {
+	if db.closed {
+		panic("closed")
+	}
+
 	db.commands = append(db.commands, setCommand{key: key, value: value})
 }
 
 func (db *BatchDB) Delete(key []byte) {
+	if db.closed {
+		panic("closed")
+	}
+
 	db.commands = append(db.commands, deleteCommand{key: key})
 }
 
@@ -168,7 +205,7 @@ func (iter *Iterator) Domain() ([]byte, []byte) {
 }
 
 func (iter *Iterator) Valid() bool {
-	return iter.qi.HasNext()
+	return iter.current != nil
 }
 
 func (iter *Iterator) Next() {
@@ -180,7 +217,11 @@ func (iter *Iterator) Next() {
 }
 
 func (iter *Iterator) Key() []byte {
-	return []byte(iter.current.Key)
+	bz, err := hex.DecodeString(iter.current.Key)
+	if err != nil {
+		panic(err)
+	}
+	return bz
 }
 
 func (iter *Iterator) Value() []byte {
@@ -199,7 +240,7 @@ func (iter *Iterator) Close() {
 
 func ReverseIterator(itr dbm.Iterator) dbm.Iterator {
 	var items []iterItem
-	for itr.Next(); itr.Valid(); itr.Next() {
+	for ; itr.Valid(); itr.Next() {
 		items = append(items, iterItem{key: itr.Key(), value: itr.Value()})
 	}
 	reverseAnySlice(items)
