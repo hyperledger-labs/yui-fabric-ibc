@@ -9,6 +9,7 @@ type (
 	Header          = types.Header
 	ConsensusState  = types.ConsensusState
 	MsgCreateClient = types.MsgCreateClient
+	MsgUpdateClient = types.MsgUpdateClient
 	Proof           = types.Proof
 )
 
