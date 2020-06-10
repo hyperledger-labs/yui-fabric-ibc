@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
@@ -115,12 +116,20 @@ func VerifyEndorsement(policyBytes []byte, proof Proof, path string, value []byt
 	return EnsureWriteSetIncludesCommitment(rwset.GetNsRwset(), proof.NSIndex, proof.WriteSetIndex, path, value)
 }
 
-func VerifyChaincodeHeader(h ChaincodeHeader) error {
-	// TODO implement
+func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
+	lastci := clientState.LastChaincodeInfo
+	lastch := clientState.LastChaincodeHeader
+	// FIXME set correct key
+	ok, err := VerifyEndorsement(lastci.PolicyBytes, lastch.Proof, fmt.Sprintf("/verify/header/%d", h.Sequence), h.GetEndorseBytes())
+	if err != nil {
+		return err
+	} else if !ok {
+		return errors.New("failed to verify endorsement")
+	}
 	return nil
 }
 
-func VerifyChaincodeInfo(info ChaincodeInfo) error {
+func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	// TODO implement
 	return nil
 }

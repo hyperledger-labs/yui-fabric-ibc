@@ -74,7 +74,7 @@ func checkValidity(
 			)
 		}
 
-		if err := types.VerifyChaincodeHeader(*header.ChaincodeHeader); err != nil {
+		if err := types.VerifyChaincodeHeader(clientState, *header.ChaincodeHeader); err != nil {
 			return sdkerrors.Wrap(
 				clienttypes.ErrInvalidHeader,
 				err.Error(),
@@ -90,7 +90,7 @@ func checkValidity(
 			)
 		}
 
-		if err := types.VerifyChaincodeInfo(*header.ChaincodeInfo); err != nil {
+		if err := types.VerifyChaincodeInfo(clientState, *header.ChaincodeInfo); err != nil {
 			return sdkerrors.Wrap(
 				clienttypes.ErrInvalidHeader,
 				err.Error(),

@@ -42,6 +42,14 @@ func NewChaincodeHeader(seq int64, timestamp time.Time, proof Proof) ChaincodeHe
 	}
 }
 
+func (h ChaincodeHeader) GetEndorseBytes() []byte {
+	h2 := ChaincodeHeader{
+		Sequence:  h.Sequence,
+		Timestamp: h.Timestamp,
+	}
+	return ModuleCdc.MustMarshalJSON(h2)
+}
+
 func (h ChaincodeHeader) ValidateBasic() error {
 	return nil
 }
@@ -50,7 +58,7 @@ type ChaincodeInfo struct {
 	ChannelID   string
 	ChaincodeID peer.ChaincodeID
 	PolicyBytes []byte
-	Signatures  [][]byte
+	Signatures  [][]byte // signatures are created by last endorsers
 }
 
 func NewChaincodeInfo(chanID string, ccID peer.ChaincodeID, policyBytes []byte, sigs [][]byte) ChaincodeInfo {
