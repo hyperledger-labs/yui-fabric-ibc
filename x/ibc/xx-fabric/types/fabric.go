@@ -118,8 +118,7 @@ func VerifyEndorsement(policyBytes []byte, proof Proof, path string, value []byt
 
 func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	lastci := clientState.LastChaincodeInfo
-	lastch := clientState.LastChaincodeHeader
-	ok, err := VerifyEndorsement(lastci.PolicyBytes, lastch.Proof, VerifyChaincodeHeaderPath(h.Sequence), h.GetEndorseBytes())
+	ok, err := VerifyEndorsement(lastci.PolicyBytes, h.Proof, VerifyChaincodeHeaderPath(h.Sequence), h.GetEndorseBytes())
 	if err != nil {
 		return err
 	} else if !ok {

@@ -187,7 +187,7 @@ func TestCreateClient(t *testing.T) {
 	{
 		/// Build Msg
 		var sigs [][]byte
-		var pcBytes []byte = makePolicy([]string{"org0"})
+		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabrictypes.Proof{})
 		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
@@ -209,7 +209,7 @@ func TestCreateClient(t *testing.T) {
 	{
 		/// Build Msg
 		var sigs [][]byte
-		var pcBytes []byte = makePolicy([]string{"org0"})
+		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabrictypes.Proof{})
 		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
@@ -226,6 +226,25 @@ func TestCreateClient(t *testing.T) {
 		require.NoError(err)
 		seq++
 	}
+}
+
+func makeSignedDataList(pr *fabric.Proof) []*protoutil.SignedData {
+	var sigSet []*protoutil.SignedData
+	for i := 0; i < len(pr.Signatures); i++ {
+		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
+		copy(msg[:len(pr.Proposal)], pr.Proposal)
+		copy(msg[len(pr.Proposal):], pr.Identities[i])
+
+		sigSet = append(
+			sigSet,
+			&protoutil.SignedData{
+				Data:      msg,
+				Identity:  pr.Identities[i],
+				Signature: pr.Signatures[i],
+			},
+		)
+	}
+	return sigSet
 }
 
 func makePolicy(mspids []string) []byte {
