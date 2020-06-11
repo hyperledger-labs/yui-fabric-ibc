@@ -10,19 +10,23 @@ import (
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	localhost "github.com/cosmos/cosmos-sdk/x/ibc/09-localhost/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/datachainlab/fabric-ibc/tests"
 	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
 	clientkeeper "github.com/datachainlab/fabric-ibc/x/ibc/02-client/keeper"
-	msppb "github.com/hyperledger/fabric-protos-go/msp"
-	tmtime "github.com/tendermint/tendermint/types/time"
-
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
+	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/policydsl"
+	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
+	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 type stakingKeeper struct {
@@ -155,7 +159,15 @@ func TestCodec(t *testing.T) {
 }
 
 func TestCreateClient(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
+
+	// setup the MSP manager so that we can sign/verify
+	require.NoError(msptesttools.LoadMSPSetupForTesting())
+	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
+	require.NoError(err)
+	lcMSP := mspmgmt.GetLocalMSP(cryptoProvider)
+	signer, err := lcMSP.GetDefaultSigningIdentity()
+	require.NoError(err)
 
 	/// Setup context
 	keys := sdk.NewKVStoreKeys(
@@ -170,40 +182,49 @@ func TestCreateClient(t *testing.T) {
 	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibc.StoreKey], sk)
 	/// END
 
+	var seq int64 = 1
 	// CreateClient
 	{
 		/// Build Msg
-		ch := fabric.NewChaincodeHeader(1, tmtime.Now(), fabric.Proof{})
 		var sigs [][]byte
-		var pcBytes []byte
+		var pcBytes []byte = makePolicy([]string{"org0"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabrictypes.Proof{})
+		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+		require.NoError(err)
+		ch.Proof = *proof
 
 		h := fabric.NewHeader(ch, ci)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgCreateClient(clientID, false, h, signer)
-		assert.NoError(msg.ValidateBasic())
+		require.NoError(msg.ValidateBasic())
 		/// END
 
-		_, err := client.HandleMsgCreateClient(ctx, clientKeeper, msg)
-		assert.NoError(err)
+		_, err = client.HandleMsgCreateClient(ctx, clientKeeper, msg)
+		require.NoError(err)
+		seq++
 	}
 
 	// UpdateClient
 	{
 		/// Build Msg
-		ch := fabric.NewChaincodeHeader(2, tmtime.Now(), fabric.Proof{})
 		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"org0"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabrictypes.Proof{})
+		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+		require.NoError(err)
+		ch.Proof = *proof
 
 		h := fabric.NewHeader(ch, ci)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgUpdateClient(clientID, h, signer)
-		assert.NoError(msg.ValidateBasic())
+		require.NoError(msg.ValidateBasic())
 		/// END
 
-		_, err := client.HandleMsgUpdateClient(ctx, clientKeeper, msg)
-		assert.NoError(err)
+		_, err = client.HandleMsgUpdateClient(ctx, clientKeeper, msg)
+		require.NoError(err)
+		seq++
 	}
 }
 
