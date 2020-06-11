@@ -8,6 +8,8 @@ type (
 	ClientState     = types.ClientState
 	Header          = types.Header
 	ConsensusState  = types.ConsensusState
+	ChaincodeHeader = types.ChaincodeHeader
+	ChaincodeInfo   = types.ChaincodeInfo
 	MsgCreateClient = types.MsgCreateClient
 	MsgUpdateClient = types.MsgUpdateClient
 	Proof           = types.Proof
@@ -23,6 +25,7 @@ var (
 	NewClientState     = types.NewClientState
 	RegisterCodec      = types.RegisterCodec
 
-	Fabric           = types.Fabric
-	ClientTypeFabric = types.ClientTypeFabric
+	Fabric                    = types.Fabric
+	ClientTypeFabric          = types.ClientTypeFabric
+	VerifyChaincodeHeaderPath = types.VerifyChaincodeHeaderPath
 )
