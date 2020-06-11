@@ -180,7 +180,7 @@ func TestCreateClient(t *testing.T) {
 
 		h := fabric.NewHeader(ch, ci)
 		signer := sdk.AccAddress("signer0")
-		msg := fabric.NewMsgCreateClient(clientID, h, signer)
+		msg := fabric.NewMsgCreateClient(clientID, false, h, signer)
 		assert.NoError(msg.ValidateBasic())
 		/// END
 
