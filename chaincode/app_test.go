@@ -9,15 +9,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	"github.com/datachainlab/fabric-ibc/tests"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/policydsl"
+	"github.com/hyperledger/fabric/msp"
+	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
+	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/log"
@@ -26,8 +31,15 @@ import (
 )
 
 func TestApp(t *testing.T) {
-	t.SkipNow()
-	assert := assert.New(t)
+	require := require.New(t)
+
+	// setup the MSP manager so that we can sign/verify
+	require.NoError(msptesttools.LoadMSPSetupForTesting())
+	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
+	require.NoError(err)
+	lcMSP := mspmgmt.GetLocalMSP(cryptoProvider)
+	endorser, err := lcMSP.GetDefaultSigningIdentity()
+	require.NoError(err)
 
 	cdc, _ := MakeCodecs()
 	logger := log.NewTMLogger(os.Stdout)
@@ -37,24 +49,24 @@ func TestApp(t *testing.T) {
 	stub := compat.MakeFakeStub()
 
 	prv := secp256k1.GenPrivKey()
-	mb := NewMsgBuilder(prv)
+	mb := NewMsgBuilder(prv, endorser)
 
 	{
-		msg, err := mb.makeMsgCreateClient()
-		assert.NoError(err)
-		assert.NoError(runner.RunMsg(stub, string(makeStdTxBytes(cdc, prv, msg))))
+		msg, err := mb.makeMsgCreateClient(1)
+		require.NoError(err)
+		require.NoError(runner.RunMsg(stub, string(makeStdTxBytes(cdc, prv, msg))))
 	}
 
 	{
-		msg, err := mb.makeMsgUpdateClient()
-		assert.NoError(err)
-		assert.NoError(runner.RunMsg(stub, string(makeStdTxBytes(cdc, prv, msg))))
+		msg, err := mb.makeMsgUpdateClient(2)
+		require.NoError(err)
+		require.NoError(runner.RunMsg(stub, string(makeStdTxBytes(cdc, prv, msg))))
 	}
 
 	{
 		msg, err := mb.makeMsgConnectionOpenInit()
-		assert.NoError(err)
-		assert.NoError(runner.RunMsg(stub, string(makeStdTxBytes(cdc, prv, msg))))
+		require.NoError(err)
+		require.NoError(runner.RunMsg(stub, string(makeStdTxBytes(cdc, prv, msg))))
 	}
 
 	// TODO add tests for other handshake step
@@ -62,14 +74,16 @@ func TestApp(t *testing.T) {
 }
 
 type MsgBuilder struct {
-	signer sdk.AccAddress
+	signer   sdk.AccAddress
+	endorser msp.SigningIdentity
 }
 
-func NewMsgBuilder(prv crypto.PrivKey) MsgBuilder {
+func NewMsgBuilder(prv crypto.PrivKey, endorser msp.SigningIdentity) MsgBuilder {
 	addr := prv.PubKey().Address()
 	signer := sdk.AccAddress(addr)
 	return MsgBuilder{
-		signer: signer,
+		signer:   signer,
+		endorser: endorser,
 	}
 }
 
@@ -97,12 +111,16 @@ func makePolicy(mspids []string) []byte {
 	})
 }
 
-func (b MsgBuilder) makeMsgCreateClient() (*fabric.MsgCreateClient, error) {
-	ch := fabric.NewChaincodeHeader(1, tmtime.Now(), fabric.Proof{})
+func (b MsgBuilder) makeMsgCreateClient(seq int64) (*fabric.MsgCreateClient, error) {
 	var sigs [][]byte
-	var pcBytes []byte
+	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-
+	ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabric.Proof{})
+	proof, err := tests.MakeProof(b.endorser, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+	if err != nil {
+		return nil, err
+	}
+	ch.Proof = *proof
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgCreateClient(clientID0, false, h, b.signer)
 	if err := msg.ValidateBasic(); err != nil {
@@ -111,12 +129,16 @@ func (b MsgBuilder) makeMsgCreateClient() (*fabric.MsgCreateClient, error) {
 	return &msg, nil
 }
 
-func (b MsgBuilder) makeMsgUpdateClient() (*fabric.MsgUpdateClient, error) {
-	ch := fabric.NewChaincodeHeader(2, tmtime.Now(), fabric.Proof{})
+func (b MsgBuilder) makeMsgUpdateClient(seq int64) (*fabric.MsgUpdateClient, error) {
 	var sigs [][]byte
-	var pcBytes []byte = makePolicy([]string{"Org1"})
+	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-
+	ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabric.Proof{})
+	proof, err := tests.MakeProof(b.endorser, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+	if err != nil {
+		return nil, err
+	}
+	ch.Proof = *proof
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgUpdateClient(clientID0, h, b.signer)
 	if err := msg.ValidateBasic(); err != nil {
