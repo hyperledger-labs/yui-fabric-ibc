@@ -14,20 +14,22 @@ var (
 
 // MsgCreateClient defines a message to create an IBC client
 type MsgCreateClient struct {
-	ClientID string         `json:"client_id" yaml:"client_id"`
-	Header   Header         `json:"header" yaml:"header"`
-	Signer   sdk.AccAddress `json:"address" yaml:"address"`
+	ClientID  string         `json:"client_id" yaml:"client_id"`
+	IsPrivate bool           `json:"is_private" yaml:"is_private"`
+	Header    Header         `json:"header" yaml:"header"`
+	Signer    sdk.AccAddress `json:"address" yaml:"address"`
 }
 
 // NewMsgCreateClient creates a new MsgCreateClient instance
 func NewMsgCreateClient(
-	id string, header Header, signer sdk.AccAddress,
+	id string, isPrivate bool, header Header, signer sdk.AccAddress,
 ) MsgCreateClient {
 
 	return MsgCreateClient{
-		ClientID: id,
-		Header:   header,
-		Signer:   signer,
+		ClientID:  id,
+		IsPrivate: isPrivate,
+		Header:    header,
+		Signer:    signer,
 	}
 }
 

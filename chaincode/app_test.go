@@ -103,7 +103,7 @@ func (b MsgBuilder) makeMsgCreateClient() (*fabric.MsgCreateClient, error) {
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
 
 	h := fabric.NewHeader(ch, ci)
-	msg := fabric.NewMsgCreateClient(clientID0, h, b.signer)
+	msg := fabric.NewMsgCreateClient(clientID0, false, h, b.signer)
 	if err := msg.ValidateBasic(); err != nil {
 		panic(err)
 	}
