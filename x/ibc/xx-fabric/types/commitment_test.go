@@ -15,79 +15,30 @@ import (
 	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
 	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
-func TestMSPSetup(t *testing.T) {
-	assert := assert.New(t)
+func TestCommitment(t *testing.T) {
+	require := require.New(t)
 
 	// setup the MSP manager so that we can sign/verify
 	err := msptesttools.LoadMSPSetupForTesting()
-	if err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(err)
 	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
-	if err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(err)
 	lcMSP := mspmgmt.GetLocalMSP(cryptoProvider)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
-	if err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(err)
 
 	mm := mspmgmt.NewDeserializersManager(cryptoProvider).GetLocalDeserializer()
 
-	pr := &Proof{}
-	{
-		result := &rwset.TxReadWriteSet{
-			DataModel: rwset.TxReadWriteSet_KV,
-			NsRwset: []*rwset.NsReadWriteSet{
-				{
-					Namespace: "lscc",
-					Rwset: MarshalOrPanic(&kvrwset.KVRWSet{
-						Writes: []*kvrwset.KVWrite{
-							{
-								Key:   "commitment/{channel}/{port}/{seq}",
-								Value: []byte("true"),
-							},
-						},
-					}),
-				},
-			},
-		}
-		bz, err := proto.Marshal(result)
-		if err != nil {
-			assert.FailNow(err.Error())
-		}
-		res, err := makeProposalResponse(signer, bz)
-		if err != nil {
-			assert.FailNow(err.Error())
-		}
-
-		pr.Signatures = append(
-			pr.Signatures,
-			res.Endorsement.Signature,
-		)
-		pr.Identities = append(
-			pr.Identities,
-			res.Endorsement.Endorser,
-		)
-		pr.Proposal = res.Payload
-		pr.NSIndex = 0
-		pr.WriteSetIndex = 0
-	}
-
-	if err := pr.ValidateBasic(); err != nil {
-		assert.FailNow(err.Error())
-	}
+	pr, err := makeProof(signer)
+	require.NoError(err)
 
 	var mspids []string
 	mspid, err := lcMSP.GetIdentifier()
-	if err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(err)
 	mspids = append(
 		mspids,
 		mspid,
@@ -95,9 +46,7 @@ func TestMSPSetup(t *testing.T) {
 	clientState := makeClientState(mspids)
 
 	var p pb.ApplicationPolicy
-	if err := proto.Unmarshal(clientState.LastChaincodeInfo.PolicyBytes, &p); err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(proto.Unmarshal(clientState.LastChaincodeInfo.PolicyBytes, &p))
 	ap := p.Type.(*pb.ApplicationPolicy_SignaturePolicy)
 
 	var sigSet []*protoutil.SignedData
@@ -118,32 +67,23 @@ func TestMSPSetup(t *testing.T) {
 
 	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mm}
 	policy, err := pp.NewPolicy(ap.SignaturePolicy)
-	if err != nil {
-		assert.FailNow(err.Error())
-	}
-	if err := policy.EvaluateSignedData(sigSet); err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(err)
+	require.NoError(policy.EvaluateSignedData(sigSet))
 
 	// TODO unmarshal and validate each fields: ChannelID, ChaincodeID, Namespace
 	var payload pb.ProposalResponsePayload
-	if err := proto.Unmarshal(pr.Proposal, &payload); err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(proto.Unmarshal(pr.Proposal, &payload))
+
 	var cact pb.ChaincodeAction
-	if err := proto.Unmarshal(payload.Extension, &cact); err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(proto.Unmarshal(payload.Extension, &cact))
+
 	var result rwset.TxReadWriteSet
-	if err := proto.Unmarshal(cact.Results, &result); err != nil {
-		assert.FailNow(err.Error())
-	}
+	require.NoError(proto.Unmarshal(cact.Results, &result))
+
 	targetKey := "commitment/{channel}/{port}/{seq}"
 	ok, err := EnsureWriteSetIncludesCommitment(result.GetNsRwset(), pr.NSIndex, pr.WriteSetIndex, targetKey, []byte("true"))
-	if err != nil {
-		assert.FailNow(err.Error())
-	}
-	assert.True(ok)
+	require.NoError(err)
+	require.True(ok)
 }
 
 func makeClientState(mspids []string) ClientState {
@@ -207,6 +147,50 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 		signer,
 	)
 	return res, err
+}
+
+func makeProof(signer protoutil.Signer) (*Proof, error) {
+	pr := &Proof{}
+	result := &rwset.TxReadWriteSet{
+		DataModel: rwset.TxReadWriteSet_KV,
+		NsRwset: []*rwset.NsReadWriteSet{
+			{
+				Namespace: "lscc",
+				Rwset: MarshalOrPanic(&kvrwset.KVRWSet{
+					Writes: []*kvrwset.KVWrite{
+						{
+							Key:   "commitment/{channel}/{port}/{seq}",
+							Value: []byte("true"),
+						},
+					},
+				}),
+			},
+		},
+	}
+	bz, err := proto.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	res, err := makeProposalResponse(signer, bz)
+	if err != nil {
+		return nil, err
+	}
+
+	pr.Signatures = append(
+		pr.Signatures,
+		res.Endorsement.Signature,
+	)
+	pr.Identities = append(
+		pr.Identities,
+		res.Endorsement.Endorser,
+	)
+	pr.Proposal = res.Payload
+	pr.NSIndex = 0
+	pr.WriteSetIndex = 0
+	if err := pr.ValidateBasic(); err != nil {
+		return nil, err
+	}
+	return pr, nil
 }
 
 func MarshalOrPanic(msg proto.Message) []byte {
