@@ -17,6 +17,7 @@ import (
 	commitmentexported "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
+	"github.com/datachainlab/fabric-ibc/commitment"
 )
 
 const (
@@ -239,12 +240,8 @@ func (cs ClientState) VerifyPacketCommitment(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketCommitmentPath(portID, channelID, sequence))
-	if err != nil {
-		return err
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), commitmentBytes); err != nil {
+	key := commitment.MakePacketCommitmentEntryKey(prefix, portID, channelID, sequence)
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -375,9 +372,14 @@ func sanitizeVerificationArgs(
 		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidPrefix, "prefix cannot be empty")
 	}
 
-	_, ok := prefix.(*Prefix)
+	// FIXME comment out this
+	// _, ok := prefix.(*Prefix)
+	// if !ok {
+	// 	return Proof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *Prefix", prefix)
+	// }
+	_, ok := prefix.(*commitmenttypes.MerklePrefix)
 	if !ok {
-		return Proof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *Prefix", prefix)
+		return Proof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *MerklePrefix", prefix)
 	}
 
 	if proofBytes == nil {

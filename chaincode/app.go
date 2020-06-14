@@ -63,6 +63,30 @@ func NewAppRunner(logger log.Logger, dbProvider DBProvider) AppRunner {
 // FIXME load this value from store
 var height int64 = 1
 
+// TODO refactoring this func and RunMsg
+func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error) error {
+	db := r.dbProvider(stub)
+	app, err := NewApp(r.logger, db, r.traceStore, true, bam.SetPruning(storetypes.PruneEverything))
+	if err != nil {
+		return err
+	}
+	if height == 1 {
+		_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
+		_ = app.Commit()
+		height++
+		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
+	} else {
+		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
+	}
+	if err := f(app); err != nil {
+		return err
+	}
+	app.EndBlock(abci.RequestEndBlock{Height: height})
+	_ = app.Commit()
+	height++
+	return nil
+}
+
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) error {
 	// FIXME can we reuse single instance instead of making new app per request?
 	db := r.dbProvider(stub)
