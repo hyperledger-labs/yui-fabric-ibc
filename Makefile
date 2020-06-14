@@ -3,3 +3,13 @@ build:
 
 test:
 	go test ./...
+
+###############################################################################
+###                                Protobuf                                 ###
+###############################################################################
+
+proto-gen:
+	@./scripts/protocgen.sh
+
+proto-update-deps:
+	# Copy from https://github.com/cosmos/cosmos-sdk/blob/65ea305336c0da689ecf5f8c864d0f2e0370c71e/Makefile#L291

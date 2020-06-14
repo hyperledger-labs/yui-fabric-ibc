@@ -18,7 +18,6 @@ import (
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
-	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/policydsl"
 	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
@@ -98,7 +97,7 @@ const (
 	clientID  = "fabricclient"
 )
 
-var ccid = peer.ChaincodeID{
+var ccid = fabrictypes.ChaincodeID{
 	Name:    "dummyCC",
 	Version: "dummyVer",
 }
@@ -189,14 +188,14 @@ func TestCreateClient(t *testing.T) {
 		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
-		ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabrictypes.Proof{})
+		ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabrictypes.Proof{})
 		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
 		h := fabric.NewHeader(ch, ci)
 		signer := sdk.AccAddress("signer0")
-		msg := fabric.NewMsgCreateClient(clientID, false, h, signer)
+		msg := fabric.NewMsgCreateClient(clientID, h, signer)
 		require.NoError(msg.ValidateBasic())
 		/// END
 
@@ -211,7 +210,7 @@ func TestCreateClient(t *testing.T) {
 		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
-		ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabrictypes.Proof{})
+		ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabrictypes.Proof{})
 		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
 		require.NoError(err)
 		ch.Proof = *proof

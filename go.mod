@@ -4,8 +4,9 @@ go 1.14
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
-	github.com/cosmos/cosmos-sdk v0.34.4-0.20200602042613-1f5626b80036
+	github.com/cosmos/cosmos-sdk v0.34.4-0.20200611221925-9048ffa8d351
 	github.com/fsouza/go-dockerclient v1.6.5 // indirect
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/hyperledger/fabric v1.4.0-rc1.0.20200416031218-eff2f9306191
@@ -18,11 +19,13 @@ require (
 	github.com/k0kubun/pp v3.0.1+incompatible
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.0
-	github.com/stretchr/testify v1.6.0
+	github.com/stretchr/testify v1.6.1
 	github.com/sykesm/zap-logfmt v0.0.3 // indirect
 	github.com/tedsuo/ifrit v0.0.0-20191009134036-9a97d0632f00 // indirect
 	github.com/tendermint/tendermint v0.33.5
 	github.com/tendermint/tm-db v0.5.1
 	github.com/willf/bitset v1.1.10 // indirect
-	google.golang.org/grpc v1.29.1 // indirect
+	google.golang.org/grpc v1.29.1
 )
+
+replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.2-alpha.regen.4

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -78,7 +77,7 @@ func (cs ClientState) IsFrozen() bool {
 }
 
 // GetLatestTimestamp returns latest block time.
-func (cs ClientState) GetLatestTimestamp() time.Time {
+func (cs ClientState) GetLatestTimestamp() uint64 {
 	return cs.LastChaincodeHeader.Timestamp
 }
 
@@ -96,16 +95,22 @@ func (cs ClientState) Validate() error {
 // VerifyClientConsensusState verifies a proof of the consensus state of the
 // Solo Machine client stored on the target machine.
 func (cs ClientState) VerifyClientConsensusState(
-	store sdk.KVStore,
-	cdc *codec.Codec,
-	root commitmentexported.Root,
-	_ uint64,
+	_ sdk.KVStore,
+	cdc codec.Marshaler,
+	aminoCdc *codec.Codec,
+	provingRoot commitmentexported.Root,
+	height uint64,
 	counterpartyClientIdentifier string,
 	consensusHeight uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	consensusState clientexported.ConsensusState,
 ) error {
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
+	if err != nil {
+		return err
+	}
+
 	clientPrefixedPath := "clients/" + counterpartyClientIdentifier + "/" + host.ConsensusStatePath(consensusHeight)
 	path, err := commitmenttypes.ApplyPrefix(prefix, clientPrefixedPath)
 	if err != nil {
@@ -116,17 +121,12 @@ func (cs ClientState) VerifyClientConsensusState(
 		return clienttypes.ErrClientFrozen
 	}
 
-	bz, err := cdc.MarshalBinaryBare(consensusState)
+	bz, err := aminoCdc.MarshalBinaryBare(consensusState)
 	if err != nil {
 		return err
 	}
 
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -139,20 +139,21 @@ func (cs ClientState) VerifyClientConsensusState(
 func (cs ClientState) VerifyConnectionState(
 	store sdk.KVStore,
 	cdc codec.Marshaler,
-	_ uint64,
+	height uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	connectionID string,
 	connectionEnd connectionexported.ConnectionI,
-	_ clientexported.ConsensusState,
+	consensusState clientexported.ConsensusState,
 ) error {
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.ConnectionPath(connectionID))
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
 	if err != nil {
 		return err
 	}
 
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
+	path, err := commitmenttypes.ApplyPrefix(prefix, host.ConnectionPath(connectionID))
+	if err != nil {
+		return err
 	}
 
 	connection, ok := connectionEnd.(connectiontypes.ConnectionEnd)
@@ -165,12 +166,7 @@ func (cs ClientState) VerifyConnectionState(
 		return err
 	}
 
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -183,14 +179,19 @@ func (cs ClientState) VerifyConnectionState(
 func (cs ClientState) VerifyChannelState(
 	store sdk.KVStore,
 	cdc codec.Marshaler,
-	_ uint64,
+	height uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	portID,
 	channelID string,
 	channel channelexported.ChannelI,
 	consensusState clientexported.ConsensusState,
 ) error {
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
+	if err != nil {
+		return err
+	}
+
 	path, err := commitmenttypes.ApplyPrefix(prefix, host.ChannelPath(portID, channelID))
 	if err != nil {
 		return err
@@ -210,12 +211,7 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -228,29 +224,27 @@ func (cs ClientState) VerifyChannelState(
 // the specified port, specified channel, and specified sequence.
 func (cs ClientState) VerifyPacketCommitment(
 	store sdk.KVStore,
-	_ uint64,
+	cdc codec.Marshaler,
+	height uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	portID,
 	channelID string,
 	sequence uint64,
 	commitmentBytes []byte,
-	_ clientexported.ConsensusState,
+	consensusState clientexported.ConsensusState,
 ) error {
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
+	if err != nil {
+		return err
+	}
+
 	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketCommitmentPath(portID, channelID, sequence))
 	if err != nil {
 		return err
 	}
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
-	}
 
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), commitmentBytes); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), commitmentBytes); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -262,30 +256,28 @@ func (cs ClientState) VerifyPacketCommitment(
 // acknowledgement at the specified port, specified channel, and specified sequence.
 func (cs ClientState) VerifyPacketAcknowledgement(
 	store sdk.KVStore,
-	_ uint64,
+	cdc codec.Marshaler,
+	height uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	portID,
 	channelID string,
 	sequence uint64,
 	acknowledgement []byte,
-	_ clientexported.ConsensusState,
+	consensusState clientexported.ConsensusState,
 ) error {
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
+	if err != nil {
+		return err
+	}
+
 	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketAcknowledgementPath(portID, channelID, sequence))
 	if err != nil {
 		return err
 	}
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
-	}
-
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
 
 	bz := channeltypes.CommitAcknowledgement(acknowledgement)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -298,26 +290,26 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 // specified sequence.
 func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 	store sdk.KVStore,
-	_ uint64,
+	cdc codec.Marshaler,
+	height uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	portID,
 	channelID string,
 	sequence uint64,
-	_ clientexported.ConsensusState,
+	consensusState clientexported.ConsensusState,
 ) error {
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
+	if err != nil {
+		return err
+	}
+
 	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketAcknowledgementPath(portID, channelID, sequence))
 	if err != nil {
 		return err
 	}
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
-	}
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), nil); err != nil {
+
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), nil); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -329,31 +321,81 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 // received of the specified channel at the specified port.
 func (cs ClientState) VerifyNextSequenceRecv(
 	store sdk.KVStore,
-	_ uint64,
+	cdc codec.Marshaler,
+	height uint64,
 	prefix commitmentexported.Prefix,
-	proof commitmentexported.Proof,
+	proof []byte,
 	portID,
 	channelID string,
 	nextSequenceRecv uint64,
-	_ clientexported.ConsensusState,
+	consensusState clientexported.ConsensusState,
 ) error {
+	fabProof, err := sanitizeVerificationArgs(cdc, cs, height, prefix, proof, consensusState)
+	if err != nil {
+		return err
+	}
+
 	path, err := commitmenttypes.ApplyPrefix(prefix, host.NextSequenceRecvPath(portID, channelID))
 	if err != nil {
 		return err
 	}
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
-	}
-	fabProof, ok := proof.(Proof)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "proof type %T is not type SignatureProof", proof)
-	}
 
 	bz := sdk.Uint64ToBigEndian(nextSequenceRecv)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.PolicyBytes, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
 	}
 	return nil
+}
+
+// sanitizeVerificationArgs perfoms the basic checks on the arguments that are
+// shared between the verification functions and returns the unmarshalled
+// merkle proof and an error if one occurred.
+func sanitizeVerificationArgs(
+	cdc codec.Marshaler,
+	cs ClientState,
+	height uint64,
+	prefix commitmentexported.Prefix,
+	proofBytes []byte,
+	consensusState clientexported.ConsensusState,
+) (proof Proof, err error) {
+	if cs.GetLatestHeight() < height {
+		return Proof{}, sdkerrors.Wrapf(
+			sdkerrors.ErrInvalidHeight,
+			"client state (%s) height < proof height (%d < %d)", cs.ID, cs.GetLatestHeight(), height,
+		)
+	}
+
+	if cs.IsFrozen() {
+		return Proof{}, clienttypes.ErrClientFrozen
+	}
+
+	if prefix == nil {
+		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidPrefix, "prefix cannot be empty")
+	}
+
+	_, ok := prefix.(*Prefix)
+	if !ok {
+		return Proof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *Prefix", prefix)
+	}
+
+	if proofBytes == nil {
+		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "proof cannot be empty")
+	}
+
+	if err = cdc.UnmarshalBinaryBare(proofBytes, &proof); err != nil {
+		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "failed to unmarshal proof into commitment merkle proof")
+	}
+
+	if consensusState == nil {
+		return Proof{}, sdkerrors.Wrap(clienttypes.ErrInvalidConsensus, "consensus state cannot be empty")
+	}
+
+	_, ok = consensusState.(ConsensusState)
+	if !ok {
+		return Proof{}, sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "invalid consensus type %T, expected %T", consensusState, ConsensusState{})
+	}
+
+	return proof, nil
 }

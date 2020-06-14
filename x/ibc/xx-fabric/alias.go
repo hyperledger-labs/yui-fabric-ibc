@@ -13,6 +13,7 @@ type (
 	MsgCreateClient = types.MsgCreateClient
 	MsgUpdateClient = types.MsgUpdateClient
 	Proof           = types.Proof
+	ChaincodeID     = types.ChaincodeID
 )
 
 var (

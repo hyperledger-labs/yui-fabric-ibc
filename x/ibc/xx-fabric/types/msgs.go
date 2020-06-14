@@ -20,16 +20,23 @@ type MsgCreateClient struct {
 	Signer    sdk.AccAddress `json:"address" yaml:"address"`
 }
 
+// this is a constant to satisfy the linter
+const TODO = "TODO"
+
+// dummy implementation of proto.Message
+func (msg MsgCreateClient) Reset()         {}
+func (msg MsgCreateClient) String() string { return TODO }
+func (msg MsgCreateClient) ProtoMessage()  {}
+
 // NewMsgCreateClient creates a new MsgCreateClient instance
 func NewMsgCreateClient(
-	id string, isPrivate bool, header Header, signer sdk.AccAddress,
+	id string, header Header, signer sdk.AccAddress,
 ) MsgCreateClient {
 
 	return MsgCreateClient{
-		ClientID:  id,
-		IsPrivate: isPrivate,
-		Header:    header,
-		Signer:    signer,
+		ClientID: id,
+		Header:   header,
+		Signer:   signer,
 	}
 }
 
@@ -84,6 +91,11 @@ type MsgUpdateClient struct {
 	Header   Header         `json:"header" yaml:"header"`
 	Signer   sdk.AccAddress `json:"address" yaml:"address"`
 }
+
+// dummy implementation of proto.Message
+func (msg MsgUpdateClient) Reset()         {}
+func (msg MsgUpdateClient) String() string { return TODO }
+func (msg MsgUpdateClient) ProtoMessage()  {}
 
 // NewMsgUpdateClient creates a new MsgUpdateClient instance
 func NewMsgUpdateClient(id string, header Header, signer sdk.AccAddress) MsgUpdateClient {
