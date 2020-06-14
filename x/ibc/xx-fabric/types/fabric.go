@@ -113,12 +113,12 @@ func VerifyEndorsement(policyBytes []byte, proof Proof, path string, value []byt
 		return false, err
 	}
 
-	return EnsureWriteSetIncludesCommitment(rwset.GetNsRwset(), proof.NSIndex, proof.WriteSetIndex, path, value)
+	return EnsureWriteSetIncludesCommitment(rwset.GetNsRwset(), proof.NsIndex, proof.WriteSetIndex, path, value)
 }
 
 func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	lastci := clientState.LastChaincodeInfo
-	ok, err := VerifyEndorsement(lastci.PolicyBytes, h.Proof, VerifyChaincodeHeaderPath(h.Sequence), h.GetEndorseBytes())
+	ok, err := VerifyEndorsement(lastci.EndorsementPolicy, h.Proof, VerifyChaincodeHeaderPath(h.Sequence), h.GetEndorseBytes())
 	if err != nil {
 		return err
 	} else if !ok {

@@ -12,10 +12,10 @@ import (
 	"github.com/datachainlab/fabric-ibc/tests"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
+	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
-	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/policydsl"
 	"github.com/hyperledger/fabric/msp"
@@ -98,7 +98,7 @@ const (
 	fabchannelID = "dummyChannel"
 )
 
-var ccid = peer.ChaincodeID{
+var ccid = fabrictypes.ChaincodeID{
 	Name:    "dummyCC",
 	Version: "dummyVer",
 }
@@ -115,14 +115,14 @@ func (b MsgBuilder) makeMsgCreateClient(seq int64) (*fabric.MsgCreateClient, err
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-	ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabric.Proof{})
+	ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabric.Proof{})
 	proof, err := tests.MakeProof(b.endorser, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
 	if err != nil {
 		return nil, err
 	}
 	ch.Proof = *proof
 	h := fabric.NewHeader(ch, ci)
-	msg := fabric.NewMsgCreateClient(clientID0, false, h, b.signer)
+	msg := fabric.NewMsgCreateClient(clientID0, h, b.signer)
 	if err := msg.ValidateBasic(); err != nil {
 		panic(err)
 	}
@@ -133,7 +133,7 @@ func (b MsgBuilder) makeMsgUpdateClient(seq int64) (*fabric.MsgUpdateClient, err
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-	ch := fabric.NewChaincodeHeader(seq, tmtime.Now(), fabric.Proof{})
+	ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabric.Proof{})
 	proof, err := tests.MakeProof(b.endorser, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (b MsgBuilder) makeMsgConnectionOpenInit() (*connection.MsgConnectionOpenIn
 	if err := msg.ValidateBasic(); err != nil {
 		return nil, err
 	}
-	return &msg, nil
+	return msg, nil
 }
 
 func makeStdTxBytes(cdc *std.Codec, prv crypto.PrivKey, msgs ...sdk.Msg) []byte {

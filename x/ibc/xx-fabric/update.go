@@ -59,11 +59,11 @@ func checkValidity(
 
 	if header.ChaincodeHeader != nil {
 		// assert header timestamp is past latest clientstate timestamp
-		if header.ChaincodeHeader.Timestamp.UnixNano() <= clientState.GetLatestTimestamp().UnixNano() {
+		if header.ChaincodeHeader.Timestamp <= clientState.GetLatestTimestamp() {
 			return sdkerrors.Wrapf(
 				clienttypes.ErrInvalidHeader,
-				"header blocktime ≤ latest client state block time (%s ≤ %s)",
-				header.ChaincodeHeader.Timestamp.String(), clientState.GetLatestTimestamp().String(),
+				"header blocktime ≤ latest client state block time (%v ≤ %v)",
+				header.ChaincodeHeader.Timestamp, clientState.GetLatestTimestamp(),
 			)
 		}
 
@@ -83,10 +83,10 @@ func checkValidity(
 	}
 
 	if header.ChaincodeInfo != nil {
-		if len(header.ChaincodeInfo.PolicyBytes) == 0 {
+		if len(header.ChaincodeInfo.EndorsementPolicy) == 0 {
 			return sdkerrors.Wrapf(
 				clienttypes.ErrInvalidHeader,
-				"ChaincodeInfo.PolicyBytes must be non-empty value",
+				"ChaincodeInfo.EndorsementPolicy must be non-empty value",
 			)
 		}
 

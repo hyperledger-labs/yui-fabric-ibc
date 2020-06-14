@@ -7,22 +7,22 @@ import (
 )
 
 const (
-	TypeFabric exported.Type = 100 // dummy
+	CommitmentTypeFabric exported.Type = 100 // dummy
 )
 
 var _ exported.Proof = Proof{}
 
-type Proof struct {
-	Proposal      []byte
-	NSIndex       uint32
-	WriteSetIndex uint32
-	Identities    [][]byte
-	Signatures    [][]byte // signatures of endorsers. This order must be equals consensState.endorsers order.
-}
+// type Proof struct {
+// 	Proposal      []byte
+// 	NSIndex       uint32
+// 	WriteSetIndex uint32
+// 	Identities    [][]byte
+// 	Signatures    [][]byte // signatures of endorsers. This order must be equals consensState.endorsers order.
+// }
 
 // GetCommitmentType implements ProofI.
 func (Proof) GetCommitmentType() exported.Type {
-	return TypeFabric
+	return CommitmentTypeFabric
 }
 
 // VerifyMembership implements ProofI.
@@ -36,7 +36,7 @@ func (Proof) VerifyNonMembership(exported.Root, exported.Path) error {
 }
 
 // IsEmpty returns trie if the signature is emtpy.
-func (proof Proof) IsEmpty() bool {
+func (proof Proof) Empty() bool {
 	return len(proof.Signatures) == 0
 }
 
@@ -48,4 +48,32 @@ func (proof Proof) ValidateBasic() error {
 		return fmt.Errorf("mismatch length: %v != %v", a, b)
 	}
 	return nil
+}
+
+var _ exported.Prefix = (*Prefix)(nil)
+
+// type Prefix struct {
+// 	Value []byte
+// }
+
+// NewPrefix constructs new Prefix instance
+func NewPrefix(value []byte) Prefix {
+	return Prefix{
+		Value: value,
+	}
+}
+
+// GetCommitmentType implements Prefix interface
+func (Prefix) GetCommitmentType() exported.Type {
+	return CommitmentTypeFabric
+}
+
+// Bytes returns the key prefix bytes
+func (fp Prefix) Bytes() []byte {
+	return fp.Value
+}
+
+// Empty returns true if the prefix is empty
+func (fp Prefix) Empty() bool {
+	return len(fp.Bytes()) == 0
 }

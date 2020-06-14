@@ -46,7 +46,7 @@ func TestCommitment(t *testing.T) {
 	clientState := makeClientState(mspids)
 
 	var p pb.ApplicationPolicy
-	require.NoError(proto.Unmarshal(clientState.LastChaincodeInfo.PolicyBytes, &p))
+	require.NoError(proto.Unmarshal(clientState.LastChaincodeInfo.EndorsementPolicy, &p))
 	ap := p.Type.(*pb.ApplicationPolicy_SignaturePolicy)
 
 	var sigSet []*protoutil.SignedData
@@ -81,7 +81,7 @@ func TestCommitment(t *testing.T) {
 	require.NoError(proto.Unmarshal(cact.Results, &result))
 
 	targetKey := "commitment/{channel}/{port}/{seq}"
-	ok, err := EnsureWriteSetIncludesCommitment(result.GetNsRwset(), pr.NSIndex, pr.WriteSetIndex, targetKey, []byte("true"))
+	ok, err := EnsureWriteSetIncludesCommitment(result.GetNsRwset(), pr.NsIndex, pr.WriteSetIndex, targetKey, []byte("true"))
 	require.NoError(err)
 	require.True(ok)
 }
@@ -95,17 +95,17 @@ func makeClientState(mspids []string) ClientState {
 	cs := ClientState{
 		LastChaincodeHeader: ChaincodeHeader{
 			Sequence:  1,
-			Timestamp: tmtime.Now(),
+			Timestamp: uint64(tmtime.Now().UnixNano()),
 			Proof:     Proof{}, // TODO fix
 		},
 		LastChaincodeInfo: ChaincodeInfo{
-			ChannelID: "dummyChannel",
-			ChaincodeID: pb.ChaincodeID{
+			ChannelId: "dummyChannel",
+			ChaincodeId: ChaincodeID{
 				Name:    "dummyCC",
 				Version: "dummyVer",
 			},
-			PolicyBytes: policy,
-			Signatures:  nil, // TODO fix
+			EndorsementPolicy: policy,
+			Signatures:        nil, // TODO fix
 		},
 	}
 	return cs
@@ -185,7 +185,7 @@ func makeProof(signer protoutil.Signer) (*Proof, error) {
 		res.Endorsement.Endorser,
 	)
 	pr.Proposal = res.Payload
-	pr.NSIndex = 0
+	pr.NsIndex = 0
 	pr.WriteSetIndex = 0
 	if err := pr.ValidateBasic(); err != nil {
 		return nil, err

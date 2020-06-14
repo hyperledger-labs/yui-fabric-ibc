@@ -46,7 +46,7 @@ func MakeProof(signer protoutil.Signer, key string, value []byte) (*fabric.Proof
 		res.Endorsement.Endorser,
 	)
 	pr.Proposal = res.Payload
-	pr.NSIndex = 0
+	pr.NsIndex = 0
 	pr.WriteSetIndex = 0
 	if err := pr.ValidateBasic(); err != nil {
 		return nil, err

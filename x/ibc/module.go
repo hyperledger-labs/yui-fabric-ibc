@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/gogo/protobuf/grpc"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 
@@ -71,8 +72,8 @@ func (AppModuleBasic) GetTxCmd(clientCtx client.Context) *cobra.Command {
 }
 
 // GetQueryCmd returns no root query command for the ibc module.
-func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetQueryCmd(QuerierRoute, cdc)
+func (AppModuleBasic) GetQueryCmd(clientCtx client.Context) *cobra.Command {
+	return cli.GetQueryCmd(QuerierRoute, clientCtx.Codec)
 }
 
 // RegisterInterfaceTypes registers module concrete types into protobuf Any.
@@ -107,13 +108,8 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 }
 
 // Route returns the message routing key for the ibc module.
-func (AppModule) Route() string {
-	return RouterKey
-}
-
-// NewHandler returns an sdk.Handler for the ibc module.
-func (am AppModule) NewHandler() sdk.Handler {
-	return NewHandler(*am.keeper)
+func (am AppModule) Route() sdk.Route {
+	return sdk.NewRoute(RouterKey, NewHandler(*am.keeper))
 }
 
 // QuerierRoute returns the ibc module's querier route name.
@@ -125,6 +121,8 @@ func (AppModule) QuerierRoute() string {
 func (am AppModule) NewQuerierHandler() sdk.Querier {
 	return NewQuerier(*am.keeper)
 }
+
+func (am AppModule) RegisterQueryService(grpc.Server) {}
 
 // InitGenesis performs genesis initialization for the ibc module. It returns
 // no validator updates.
@@ -175,9 +173,8 @@ func (AppModule) RandomizedParams(_ *rand.Rand) []simtypes.ParamChange {
 }
 
 // RegisterStoreDecoder registers a decoder for ibc module's types
-func (am AppModule) RegisterStoreDecoder(_ sdk.StoreDecoderRegistry) {
-	// TODO: in a following PR
-	// sdr[StoreKey] = simulation.NewDecodeStore(am.cdc)
+func (am AppModule) RegisterStoreDecoder(sdr sdk.StoreDecoderRegistry) {
+	sdr[StoreKey] = simulation.NewDecodeStore(am.keeper.Codecs())
 }
 
 // WeightedOperations returns the all the ibc module operations with their respective weights.
