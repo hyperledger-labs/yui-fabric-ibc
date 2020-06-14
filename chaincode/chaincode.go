@@ -33,6 +33,7 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 		if err != nil {
 			return err
 		}
+		// TODO also put timestamp and sequence entry?
 		return ctx.GetStub().PutState(entry.Key, entry.Value)
 	})
 }

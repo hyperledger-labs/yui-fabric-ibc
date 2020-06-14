@@ -15,6 +15,12 @@ type Entry struct {
 	Value []byte
 }
 
+func MakeEntryKey(prefix commitmentexported.Prefix, key string) string {
+	return fmt.Sprintf("e/k:%v/%v", string(prefix.Bytes()), key)
+}
+
+/// PacketCommitment
+
 func MakePacketCommitmentEntry(
 	ctx sdk.Context,
 	channelKeeper channel.Keeper,
@@ -37,9 +43,59 @@ func MakePacketCommitmentEntryKey(
 	portID, channelID string, sequence uint64,
 ) string {
 	key := host.PacketCommitmentPath(portID, channelID, sequence)
-	return MakeEntryKey(key, prefix)
+	return MakeEntryKey(prefix, key)
 }
 
-func MakeEntryKey(key string, prefix commitmentexported.Prefix) string {
-	return fmt.Sprintf("e/k:%v/%v", string(prefix.Bytes()), key)
+/// PacketAcknowledgement
+
+func MakePacketAcknowledgementEntry(
+	ctx sdk.Context,
+	channelKeeper channel.Keeper,
+	prefix commitmentexported.Prefix,
+	portID, channelID string, sequence uint64) (*Entry, error) {
+
+	ackbz, ok := channelKeeper.GetPacketAcknowledgement(ctx, portID, channelID, sequence)
+	if !ok {
+		return nil, errors.New("acknowledgement packet not found")
+	}
+	key := MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
+	return &Entry{
+		Key:   key,
+		Value: ackbz,
+	}, nil
+}
+
+func MakePacketAcknowledgementEntryKey(
+	prefix commitmentexported.Prefix,
+	portID, channelID string, sequence uint64,
+) string {
+	key := host.PacketAcknowledgementPath(portID, channelID, sequence)
+	return MakeEntryKey(prefix, key)
+}
+
+/// PacketAcknowledgementAbsence
+
+func MakePacketAcknowledgementAbsenceEntry(
+	ctx sdk.Context,
+	channelKeeper channel.Keeper,
+	prefix commitmentexported.Prefix,
+	portID, channelID string, sequence uint64) (*Entry, error) {
+
+	_, ok := channelKeeper.GetPacketAcknowledgement(ctx, portID, channelID, sequence)
+	if ok {
+		return nil, errors.New("acknowledgement packet found")
+	}
+	key := MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
+	return &Entry{
+		Key:   key,
+		Value: []byte{},
+	}, nil
+}
+
+func MakePacketAcknowledgementAbsenceEntryKey(
+	prefix commitmentexported.Prefix,
+	portID, channelID string, sequence uint64,
+) string {
+	key := host.PacketAcknowledgementPath(portID, channelID, sequence)
+	return MakeEntryKey(prefix, key)
 }
