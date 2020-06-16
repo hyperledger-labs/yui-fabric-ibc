@@ -59,7 +59,7 @@ func (cs ClientState) GetID() string {
 
 // GetChainID returns an empty string
 func (cs ClientState) GetChainID() string {
-	return cs.LastChaincodeInfo.ChainID()
+	return cs.LastChaincodeInfo.GetChainID()
 }
 
 // ClientType is localhost.
@@ -127,7 +127,7 @@ func (cs ClientState) VerifyClientConsensusState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -167,7 +167,7 @@ func (cs ClientState) VerifyConnectionState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -212,7 +212,7 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -241,7 +241,7 @@ func (cs ClientState) VerifyPacketCommitment(
 	}
 
 	key := commitment.MakePacketCommitmentEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -274,7 +274,7 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 	}
 
 	bz := channeltypes.CommitAcknowledgement(acknowledgement)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -306,7 +306,7 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), nil); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), nil); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -338,7 +338,7 @@ func (cs ClientState) VerifyNextSequenceRecv(
 	}
 
 	bz := sdk.Uint64ToBigEndian(nextSequenceRecv)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
