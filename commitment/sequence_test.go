@@ -1,0 +1,73 @@
+package commitment
+
+import (
+	"testing"
+	"time"
+
+	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	"github.com/datachainlab/fabric-ibc/x/compat"
+	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/stretchr/testify/require"
+	tmtime "github.com/tendermint/tendermint/types/time"
+)
+
+func TestSequence(t *testing.T) {
+	require := require.New(t)
+	clientTk := newTimeKeeper()
+	endorserTk := newTimeKeeper()
+
+	stub := compat.MakeFakeStub()
+	stub.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
+		return &timestamp.Timestamp{Seconds: clientTk.Now().Unix()}, nil
+	}
+
+	prefix := commitmenttypes.NewMerklePrefix([]byte("ibc"))
+
+	smgr := NewSequenceManager(DefaultConfig(), prefix)
+	smgr.clock = func() time.Time {
+		return endorserTk.Now()
+	}
+
+	// valid sequence 1
+	seq, err := smgr.InitSequence(stub)
+	require.NoError(err)
+	require.Equal(NewSequence(1, clientTk.Now().Unix()), *seq)
+
+	// valid sequence 2
+	require.NoError(smgr.UpdateSequence(stub))
+	seq, err = smgr.getCurrentSequence(stub)
+	require.NoError(err)
+	require.Equal(NewSequence(2, clientTk.Now().Unix()), *seq)
+
+	// invalid client timestamp(future)
+	clientTk.Add(time.Minute)
+	require.Error(smgr.UpdateSequence(stub))
+	clientTk.Add(-time.Minute) // rollback
+
+	// invalid client timestamp(past)
+	clientTk.Add(-time.Minute)
+	require.Error(smgr.UpdateSequence(stub))
+	clientTk.Add(time.Minute)
+
+	// valid sequence 3
+	require.NoError(smgr.UpdateSequence(stub))
+	seq, err = smgr.getCurrentSequence(stub)
+	require.NoError(err)
+	require.Equal(NewSequence(3, clientTk.Now().Unix()), *seq)
+}
+
+type timeKeeper struct {
+	tm time.Time
+}
+
+func newTimeKeeper() *timeKeeper {
+	return &timeKeeper{tm: tmtime.Now()}
+}
+
+func (tk timeKeeper) Now() time.Time {
+	return tk.tm
+}
+
+func (tk *timeKeeper) Add(d time.Duration) {
+	tk.tm = tk.tm.Add(d)
+}
