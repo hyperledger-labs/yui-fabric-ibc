@@ -43,7 +43,7 @@ func (m SequenceManager) UpdateSequence(stub shim.ChaincodeStubInterface) error 
 	if err != nil {
 		return err
 	}
-	if err := m.ValidateTimestamp(m.clock(), tm); err != nil {
+	if err := m.ValidateTimestamp(m.clock(), current.Timestamp, tm); err != nil {
 		return err
 	}
 
@@ -51,12 +51,15 @@ func (m SequenceManager) UpdateSequence(stub shim.ChaincodeStubInterface) error 
 	return m.updateSequence(stub, next)
 }
 
-func (m SequenceManager) ValidateTimestamp(now time.Time, tm *timestamp.Timestamp) error {
-	if now.Unix()+int64(m.config.MaxTimestampDiff/time.Second) < tm.GetSeconds() {
-		return errors.New("timestamp indicates future")
+func (m SequenceManager) ValidateTimestamp(now time.Time, prevSec int64, next *timestamp.Timestamp) error {
+	if now.Unix()+int64(m.config.MaxTimestampDiff/time.Second) < next.GetSeconds() {
+		return errors.New("the next timestamp indicates future time")
 	}
-	if now.Unix()-int64(m.config.MaxTimestampDiff/time.Second) > tm.GetSeconds() {
-		return errors.New("timestamp indicates past")
+	if now.Unix()-int64(m.config.MaxTimestampDiff/time.Second) > next.GetSeconds() {
+		return errors.New("the next timestamp indicates past time")
+	}
+	if prevSec > 0 && prevSec+int64(m.config.MinTimeInterval/time.Second) > next.GetSeconds() {
+		return errors.New("the next timestamp is less than the minimum time for advancing the sequence")
 	}
 	return nil
 }
@@ -66,7 +69,7 @@ func (m SequenceManager) InitSequence(stub shim.ChaincodeStubInterface) (*Sequen
 	if err != nil {
 		return nil, err
 	}
-	if err := m.ValidateTimestamp(m.clock(), tm); err != nil {
+	if err := m.ValidateTimestamp(m.clock(), 0, tm); err != nil {
 		return nil, err
 	}
 	seq := NewSequence(1, tm.GetSeconds())
