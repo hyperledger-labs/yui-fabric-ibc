@@ -10,6 +10,7 @@ import (
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	localhost "github.com/cosmos/cosmos-sdk/x/ibc/09-localhost/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/tests"
 	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
 	clientkeeper "github.com/datachainlab/fabric-ibc/x/ibc/02-client/keeper"
@@ -181,15 +182,15 @@ func TestCreateClient(t *testing.T) {
 	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibc.StoreKey], sk)
 	/// END
 
-	var seq int64 = 1
+	var seq uint64 = 1
 	// CreateClient
 	{
 		/// Build Msg
 		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
-		ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabrictypes.Proof{})
-		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
+		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
@@ -210,8 +211,8 @@ func TestCreateClient(t *testing.T) {
 		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
-		ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabrictypes.Proof{})
-		proof, err := tests.MakeProof(signer, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
+		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 

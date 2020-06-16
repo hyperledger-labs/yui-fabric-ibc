@@ -3,6 +3,7 @@ package chaincode
 import (
 	"os"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
@@ -13,23 +14,44 @@ import (
 
 type IBCChaincode struct {
 	contractapi.Contract
-	runner AppRunner
+	sequenceMgr commitment.SequenceManager
+	runner      AppRunner
 }
 
 func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface, msgJSON string) error {
 	return c.runner.RunMsg(ctx.GetStub(), msgJSON)
 }
 
-func (c *IBCChaincode) GenerateChaincodeHeader(ctx contractapi.ContractInterface) error {
-	// TODO generate sequence and timestamp
-	return nil
+func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) error {
+	_, err := c.sequenceMgr.UpdateSequence(ctx.GetStub())
+	return err
 }
 
-func (c *IBCChaincode) EndorseChaincodeHeader(ctx contractapi.ContractInterface) error {
-	return nil
+func (c *IBCChaincode) MakeSequenceCommitment(ctx contractapi.TransactionContextInterface) error {
+	var (
+		seq *commitment.Sequence
+		err error
+	)
+
+	args := ctx.GetStub().GetArgs()
+	if len(args) > 0 {
+		seqValue := sdk.BigEndianToUint64(args[0])
+		seq, err = c.sequenceMgr.GetSequence(ctx.GetStub(), seqValue)
+	} else {
+		seq, err = c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+	}
+	if err != nil {
+		return err
+	}
+
+	entry, err := commitment.MakeSequenceCommitmentEntry(seq)
+	if err != nil {
+		return err
+	}
+	return ctx.GetStub().PutState(entry.Key, entry.Value)
 }
 
-func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
+func (c *IBCChaincode) MakePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
 	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
 		entry, err := commitment.MakePacketCommitmentEntry(
 			app.NewContext(false, abci.Header{}),

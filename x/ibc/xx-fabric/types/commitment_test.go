@@ -3,6 +3,7 @@ package types
 import (
 	"testing"
 
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
@@ -94,9 +95,8 @@ func makeClientState(mspids []string) ClientState {
 	})
 	cs := ClientState{
 		LastChaincodeHeader: ChaincodeHeader{
-			Sequence:  1,
-			Timestamp: uint64(tmtime.Now().UnixNano()),
-			Proof:     Proof{}, // TODO fix
+			Sequence: commitment.NewSequence(1, tmtime.Now().UnixNano()),
+			Proof:    Proof{}, // TODO fix
 		},
 		LastChaincodeInfo: ChaincodeInfo{
 			ChannelId: "dummyChannel",

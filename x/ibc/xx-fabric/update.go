@@ -59,15 +59,15 @@ func checkValidity(
 
 	if header.ChaincodeHeader != nil {
 		// assert header timestamp is past latest clientstate timestamp
-		if header.ChaincodeHeader.Timestamp <= clientState.GetLatestTimestamp() {
+		if header.ChaincodeHeader.Sequence.Timestamp <= clientState.GetLatestTimestamp() {
 			return sdkerrors.Wrapf(
 				clienttypes.ErrInvalidHeader,
 				"header blocktime ≤ latest client state block time (%v ≤ %v)",
-				header.ChaincodeHeader.Timestamp, clientState.GetLatestTimestamp(),
+				header.ChaincodeHeader.Sequence.Timestamp, clientState.GetLatestTimestamp(),
 			)
 		}
 
-		if header.ChaincodeHeader.Sequence != int64(clientState.GetLatestHeight()+1) {
+		if header.ChaincodeHeader.Sequence.Value != clientState.GetLatestHeight()+1 {
 			return sdkerrors.Wrapf(
 				clienttypes.ErrInvalidHeader,
 				"header sequence != expected client state sequence (%d != %d)", header.ChaincodeHeader.Sequence, clientState.GetLatestHeight()+1,
@@ -110,7 +110,7 @@ func update(clientState ClientState, header Header) (ClientState, *ConsensusStat
 	if header.ChaincodeHeader != nil {
 		clientState.LastChaincodeHeader = *header.ChaincodeHeader
 		consensusState := NewConsensusState(
-			header.ChaincodeHeader.Timestamp,
+			header.ChaincodeHeader.Sequence.Timestamp,
 			header.GetHeight(),
 		)
 		return clientState, &consensusState

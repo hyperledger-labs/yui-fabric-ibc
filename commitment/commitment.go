@@ -14,6 +14,18 @@ type Entry struct {
 	Value []byte
 }
 
+/// SequenceCommitment
+
+func MakeSequenceCommitmentEntry(
+	sequence *Sequence,
+) (*Entry, error) {
+	key := MakeSequenceCommitmentKey(sequence.Value)
+	return &Entry{
+		Key:   key,
+		Value: sequence.Bytes(),
+	}, nil
+}
+
 /// PacketCommitment
 
 func MakePacketCommitmentEntry(

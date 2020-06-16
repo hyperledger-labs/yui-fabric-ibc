@@ -26,7 +26,6 @@ var (
 	NewClientState     = types.NewClientState
 	RegisterCodec      = types.RegisterCodec
 
-	Fabric                    = types.Fabric
-	ClientTypeFabric          = types.ClientTypeFabric
-	VerifyChaincodeHeaderPath = types.VerifyChaincodeHeaderPath
+	Fabric           = types.Fabric
+	ClientTypeFabric = types.ClientTypeFabric
 )

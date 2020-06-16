@@ -4,6 +4,7 @@ package cosmos_sdk.x.ibc.commitment.v1;
 option go_package = "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types";
 
 import "third_party/proto/gogoproto/gogo.proto";
+import "commitment/types.proto";
 
 message Header {
   ChaincodeHeader ChaincodeHeader = 1 [(gogoproto.nullable) = true];
@@ -11,9 +12,8 @@ message Header {
 }
 
 message ChaincodeHeader {
-  int64  sequence  = 1;
-  uint64 timestamp = 2;
-  Proof  proof     = 3 [(gogoproto.nullable) = false];
+  Sequence sequence = 1 [(gogoproto.nullable) = false];
+  Proof  proof      = 2 [(gogoproto.nullable) = false];
 }
 
 message ChaincodeInfo {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
+	"github.com/datachainlab/fabric-ibc/commitment"
 )
 
 var _ clientexported.Header = (*Header)(nil)
@@ -13,27 +14,18 @@ func NewHeader(cheader ChaincodeHeader, cinfo ChaincodeInfo) Header {
 }
 
 func (h Header) GetHeight() uint64 {
-	return uint64(h.ChaincodeHeader.Sequence)
+	return h.ChaincodeHeader.Sequence.Value
 }
 
 func (h Header) ClientType() clientexported.ClientType {
 	return Fabric
 }
 
-func NewChaincodeHeader(seq int64, timestamp uint64, proof Proof) ChaincodeHeader {
+func NewChaincodeHeader(seq uint64, timestamp int64, proof Proof) ChaincodeHeader {
 	return ChaincodeHeader{
-		Sequence:  seq,
-		Timestamp: timestamp,
-		Proof:     proof,
+		Sequence: commitment.NewSequence(seq, timestamp),
+		Proof:    proof,
 	}
-}
-
-func (h ChaincodeHeader) GetEndorseBytes() []byte {
-	h2 := ChaincodeHeader{
-		Sequence:  h.Sequence,
-		Timestamp: h.Timestamp,
-	}
-	return ModuleCdc.MustMarshalJSON(h2)
 }
 
 func (h ChaincodeHeader) ValidateBasic() error {
