@@ -61,20 +61,20 @@ func makeSignedDataList(pr *Proof) []*protoutil.SignedData {
 	return sigSet
 }
 
-func GetTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*rwset.TxReadWriteSet, error) {
+func GetTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.ChaincodeID, *rwset.TxReadWriteSet, error) {
 	var payload peer.ProposalResponsePayload
 	if err := proto.Unmarshal(proposal, &payload); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var cact peer.ChaincodeAction
 	if err := proto.Unmarshal(payload.Extension, &cact); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var result rwset.TxReadWriteSet
 	if err := proto.Unmarshal(cact.Results, &result); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &result, nil
+	return cact.GetChaincodeId(), &result, nil
 }
 
 func EnsureWriteSetIncludesCommitment(set []*rwset.NsReadWriteSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {
@@ -98,7 +98,7 @@ func EnsureWriteSetIncludesCommitment(set []*rwset.NsReadWriteSet, nsIdx, rwsIdx
 	}
 }
 
-func VerifyEndorsement(policyBytes []byte, proof Proof, path string, value []byte) (bool, error) {
+func VerifyEndorsement(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, path string, value []byte) (bool, error) {
 	sigSet := makeSignedDataList(&proof)
 	policy, err := GetPolicyEvaluator(policyBytes)
 	if err != nil {
@@ -108,17 +108,27 @@ func VerifyEndorsement(policyBytes []byte, proof Proof, path string, value []byt
 		return false, err
 	}
 
-	rwset, err := GetTxReadWriteSetFromProposalResponsePayload(proof.Proposal)
+	id, rwset, err := GetTxReadWriteSetFromProposalResponsePayload(proof.Proposal)
 	if err != nil {
 		return false, err
 	}
-
+	if !equalChaincodeID(ccID, *id) {
+		return false, fmt.Errorf("unexpected chaincodID: %v", *id)
+	}
 	return EnsureWriteSetIncludesCommitment(rwset.GetNsRwset(), proof.NsIndex, proof.WriteSetIndex, path, value)
+}
+
+func equalChaincodeID(a, b peer.ChaincodeID) bool {
+	if a.Name == b.Name && a.Path == b.Path && a.Version == b.Version {
+		return true
+	} else {
+		return false
+	}
 }
 
 func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	lastci := clientState.LastChaincodeInfo
-	ok, err := VerifyEndorsement(lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentKey(h.Sequence.Value), h.Sequence.Bytes())
+	ok, err := VerifyEndorsement(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentKey(h.Sequence.Value), h.Sequence.Bytes())
 	if err != nil {
 		return err
 	} else if !ok {

@@ -5,6 +5,7 @@ import (
 
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/hyperledger/fabric-protos-go/peer"
 )
 
 var _ clientexported.Header = (*Header)(nil)
@@ -45,6 +46,14 @@ func (ci ChaincodeInfo) ValidateBasic() error {
 	return nil
 }
 
-func (ci ChaincodeInfo) ChainID() string {
+func (ci ChaincodeInfo) GetChainID() string {
 	return fmt.Sprintf("%v/%v", ci.ChannelId, ci.ChaincodeId.String())
+}
+
+func (ci ChaincodeInfo) GetFabricChaincodeID() peer.ChaincodeID {
+	return peer.ChaincodeID{
+		Path:    ci.ChaincodeId.Path,
+		Name:    ci.ChaincodeId.Name,
+		Version: ci.ChaincodeId.Version,
+	}
 }
