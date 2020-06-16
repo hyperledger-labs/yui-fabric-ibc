@@ -32,12 +32,14 @@ func TestSequence(t *testing.T) {
 	seq, err := smgr.InitSequence(stub)
 	require.NoError(err)
 	require.Equal(NewSequence(1, clientTk.Now().Unix()), *seq)
+	clientTk.Add(10 * time.Second)
 
 	// valid sequence 2
 	require.NoError(smgr.UpdateSequence(stub))
 	seq, err = smgr.getCurrentSequence(stub)
 	require.NoError(err)
 	require.Equal(NewSequence(2, clientTk.Now().Unix()), *seq)
+	clientTk.Add(10 * time.Second)
 
 	// invalid client timestamp(future)
 	clientTk.Add(time.Minute)
@@ -54,6 +56,7 @@ func TestSequence(t *testing.T) {
 	seq, err = smgr.getCurrentSequence(stub)
 	require.NoError(err)
 	require.Equal(NewSequence(3, clientTk.Now().Unix()), *seq)
+	clientTk.Add(10 * time.Second)
 }
 
 type timeKeeper struct {
