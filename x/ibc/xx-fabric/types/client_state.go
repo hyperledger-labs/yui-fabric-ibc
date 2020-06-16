@@ -69,7 +69,7 @@ func (cs ClientState) ClientType() clientexported.ClientType {
 
 // GetLatestHeight returns the latest height stored.
 func (cs ClientState) GetLatestHeight() uint64 {
-	return uint64(cs.LastChaincodeHeader.Sequence)
+	return uint64(cs.LastChaincodeHeader.Sequence.Value)
 }
 
 // IsFrozen returns false.
@@ -78,8 +78,8 @@ func (cs ClientState) IsFrozen() bool {
 }
 
 // GetLatestTimestamp returns latest block time.
-func (cs ClientState) GetLatestTimestamp() uint64 {
-	return cs.LastChaincodeHeader.Timestamp
+func (cs ClientState) GetLatestTimestamp() int64 {
+	return cs.LastChaincodeHeader.Sequence.Timestamp
 }
 
 // Validate performs a basic validation of the client state fields.

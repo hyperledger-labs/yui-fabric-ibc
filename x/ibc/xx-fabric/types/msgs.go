@@ -80,8 +80,8 @@ func (msg MsgCreateClient) GetClientType() string {
 func (msg MsgCreateClient) GetConsensusState() clientexported.ConsensusState {
 	// Construct initial consensus state from provided Header
 	return ConsensusState{
-		Timestamp: msg.Header.ChaincodeHeader.Timestamp,
-		Height:    uint64(msg.Header.ChaincodeHeader.Sequence),
+		Timestamp: msg.Header.ChaincodeHeader.Sequence.Timestamp,
+		Height:    msg.Header.ChaincodeHeader.Sequence.Value,
 	}
 }
 

@@ -10,12 +10,12 @@ import (
 var _ clientexported.ConsensusState = (*ConsensusState)(nil)
 
 type ConsensusState struct {
-	Timestamp uint64
+	Timestamp int64
 	Height    uint64
 }
 
 func NewConsensusState(
-	timestamp uint64, height uint64,
+	timestamp int64, height uint64,
 ) ConsensusState {
 	return ConsensusState{
 		Timestamp: timestamp,
@@ -36,7 +36,7 @@ func (cs ConsensusState) GetRoot() commitmentexported.Root {
 }
 
 func (cs ConsensusState) GetTimestamp() uint64 {
-	return cs.Timestamp
+	return uint64(cs.Timestamp)
 }
 
 // ValidateBasic defines a basic validation for the tendermint consensus state.

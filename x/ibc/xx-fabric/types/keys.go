@@ -1,7 +1,5 @@
 package types
 
-import "fmt"
+import "github.com/datachainlab/fabric-ibc/commitment"
 
-func VerifyChaincodeHeaderPath(seq int64) string {
-	return fmt.Sprintf("/verify/header/%d", seq)
-}
+var MakeSequenceCommitmentKey = commitment.MakeSequenceCommitmentKey

@@ -35,7 +35,8 @@ func TestSequence(t *testing.T) {
 	clientTk.Add(10 * time.Second)
 
 	// valid sequence 2
-	require.NoError(smgr.UpdateSequence(stub))
+	_, err = smgr.UpdateSequence(stub)
+	require.NoError(err)
 	seq, err = smgr.getCurrentSequence(stub)
 	require.NoError(err)
 	require.Equal(NewSequence(2, clientTk.Now().Unix()), *seq)
@@ -43,16 +44,19 @@ func TestSequence(t *testing.T) {
 
 	// invalid client timestamp(future)
 	clientTk.Add(time.Minute)
-	require.Error(smgr.UpdateSequence(stub))
+	_, err = smgr.UpdateSequence(stub)
+	require.Error(err)
 	clientTk.Add(-time.Minute) // rollback
 
 	// invalid client timestamp(past)
 	clientTk.Add(-time.Minute)
-	require.Error(smgr.UpdateSequence(stub))
+	_, err = smgr.UpdateSequence(stub)
+	require.Error(err)
 	clientTk.Add(time.Minute)
 
 	// valid sequence 3
-	require.NoError(smgr.UpdateSequence(stub))
+	_, err = smgr.UpdateSequence(stub)
+	require.NoError(err)
 	seq, err = smgr.getCurrentSequence(stub)
 	require.NoError(err)
 	require.Equal(NewSequence(3, clientTk.Now().Unix()), *seq)

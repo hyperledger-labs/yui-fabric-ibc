@@ -9,6 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/tests"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
@@ -111,12 +112,12 @@ func makePolicy(mspids []string) []byte {
 	})
 }
 
-func (b MsgBuilder) makeMsgCreateClient(seq int64) (*fabric.MsgCreateClient, error) {
+func (b MsgBuilder) makeMsgCreateClient(seq uint64) (*fabric.MsgCreateClient, error) {
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-	ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabric.Proof{})
-	proof, err := tests.MakeProof(b.endorser, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+	ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabric.Proof{})
+	proof, err := tests.MakeProof(b.endorser, commitment.MakeSequenceCommitmentKey(seq), ch.Sequence.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +130,12 @@ func (b MsgBuilder) makeMsgCreateClient(seq int64) (*fabric.MsgCreateClient, err
 	return &msg, nil
 }
 
-func (b MsgBuilder) makeMsgUpdateClient(seq int64) (*fabric.MsgUpdateClient, error) {
+func (b MsgBuilder) makeMsgUpdateClient(seq uint64) (*fabric.MsgUpdateClient, error) {
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-	ch := fabric.NewChaincodeHeader(seq, uint64(tmtime.Now().UnixNano()), fabric.Proof{})
-	proof, err := tests.MakeProof(b.endorser, fabric.VerifyChaincodeHeaderPath(seq), ch.GetEndorseBytes())
+	ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabric.Proof{})
+	proof, err := tests.MakeProof(b.endorser, commitment.MakeSequenceCommitmentKey(seq), ch.Sequence.Bytes())
 	if err != nil {
 		return nil, err
 	}
