@@ -20,6 +20,15 @@ func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface,
 	return c.runner.RunMsg(ctx.GetStub(), msgJSON)
 }
 
+func (c *IBCChaincode) GenerateChaincodeHeader(ctx contractapi.ContractInterface) error {
+	// TODO generate sequence and timestamp
+	return nil
+}
+
+func (c *IBCChaincode) EndorseChaincodeHeader(ctx contractapi.ContractInterface) error {
+	return nil
+}
+
 func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
 	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
 		entry, err := commitment.MakePacketCommitmentEntry(

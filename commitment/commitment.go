@@ -2,7 +2,6 @@ package commitment
 
 import (
 	"errors"
-	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
@@ -13,10 +12,6 @@ import (
 type Entry struct {
 	Key   string
 	Value []byte
-}
-
-func MakeEntryKey(prefix commitmentexported.Prefix, key string) string {
-	return fmt.Sprintf("e/k:%v/%v", string(prefix.Bytes()), key)
 }
 
 /// PacketCommitment
