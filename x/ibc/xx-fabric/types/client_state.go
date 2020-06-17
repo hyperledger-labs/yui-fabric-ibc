@@ -33,7 +33,6 @@ var _ clientexported.ClientState = ClientState{}
 // ClientState requires (read-only) access to keys outside the client prefix.
 type ClientState struct {
 	ID                  string          `json:"id" yaml:"id"`
-	IsPrivate           bool            `json:"is_private" yaml:"is_private"`
 	LastChaincodeHeader ChaincodeHeader `json:"last_chaincode_header" yaml:"last_chaincode_header"`
 	LastChaincodeInfo   ChaincodeInfo   `json:"last_chaincode_info" yaml:"last_chaincode_info"`
 }
@@ -46,7 +45,6 @@ func NewClientState(
 ) ClientState {
 	return ClientState{
 		ID:                  id,
-		IsPrivate:           isPrivate,
 		LastChaincodeHeader: *header.ChaincodeHeader,
 		LastChaincodeInfo:   *header.ChaincodeInfo,
 	}
