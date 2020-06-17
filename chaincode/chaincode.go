@@ -1,6 +1,8 @@
 package chaincode
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -27,7 +29,7 @@ func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterfac
 	return err
 }
 
-func (c *IBCChaincode) MakeSequenceCommitment(ctx contractapi.TransactionContextInterface) error {
+func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) error {
 	var (
 		seq *commitment.Sequence
 		err error
@@ -51,15 +53,20 @@ func (c *IBCChaincode) MakeSequenceCommitment(ctx contractapi.TransactionContext
 	return ctx.GetStub().PutState(entry.Key, entry.Value)
 }
 
-func (c *IBCChaincode) MakePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
+func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
 	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+		c := app.NewContext(false, abci.Header{})
+		cmbz := app.IBCKeeper.ChannelKeeper.GetPacketCommitment(c, portID, channelID, sequence)
+		if cmbz == nil {
+			return errors.New("commitment not found")
+		}
+
 		entry, err := commitment.MakePacketCommitmentEntry(
-			app.NewContext(false, abci.Header{}),
-			app.IBCKeeper.ChannelKeeper,
 			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
 			portID,
 			channelID,
 			sequence,
+			cmbz,
 		)
 		if err != nil {
 			return err
@@ -69,11 +76,36 @@ func (c *IBCChaincode) MakePacketCommitment(ctx contractapi.TransactionContextIn
 	})
 }
 
+func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) error {
+	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+		c := app.NewContext(false, abci.Header{})
+		cs, ok := app.IBCKeeper.ClientKeeper.GetClientConsensusState(c, clientID, height)
+		if !ok {
+			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
+		}
+		bz, err := app.cdc.Amino.MarshalBinaryBare(cs)
+		if err != nil {
+			return err
+		}
+		entry, err := commitment.MakeConsensusStateCommitmentEntry(
+			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
+			clientID,
+			height,
+			bz,
+		)
+		if err != nil {
+			return err
+		}
+		return ctx.GetStub().PutState(entry.Key, entry.Value)
+	})
+}
+
 func NewIBCChaincode() *IBCChaincode {
 	logger := log.NewTMLogger(os.Stdout)
 	runner := NewAppRunner(logger, DefaultDBProvider)
 	c := &IBCChaincode{
-		runner: runner,
+		runner:      runner,
+		sequenceMgr: commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey))),
 	}
 	return c
 }

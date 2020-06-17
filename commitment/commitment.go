@@ -14,6 +14,19 @@ type Entry struct {
 	Value []byte
 }
 
+/// ConsensusStateCommitment
+
+func MakeConsensusStateCommitmentEntry(
+	prefix commitmentexported.Prefix,
+	clientID string, height uint64, consensusStateBytes []byte,
+) (*Entry, error) {
+	key := MakeConsensusStateCommitmentKey(prefix, clientID, height)
+	return &Entry{
+		Key:   key,
+		Value: consensusStateBytes,
+	}, nil
+}
+
 /// SequenceCommitment
 
 func MakeSequenceCommitmentEntry(
@@ -29,19 +42,13 @@ func MakeSequenceCommitmentEntry(
 /// PacketCommitment
 
 func MakePacketCommitmentEntry(
-	ctx sdk.Context,
-	channelKeeper channel.Keeper,
 	prefix commitmentexported.Prefix,
-	portID, channelID string, sequence uint64) (*Entry, error) {
-
-	cmbz := channelKeeper.GetPacketCommitment(ctx, portID, channelID, sequence)
-	if cmbz == nil {
-		return nil, errors.New("commitment not found")
-	}
+	portID, channelID string, sequence uint64, packetCommitmentBytes []byte,
+) (*Entry, error) {
 	key := MakePacketCommitmentEntryKey(prefix, portID, channelID, sequence)
 	return &Entry{
 		Key:   key,
-		Value: cmbz,
+		Value: packetCommitmentBytes,
 	}, nil
 }
 
