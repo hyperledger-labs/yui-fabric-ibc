@@ -97,7 +97,7 @@ func (cs ClientState) VerifyClientConsensusState(
 	_ sdk.KVStore,
 	cdc codec.Marshaler,
 	aminoCdc *codec.Codec,
-	provingRoot commitmentexported.Root,
+	_ commitmentexported.Root,
 	height uint64,
 	counterpartyClientIdentifier string,
 	consensusHeight uint64,
@@ -110,22 +110,13 @@ func (cs ClientState) VerifyClientConsensusState(
 		return err
 	}
 
-	clientPrefixedPath := "clients/" + counterpartyClientIdentifier + "/" + host.ConsensusStatePath(consensusHeight)
-	path, err := commitmenttypes.ApplyPrefix(prefix, clientPrefixedPath)
-	if err != nil {
-		return err
-	}
-
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
-	}
-
 	bz, err := aminoCdc.MarshalBinaryBare(consensusState)
 	if err != nil {
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	key := commitment.MakeConsensusStateCommitmentKey(prefix, counterpartyClientIdentifier, consensusHeight)
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
