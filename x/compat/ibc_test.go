@@ -71,43 +71,6 @@ func MakeContext(stub shim.ChaincodeStubInterface, keys map[string]*sdk.KVStoreK
 	return sdk.NewContext(cms, abci.Header{}, false, log.NewTMLogger(os.Stdout))
 }
 
-type LocalhostHeader struct {
-	height uint64
-}
-
-func (h LocalhostHeader) GetHeight() uint64 {
-	return h.height
-}
-
-func (LocalhostHeader) ClientType() clientexported.ClientType {
-	return clientexported.Localhost
-}
-
-func TestIBC02Client(t *testing.T) {
-	assert := assert.New(t)
-
-	cdc := MakeCodec()
-	sk := NewStakingKeeper()
-
-	keys := sdk.NewKVStoreKeys(
-		ibc.StoreKey,
-		client.SubModuleName,
-	)
-	stub := NewMockStub()
-	clientState := localhost.NewClientState("chain-id", 1)
-	ctx := MakeContext(stub, keys)
-	k := clientkeeper.NewKeeper(cdc, keys[ibc.StoreKey], sk)
-
-	ctx.KVStore(keys[ibc.StoreKey])
-
-	_, err := k.CreateClient(ctx, clientState, nil)
-	assert.NoError(err)
-
-	h := LocalhostHeader{height: 2}
-	_, err = k.UpdateClient(ctx, clientState.GetID(), h)
-	assert.NoError(err)
-}
-
 const (
 	channelID = "dummyChannel"
 	clientID  = "fabricclient"
@@ -194,7 +157,8 @@ func TestCreateClient(t *testing.T) {
 
 	cdc := MakeCodec()
 	sk := NewStakingKeeper()
-	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibc.StoreKey], sk)
+	csk := fabric.NewConsensusStateKeeper(stub, nil)
+	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibc.StoreKey], sk, csk)
 	/// END
 
 	var seq uint64 = 1
@@ -205,7 +169,7 @@ func TestCreateClient(t *testing.T) {
 		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
-		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentKey(seq), ch.Sequence.Bytes())
+		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
@@ -227,7 +191,7 @@ func TestCreateClient(t *testing.T) {
 		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
-		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentKey(seq), ch.Sequence.Bytes())
+		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
