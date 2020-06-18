@@ -8,6 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/ibc/03-connection/types"
+	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
@@ -80,6 +81,36 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 		e, err := commitment.MakeConnectionStateCommitmentEntry(
 			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
 			connectionID,
+			bz,
+		)
+		if err != nil {
+			return err
+		}
+		entry = e
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
+
+func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.Entry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+		c := app.NewContext(false, abci.Header{})
+
+		channel, found := app.IBCKeeper.ChannelKeeper.GetChannel(c, portID, channelID)
+		if !found {
+			return sdkerrors.Wrap(channeltypes.ErrChannelNotFound, channelID)
+		}
+		bz, err := proto.Marshal(&channel)
+		if err != nil {
+			return err
+		}
+		e, err := commitment.MakeChannelStateCommitmentEntry(
+			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			portID,
+			channelID,
 			bz,
 		)
 		if err != nil {

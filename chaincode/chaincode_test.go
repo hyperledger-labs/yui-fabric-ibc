@@ -222,6 +222,30 @@ func (ca TestChaincodeApp) createMsgChannelOpenInit(
 	return msg
 }
 
+func (ca TestChaincodeApp) createMsgChannelOpenTry(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+) *channel.MsgChannelOpenTry {
+	proofHeight, proofInit, err := ca.makeProofChannelState(counterPartyCtx, counterParty.portID, counterParty.channelID)
+	require.NoError(t, err)
+	msg := channel.NewMsgChannelOpenTry(
+		ca.portID,
+		ca.channelID,
+		ibctransfertypes.Version,
+		ca.channelOrder,
+		[]string{ca.connectionID},
+		counterParty.portID,
+		counterParty.channelID,
+		ibctransfertypes.Version,
+		proofInit,
+		proofHeight,
+		ca.signer,
+	)
+	require.NoError(t, msg.ValidateBasic())
+	return msg
+}
+
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
 	entry, err := ca.cc.EndorseSequenceCommitment(ctx)
 	if err != nil {
@@ -238,6 +262,19 @@ func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Ent
 	return tests.MakeProof(ca.endorser, entry.Key, entry.Value)
 }
 
+func (ca TestChaincodeApp) makeProofConsensus(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (uint64, []byte, error) {
+	entry, err := ca.cc.EndorseConsensusStateCommitment(ctx, clientID, height)
+	proof, err := ca.makeMockEndorsedCommitmentProof(entry)
+	if err != nil {
+		return 0, nil, err
+	}
+	bz, err := proto.Marshal(proof)
+	if err != nil {
+		return 0, nil, err
+	}
+	return 1, bz, nil // FIXME returns current height
+}
+
 func (ca TestChaincodeApp) makeProofConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (uint64, []byte, error) {
 	entry, err := ca.cc.EndorseConnectionState(ctx, connectionID)
 	if err != nil {
@@ -251,11 +288,14 @@ func (ca TestChaincodeApp) makeProofConnectionState(ctx contractapi.TransactionC
 	if err != nil {
 		return 0, nil, err
 	}
-	return 1, bz, nil
+	return 1, bz, nil // FIXME returns current height
 }
 
-func (ca TestChaincodeApp) makeProofConsensus(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorseConsensusStateCommitment(ctx, clientID, height)
+func (ca TestChaincodeApp) makeProofChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (uint64, []byte, error) {
+	entry, err := ca.cc.EndorseChannelState(ctx, portID, channelID)
+	if err != nil {
+		return 0, nil, err
+	}
 	proof, err := ca.makeMockEndorsedCommitmentProof(entry)
 	if err != nil {
 		return 0, nil, err
@@ -264,5 +304,5 @@ func (ca TestChaincodeApp) makeProofConsensus(ctx contractapi.TransactionContext
 	if err != nil {
 		return 0, nil, err
 	}
-	return 1, bz, nil
+	return 1, bz, nil // FIXME returns current height
 }

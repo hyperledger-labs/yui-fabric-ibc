@@ -38,7 +38,7 @@ func TestApp(t *testing.T) {
 		connectionID1 = "connection1"
 		portID1       = "transfer"
 		channelID1    = "channelID1"
-		channelOrder1 = channel.UNORDERED
+		channelOrder1 = channel.ORDERED
 	)
 
 	const (
@@ -95,6 +95,7 @@ func TestApp(t *testing.T) {
 
 	// Create channel
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenInit(t, app1)))
+	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenTry(t, ctx0, app0)))
 }
 
 type mockContext struct {
