@@ -1,12 +1,13 @@
 package chaincode
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
+	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/tests"
@@ -39,6 +40,9 @@ type TestChaincodeApp struct {
 	// IBC
 	clientID     string
 	connectionID string
+	portID       string
+	channelID    string
+	channelOrder channel.Order
 }
 
 func MakeTestChaincodeApp(
@@ -48,6 +52,9 @@ func MakeTestChaincodeApp(
 	endorser msp.SigningIdentity,
 	clientID string,
 	connectionID string,
+	portID string,
+	channelID string,
+	channelOrder channel.Order,
 ) TestChaincodeApp {
 	cdc, _ := MakeCodecs()
 	cc := NewIBCChaincode()
@@ -66,6 +73,9 @@ func MakeTestChaincodeApp(
 
 		clientID:     clientID,
 		connectionID: connectionID,
+		portID:       portID,
+		channelID:    channelID,
+		channelOrder: channelOrder,
 	}
 }
 
@@ -74,11 +84,6 @@ func (ca TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) err
 	if err != nil {
 		return err
 	}
-	seq, err := ca.cc.sequenceMgr.GetCurrentSequence(ctx.GetStub())
-	if err != nil {
-		return err
-	}
-	fmt.Println("Currentseq:", seq.GetValue(), seq.GetTimestamp())
 	return nil
 }
 
@@ -193,6 +198,24 @@ func (ca TestChaincodeApp) createMsgConnectionOpenConfirm(
 		ca.connectionID,
 		proofConfirm,
 		proofHeight,
+		ca.signer,
+	)
+	require.NoError(t, msg.ValidateBasic())
+	return msg
+}
+
+func (ca TestChaincodeApp) createMsgChannelOpenInit(
+	t *testing.T,
+	counterParty TestChaincodeApp,
+) *channel.MsgChannelOpenInit {
+	msg := channel.NewMsgChannelOpenInit(
+		ca.portID,
+		ca.channelID,
+		ibctransfertypes.Version,
+		ca.channelOrder,
+		[]string{ca.connectionID},
+		counterParty.portID,
+		counterParty.channelID,
 		ca.signer,
 	)
 	require.NoError(t, msg.ValidateBasic())

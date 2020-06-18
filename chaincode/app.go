@@ -16,9 +16,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
+	"github.com/cosmos/cosmos-sdk/x/bank"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/capability"
+	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	transfer "github.com/cosmos/cosmos-sdk/x/ibc-transfer"
+	ibctransferkeeper "github.com/cosmos/cosmos-sdk/x/ibc-transfer/keeper"
+	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	port "github.com/cosmos/cosmos-sdk/x/ibc/05-port"
+	ibchost "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
 	"github.com/cosmos/cosmos-sdk/x/params"
+	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
+	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/compat"
@@ -40,8 +51,24 @@ var (
 	// non-dependant module elements, such as codec registration
 	// and genesis verification.
 	ModuleBasics = module.NewBasicManager(
+		auth.AppModuleBasic{},
+		bank.AppModuleBasic{},
+		capability.AppModuleBasic{},
 		ibc.AppModuleBasic{},
+		transfer.AppModuleBasic{},
 	)
+
+	// module account permissions
+	maccPerms = map[string][]string{
+		auth.FeeCollectorName:       nil,
+		distrtypes.ModuleName:       nil,
+		ibctransfertypes.ModuleName: {auth.Minter, auth.Burner},
+	}
+
+	// module accounts that are allowed to receive tokens
+	allowedReceivingModAcc = map[string]bool{
+		distrtypes.ModuleName: true,
+	}
 )
 
 type DBProvider func(shim.ChaincodeStubInterface) dbm.DB
@@ -160,8 +187,12 @@ type App struct {
 	subspaces map[string]params.Subspace
 
 	// keepers
+	AccountKeeper    auth.AccountKeeper
+	BankKeeper       bankkeeper.Keeper
 	CapabilityKeeper *capability.Keeper
+	ParamsKeeper     paramskeeper.Keeper
 	IBCKeeper        *ibc.Keeper
+	TransferKeeper   ibctransferkeeper.Keeper
 
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper capability.ScopedKeeper
@@ -200,9 +231,11 @@ func NewApp(
 	bApp.SetAppVersion(version.Version)
 
 	keys := sdk.NewKVStoreKeys(
-		staking.StoreKey, ibc.StoreKey, capability.StoreKey,
+		auth.StoreKey, banktypes.StoreKey,
+		staking.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capability.StoreKey,
 	)
 	memKeys := sdk.NewMemoryStoreKeys(capability.MemStoreKey)
+	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
 
 	app := &App{
 		BaseApp:   bApp,
@@ -213,26 +246,60 @@ func NewApp(
 		subspaces: make(map[string]params.Subspace),
 	}
 
+	// init params keeper and subspaces
+	app.ParamsKeeper = paramskeeper.NewKeeper(appCodec, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
+	app.subspaces[auth.ModuleName] = app.ParamsKeeper.Subspace(auth.DefaultParamspace)
+	app.subspaces[banktypes.ModuleName] = app.ParamsKeeper.Subspace(banktypes.DefaultParamspace)
+
 	// add capability keeper and ScopeToModule for ibc module
 	app.CapabilityKeeper = capability.NewKeeper(appCodec, keys[capability.StoreKey], memKeys[capability.MemStoreKey])
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibc.ModuleName)
+	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
+
+	// add keepers
+	app.AccountKeeper = auth.NewAccountKeeper(
+		appCodec, keys[auth.StoreKey], app.subspaces[auth.ModuleName], auth.ProtoBaseAccount, maccPerms,
+	)
+	app.BankKeeper = bankkeeper.NewBaseKeeper(
+		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.subspaces[banktypes.ModuleName], app.BlacklistedAccAddrs(),
+	)
 	app.IBCKeeper = ibc.NewKeeper(
 		app.cdc, appCodec, keys[ibc.StoreKey], nil, cskProvider(), scopedIBCKeeper, // TODO set stakingKeeper
 	)
 
+	// Create Transfer Keepers
+	app.TransferKeeper = ibctransferkeeper.NewKeeper(
+		appCodec, keys[ibctransfertypes.StoreKey],
+		app.IBCKeeper.ChannelKeeper, &app.IBCKeeper.PortKeeper,
+		app.AccountKeeper, app.BankKeeper, scopedTransferKeeper,
+	)
+	transferModule := transfer.NewAppModule(app.TransferKeeper)
+
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := port.NewRouter()
-	/*
-		ibcRouter.AddRoute(transfer.ModuleName, transferModule)
-		ibcRouter.AddRoute(cross.ModuleName, crossModule)
-	*/
+	ibcRouter.AddRoute(transfer.ModuleName, transferModule)
 	app.IBCKeeper.SetRouter(ibcRouter)
 
 	// NOTE: Any module instantiated in the module manager that is later modified
 	// must be passed by reference here.
 	app.mm = module.NewManager(
+		auth.NewAppModule(appCodec, app.AccountKeeper),
+		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper),
+		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		ibc.NewAppModule(app.IBCKeeper),
+		params.NewAppModule(app.ParamsKeeper),
+		transferModule,
 	)
+
+	app.mm.SetOrderBeginBlockers(
+		// distrtypes.ModuleName,
+		ibchost.ModuleName,
+	)
+	app.mm.SetOrderInitGenesis(
+		capabilitytypes.ModuleName, auth.ModuleName, distrtypes.ModuleName, banktypes.ModuleName,
+		ibchost.ModuleName, ibctransfertypes.ModuleName,
+	)
+
 	app.mm.RegisterRoutes(app.Router(), app.QueryRouter())
 
 	// initialize stores
@@ -255,7 +322,7 @@ func NewApp(
 	// Initialize and seal the capability keeper so all persistent capabilities
 	// are loaded in-memory and prevent any further modules from creating scoped
 	// sub-keepers.
-	ctx := app.BaseApp.NewContext(true, abci.Header{})
+	ctx := app.BaseApp.NewUncachedContext(true, abci.Header{})
 	app.CapabilityKeeper.InitializeAndSeal(ctx)
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
@@ -294,13 +361,18 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 	app.cdc.MustUnmarshalJSON(req.AppStateBytes, &genesisState)
 
 	res := app.mm.InitGenesis(ctx, app.cdc, genesisState)
-
-	// // Set Historical infos in InitChain to ignore genesis params
-	// stakingParams := staking.DefaultParams()
-	// stakingParams.HistoricalEntries = 1000
-	// app.StakingKeeper.SetParams(ctx, stakingParams)
-
+	transfer.InitGenesis(ctx, app.TransferKeeper, ibctransfertypes.DefaultGenesisState())
 	return res
+}
+
+// BlacklistedAccAddrs returns all the app's module account addresses black listed for receiving tokens.
+func (app *App) BlacklistedAccAddrs() map[string]bool {
+	blacklistedAddrs := make(map[string]bool)
+	for acc := range maccPerms {
+		blacklistedAddrs[auth.NewModuleAddress(acc).String()] = !allowedReceivingModAcc[acc]
+	}
+
+	return blacklistedAddrs
 }
 
 // NewAnteHandler returns an AnteHandler that checks and increments sequence

@@ -7,6 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -27,10 +28,17 @@ import (
 
 func TestApp(t *testing.T) {
 	const (
-		connectionID0 = "connection0"
 		clientID0     = "ibcclient0"
-		connectionID1 = "connection1"
+		connectionID0 = "connection0"
+		portID0       = "transfer"
+		channelID0    = "channelID0"
+		channelOrder0 = channel.ORDERED
+
 		clientID1     = "ibcclient1"
+		connectionID1 = "connection1"
+		portID1       = "transfer"
+		channelID1    = "channelID1"
+		channelOrder1 = channel.UNORDERED
 	)
 
 	const (
@@ -66,9 +74,9 @@ func TestApp(t *testing.T) {
 	prv0 := secp256k1.GenPrivKey()
 	prv1 := secp256k1.GenPrivKey()
 
-	app0 := MakeTestChaincodeApp(prv0, fabchannelID, ccid, endorser, clientID0, connectionID0)
+	app0 := MakeTestChaincodeApp(prv0, fabchannelID, ccid, endorser, clientID0, connectionID0, portID0, channelID0, channelOrder0)
 	require.NoError(app0.init(ctx0))
-	app1 := MakeTestChaincodeApp(prv1, fabchannelID, ccid, endorser, clientID1, connectionID1)
+	app1 := MakeTestChaincodeApp(prv1, fabchannelID, ccid, endorser, clientID1, connectionID1, portID1, channelID1, channelOrder1)
 	require.NoError(app1.init(ctx1))
 
 	// Create Clients
@@ -84,6 +92,9 @@ func TestApp(t *testing.T) {
 	require.NoError(app1.runMsg(stub1, app1.createMsgConnectionOpenTry(t, ctx0, app0)))
 	require.NoError(app0.runMsg(stub0, app0.createMsgConnectionOpenAck(t, ctx1, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgConnectionOpenConfirm(t, ctx0, app0)))
+
+	// Create channel
+	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenInit(t, app1)))
 }
 
 type mockContext struct {
