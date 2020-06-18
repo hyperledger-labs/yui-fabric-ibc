@@ -128,7 +128,7 @@ func equalChaincodeID(a, b peer.ChaincodeID) bool {
 
 func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	lastci := clientState.LastChaincodeInfo
-	ok, err := VerifyEndorsement(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentKey(h.Sequence.Value), h.Sequence.Bytes())
+	ok, err := VerifyEndorsement(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentEntryKey(h.Sequence.Value), h.Sequence.Bytes())
 	if err != nil {
 		return err
 	} else if !ok {

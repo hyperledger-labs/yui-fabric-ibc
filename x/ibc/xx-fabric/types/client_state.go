@@ -40,7 +40,6 @@ type ClientState struct {
 // NewClientState creates a new ClientState instance
 func NewClientState(
 	id string,
-	isPrivate bool,
 	header Header,
 ) ClientState {
 	return ClientState{
@@ -115,7 +114,7 @@ func (cs ClientState) VerifyClientConsensusState(
 		return err
 	}
 
-	key := commitment.MakeConsensusStateCommitmentKey(prefix, counterpartyClientIdentifier, consensusHeight)
+	key := commitment.MakeConsensusStateCommitmentEntryKey(prefix, counterpartyClientIdentifier, consensusHeight)
 	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
@@ -141,10 +140,7 @@ func (cs ClientState) VerifyConnectionState(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.ConnectionPath(connectionID))
-	if err != nil {
-		return err
-	}
+	key := commitment.MakeConnectionStateCommitmentEntryKey(prefix, connectionID)
 
 	connection, ok := connectionEnd.(connectiontypes.ConnectionEnd)
 	if !ok {
@@ -156,7 +152,7 @@ func (cs ClientState) VerifyConnectionState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -185,10 +181,6 @@ func (cs ClientState) VerifyChannelState(
 	path, err := commitmenttypes.ApplyPrefix(prefix, host.ChannelPath(portID, channelID))
 	if err != nil {
 		return err
-	}
-
-	if cs.IsFrozen() {
-		return clienttypes.ErrClientFrozen
 	}
 
 	channelEnd, ok := channel.(channeltypes.Channel)

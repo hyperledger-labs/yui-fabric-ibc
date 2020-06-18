@@ -38,7 +38,7 @@ func HandleMsgCreateClient(ctx sdk.Context, k Keeper, msg exported.MsgCreateClie
 		if !ok {
 			return nil, sdkerrors.Wrap(ErrInvalidClientType, "Msg is not a Fabric CreateClient msg")
 		}
-		clientState = fabric.NewClientState(fabMsg.GetClientID(), fabMsg.IsPrivate, fabMsg.Header)
+		clientState = fabric.NewClientState(fabMsg.GetClientID(), fabMsg.Header)
 	default:
 		return nil, sdkerrors.Wrap(ErrInvalidClientType, msg.GetClientType())
 	}

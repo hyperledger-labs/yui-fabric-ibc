@@ -60,8 +60,21 @@ func NewAppRunner(logger log.Logger, dbProvider DBProvider) AppRunner {
 	}
 }
 
-// FIXME load this value from store
-var height int64 = 1
+func (r AppRunner) getHeight(stub shim.ChaincodeStubInterface) int64 {
+	bz, err := stub.GetState("height")
+	if err != nil {
+		panic(err)
+	} else if bz == nil {
+		return 1
+	}
+	return int64(sdk.BigEndianToUint64(bz))
+}
+
+func (r AppRunner) setHeight(stub shim.ChaincodeStubInterface, height int64) {
+	if err := stub.PutState("height", sdk.Uint64ToBigEndian(uint64(height))); err != nil {
+		panic(err)
+	}
+}
 
 // TODO refactoring this func and RunMsg
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error) error {
@@ -70,6 +83,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error)
 	if err != nil {
 		return err
 	}
+	height := r.getHeight(stub)
 	if height == 1 {
 		_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
 		_ = app.Commit()
@@ -84,6 +98,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error)
 	app.EndBlock(abci.RequestEndBlock{Height: height})
 	_ = app.Commit()
 	height++
+	r.setHeight(stub, height)
 	return nil
 }
 
@@ -94,7 +109,7 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) erro
 	if err != nil {
 		return err
 	}
-
+	height := r.getHeight(stub)
 	if height == 1 {
 		_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
 		_ = app.Commit()
@@ -115,6 +130,7 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) erro
 	app.EndBlock(abci.RequestEndBlock{Height: height})
 	_ = app.Commit()
 	height++
+	r.setHeight(stub, height)
 	return nil
 }
 
