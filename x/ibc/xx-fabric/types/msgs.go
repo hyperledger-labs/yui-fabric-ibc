@@ -14,10 +14,9 @@ var (
 
 // MsgCreateClient defines a message to create an IBC client
 type MsgCreateClient struct {
-	ClientID  string         `json:"client_id" yaml:"client_id"`
-	IsPrivate bool           `json:"is_private" yaml:"is_private"`
-	Header    Header         `json:"header" yaml:"header"`
-	Signer    sdk.AccAddress `json:"address" yaml:"address"`
+	ClientID string         `json:"client_id" yaml:"client_id"`
+	Header   Header         `json:"header" yaml:"header"`
+	Signer   sdk.AccAddress `json:"address" yaml:"address"`
 }
 
 // this is a constant to satisfy the linter

@@ -2,6 +2,7 @@ package commitment
 
 import (
 	"errors"
+	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
@@ -20,11 +21,15 @@ func MakeConsensusStateCommitmentEntry(
 	prefix commitmentexported.Prefix,
 	clientID string, height uint64, consensusStateBytes []byte,
 ) (*Entry, error) {
-	key := MakeConsensusStateCommitmentKey(prefix, clientID, height)
+	key := MakeConsensusStateCommitmentEntryKey(prefix, clientID, height)
 	return &Entry{
 		Key:   key,
 		Value: consensusStateBytes,
 	}, nil
+}
+
+func MakeConsensusStateCommitmentEntryKey(prefix commitmentexported.Prefix, clientID string, height uint64) string {
+	return fmt.Sprintf("h/k:%v/clients/%v/%v/commitment", string(prefix.Bytes()), clientID, host.ConsensusStatePath(height))
 }
 
 /// SequenceCommitment
@@ -32,11 +37,33 @@ func MakeConsensusStateCommitmentEntry(
 func MakeSequenceCommitmentEntry(
 	sequence *Sequence,
 ) (*Entry, error) {
-	key := MakeSequenceCommitmentKey(sequence.Value)
+	key := MakeSequenceCommitmentEntryKey(sequence.Value)
 	return &Entry{
 		Key:   key,
 		Value: sequence.Bytes(),
 	}, nil
+}
+
+func MakeSequenceCommitmentEntryKey(seq uint64) string {
+	return fmt.Sprintf("h/_/seq/%v/commitment", seq)
+}
+
+/// ConnectionStateCommitment
+
+func MakeConnectionStateCommitmentEntry(
+	prefix commitmentexported.Prefix,
+	connectionID string,
+	connectionBytes []byte,
+) (*Entry, error) {
+	key := MakeConnectionStateCommitmentEntryKey(prefix, connectionID)
+	return &Entry{
+		Key:   key,
+		Value: connectionBytes,
+	}, nil
+}
+
+func MakeConnectionStateCommitmentEntryKey(prefix commitmentexported.Prefix, connectionID string) string {
+	return fmt.Sprintf("h/k:%v/%v/commitment", string(prefix.Bytes()), host.ConnectionPath(connectionID))
 }
 
 /// PacketCommitment

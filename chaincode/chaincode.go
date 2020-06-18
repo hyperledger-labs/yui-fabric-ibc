@@ -6,6 +6,8 @@ import (
 	"os"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/cosmos/cosmos-sdk/x/ibc/03-connection/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
@@ -53,6 +55,35 @@ func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionCont
 	return ctx.GetStub().PutState(entry.Key, entry.Value)
 }
 
+func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.Entry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+		c := app.NewContext(false, abci.Header{})
+
+		connection, found := app.IBCKeeper.ConnectionKeeper.GetConnection(c, connectionID)
+		if !found {
+			return sdkerrors.Wrap(types.ErrConnectionNotFound, "cannot relay ACK of open attempt")
+		}
+		bz, err := app.cdc.MarshalBinaryBare(connection)
+		if err != nil {
+			return err
+		}
+		e, err := commitment.MakeConnectionStateCommitmentEntry(
+			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			connectionID,
+			bz,
+		)
+		if err != nil {
+			return err
+		}
+		entry = e
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
+
 func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
 	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
 		c := app.NewContext(false, abci.Header{})
@@ -76,8 +107,9 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 	})
 }
 
-func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) error {
-	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.Entry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
 		c := app.NewContext(false, abci.Header{})
 		cs, ok := app.IBCKeeper.ClientKeeper.GetClientConsensusState(c, clientID, height)
 		if !ok {
@@ -87,7 +119,7 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 		if err != nil {
 			return err
 		}
-		entry, err := commitment.MakeConsensusStateCommitmentEntry(
+		e, err := commitment.MakeConsensusStateCommitmentEntry(
 			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
 			clientID,
 			height,
@@ -96,8 +128,12 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 		if err != nil {
 			return err
 		}
-		return ctx.GetStub().PutState(entry.Key, entry.Value)
-	})
+		entry = e
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry, nil
 }
 
 func NewIBCChaincode() *IBCChaincode {
