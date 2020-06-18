@@ -19,7 +19,6 @@ import (
 	"github.com/hyperledger/fabric/msp"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
-	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 type TestChaincodeApp struct {
@@ -35,7 +34,7 @@ type TestChaincodeApp struct {
 	endorser       msp.SigningIdentity
 
 	// Sequence
-	seq uint64
+	seq *commitment.Sequence
 
 	// IBC
 	clientID     string
@@ -69,8 +68,6 @@ func MakeTestChaincodeApp(
 		fabChaincodeID: fabChaincodeID,
 		endorser:       endorser,
 
-		seq: 1,
-
 		clientID:     clientID,
 		connectionID: connectionID,
 		portID:       portID,
@@ -79,11 +76,16 @@ func MakeTestChaincodeApp(
 	}
 }
 
-func (ca TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) error {
+func (ca *TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) error {
 	err := ca.cc.InitChaincode(ctx)
 	if err != nil {
 		return err
 	}
+	seq, err := ca.getEndorsedCurrentSequence(ctx)
+	if err != nil {
+		return err
+	}
+	ca.seq = seq
 	return nil
 }
 
@@ -91,13 +93,19 @@ func (ca TestChaincodeApp) runMsg(stub shim.ChaincodeStubInterface, msgs ...sdk.
 	return ca.cc.runner.RunMsg(stub, string(makeStdTxBytes(ca.cdc, ca.prvKey, msgs...)))
 }
 
+func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
+	seq, err := ca.cc.UpdateSequence(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ca.seq = seq
+	return seq, nil
+}
+
 func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.TransactionContextInterface) *fabric.MsgCreateClient {
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, nil)
-	seq, err := ca.getEndorsedCurrentSequence(ctx)
-	require.NoError(t, err)
-	require.Equal(t, ca.seq, seq.GetValue())
-	ch := fabric.NewChaincodeHeader(seq.Value, seq.Timestamp, fabric.Proof{})
+	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.Proof{})
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
@@ -105,13 +113,11 @@ func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.T
 }
 
 func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdateClient {
-	seq := ca.seq + 1
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, sigs)
-	// TODO must use endorsed sequence
-	ch := fabric.NewChaincodeHeader(seq, tmtime.Now().Unix(), fabric.Proof{})
-	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.Proof{})
+	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ch.Sequence.Bytes())
 	require.NoError(t, err)
 	ch.Proof = *proof
 	h := fabric.NewHeader(ch, ci)
