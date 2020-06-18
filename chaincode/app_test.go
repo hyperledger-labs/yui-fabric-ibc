@@ -96,6 +96,8 @@ func TestApp(t *testing.T) {
 	// Create channel
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenInit(t, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenTry(t, ctx0, app0)))
+	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenAck(t, ctx1, app1)))
+	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenConfirm(t, ctx0, app0)))
 }
 
 type mockContext struct {

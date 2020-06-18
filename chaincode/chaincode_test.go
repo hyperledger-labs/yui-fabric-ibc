@@ -246,6 +246,43 @@ func (ca TestChaincodeApp) createMsgChannelOpenTry(
 	return msg
 }
 
+func (ca TestChaincodeApp) createMsgChannelOpenAck(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+) *channel.MsgChannelOpenAck {
+	proofHeight, proofTry, err := ca.makeProofChannelState(counterPartyCtx, counterParty.portID, counterParty.channelID)
+	require.NoError(t, err)
+	msg := channel.NewMsgChannelOpenAck(
+		ca.portID,
+		ca.channelID,
+		ibctransfertypes.Version,
+		proofTry,
+		proofHeight,
+		ca.signer,
+	)
+	require.NoError(t, msg.ValidateBasic())
+	return msg
+}
+
+func (ca TestChaincodeApp) createMsgChannelOpenConfirm(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+) *channel.MsgChannelOpenConfirm {
+	proofHeight, proofAck, err := ca.makeProofChannelState(counterPartyCtx, counterParty.portID, counterParty.channelID)
+	require.NoError(t, err)
+	msg := channel.NewMsgChannelOpenConfirm(
+		ca.portID,
+		ca.channelID,
+		proofAck,
+		proofHeight,
+		ca.signer,
+	)
+	require.NoError(t, msg.ValidateBasic())
+	return msg
+}
+
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
 	entry, err := ca.cc.EndorseSequenceCommitment(ctx)
 	if err != nil {
