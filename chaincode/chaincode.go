@@ -33,9 +33,8 @@ func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface,
 	return c.runner.RunMsg(ctx.GetStub(), msgJSON)
 }
 
-func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) error {
-	_, err := c.sequenceMgr.UpdateSequence(ctx.GetStub())
-	return err
+func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
+	return c.sequenceMgr.UpdateSequence(ctx.GetStub())
 }
 
 func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) (*commitment.Entry, error) {

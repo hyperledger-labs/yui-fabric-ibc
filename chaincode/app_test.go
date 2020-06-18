@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
+	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -60,14 +61,16 @@ func TestApp(t *testing.T) {
 	endorser, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
 
+	app0Tk := newTimeKeeper()
+	app1Tk := newTimeKeeper()
 	stub0 := compat.MakeFakeStub()
 	stub0.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
-		return &timestamp.Timestamp{Seconds: time.Now().Unix()}, nil
+		return &timestamp.Timestamp{Seconds: app0Tk.Now().Unix()}, nil
 	}
 	ctx0 := mockContext{stub: stub0}
 	stub1 := compat.MakeFakeStub()
 	stub1.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
-		return &timestamp.Timestamp{Seconds: time.Now().Unix()}, nil
+		return &timestamp.Timestamp{Seconds: app1Tk.Now().Unix()}, nil
 	}
 	ctx1 := mockContext{stub: stub1}
 
@@ -83,9 +86,16 @@ func TestApp(t *testing.T) {
 	require.NoError(app0.runMsg(stub0, app0.createMsgCreateClient(t, ctx0)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgCreateClient(t, ctx1)))
 
-	// Update Clients // TODO must call cc.UpdateSequence
-	// require.NoError(app0.runMsg(stub0, app0.createMsgUpdateClient(t)))
-	// require.NoError(app1.runMsg(stub1, app1.createMsgUpdateClient(t)))
+	// Update Clients
+	app0Tk.Add(5 * time.Second)
+	_, err = app0.updateSequence(ctx0)
+	require.NoError(err)
+	require.NoError(app0.runMsg(stub0, app0.createMsgUpdateClient(t)))
+
+	app1Tk.Add(5 * time.Second)
+	_, err = app1.updateSequence(ctx1)
+	require.NoError(err)
+	require.NoError(app1.runMsg(stub1, app1.createMsgUpdateClient(t)))
 
 	// Create connection
 	require.NoError(app0.runMsg(stub0, app0.createMsgConnectionOpenInit(t, app1)))
@@ -148,4 +158,20 @@ type staticTMDBProvider struct {
 
 func (p staticTMDBProvider) Provider(_ shim.ChaincodeStubInterface) dbm.DB {
 	return p.db
+}
+
+type timeKeeper struct {
+	tm time.Time
+}
+
+func newTimeKeeper() *timeKeeper {
+	return &timeKeeper{tm: tmtime.Now()}
+}
+
+func (tk timeKeeper) Now() time.Time {
+	return tk.tm
+}
+
+func (tk *timeKeeper) Add(d time.Duration) {
+	tk.tm = tk.tm.Add(d)
 }
