@@ -66,6 +66,25 @@ func MakeConnectionStateCommitmentEntryKey(prefix commitmentexported.Prefix, con
 	return fmt.Sprintf("h/k:%v/%v/commitment", string(prefix.Bytes()), host.ConnectionPath(connectionID))
 }
 
+/// ChannelStateCommitment
+
+func MakeChannelStateCommitmentEntry(
+	prefix commitmentexported.Prefix,
+	portID string,
+	channelID string,
+	channelBytes []byte,
+) (*Entry, error) {
+	key := MakeChannelStateCommitmentEntryKey(prefix, portID, channelID)
+	return &Entry{
+		Key:   key,
+		Value: channelBytes,
+	}, nil
+}
+
+func MakeChannelStateCommitmentEntryKey(prefix commitmentexported.Prefix, portID, channelID string) string {
+	return fmt.Sprintf("h/k:%v/%v/commitment", string(prefix.Bytes()), host.ChannelPath(portID, channelID))
+}
+
 /// PacketCommitment
 
 func MakePacketCommitmentEntry(

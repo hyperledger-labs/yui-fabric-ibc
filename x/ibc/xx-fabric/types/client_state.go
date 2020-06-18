@@ -178,11 +178,7 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.ChannelPath(portID, channelID))
-	if err != nil {
-		return err
-	}
-
+	key := commitment.MakeChannelStateCommitmentEntryKey(prefix, portID, channelID)
 	channelEnd, ok := channel.(channeltypes.Channel)
 	if !ok {
 		return sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "invalid channel type %T", channel)
@@ -193,12 +189,11 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
 	}
-
 	return nil
 }
 
