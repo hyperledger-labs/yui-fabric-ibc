@@ -11,6 +11,7 @@ import (
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
@@ -22,6 +23,11 @@ type IBCChaincode struct {
 	runner      AppRunner
 }
 
+func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface) error {
+	_, err := c.sequenceMgr.InitSequence(ctx.GetStub())
+	return err
+}
+
 func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface, msgJSON string) error {
 	return c.runner.RunMsg(ctx.GetStub(), msgJSON)
 }
@@ -31,7 +37,7 @@ func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterfac
 	return err
 }
 
-func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) error {
+func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) (*commitment.Entry, error) {
 	var (
 		seq *commitment.Sequence
 		err error
@@ -45,14 +51,17 @@ func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionCont
 		seq, err = c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	entry, err := commitment.MakeSequenceCommitmentEntry(seq)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return ctx.GetStub().PutState(entry.Key, entry.Value)
+	if err := ctx.GetStub().PutState(entry.Key, entry.Value); err != nil {
+		return nil, err
+	}
+	return entry, nil
 }
 
 func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.Entry, error) {
@@ -64,7 +73,7 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 		if !found {
 			return sdkerrors.Wrap(types.ErrConnectionNotFound, "cannot relay ACK of open attempt")
 		}
-		bz, err := app.cdc.MarshalBinaryBare(connection)
+		bz, err := proto.Marshal(&connection)
 		if err != nil {
 			return err
 		}
@@ -138,10 +147,11 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 
 func NewIBCChaincode() *IBCChaincode {
 	logger := log.NewTMLogger(os.Stdout)
-	runner := NewAppRunner(logger, DefaultDBProvider)
+	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
+	runner := NewAppRunner(logger, DefaultDBProvider, &sequenceMgr)
 	c := &IBCChaincode{
+		sequenceMgr: sequenceMgr,
 		runner:      runner,
-		sequenceMgr: commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey))),
 	}
 	return c
 }

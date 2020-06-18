@@ -5,33 +5,31 @@ import (
 	"strings"
 
 	"github.com/tendermint/tendermint/libs/log"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	"github.com/cosmos/cosmos-sdk/x/ibc/02-client/types"
-	ibctmtypes "github.com/cosmos/cosmos-sdk/x/ibc/07-tendermint/types"
-	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
-	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 // Keeper represents a type that grants read and write permissions to any client
 // state information
 type Keeper struct {
-	storeKey      sdk.StoreKey
-	cdc           *codec.Codec
-	stakingKeeper types.StakingKeeper
+	storeKey                 sdk.StoreKey
+	cdc                      *codec.Codec
+	stakingKeeper            types.StakingKeeper
+	selfConsensusStateKeeper SelfConsensusStateKeeper
 }
 
 // NewKeeper creates a new NewKeeper instance
-func NewKeeper(cdc *codec.Codec, key sdk.StoreKey, sk types.StakingKeeper) Keeper {
+func NewKeeper(cdc *codec.Codec, key sdk.StoreKey, sk types.StakingKeeper, csk SelfConsensusStateKeeper) Keeper {
 	return Keeper{
-		storeKey:      key,
-		cdc:           cdc,
-		stakingKeeper: sk,
+		storeKey:                 key,
+		cdc:                      cdc,
+		stakingKeeper:            sk,
+		selfConsensusStateKeeper: csk,
 	}
 }
 
@@ -45,6 +43,7 @@ func (k Keeper) GetClientState(ctx sdk.Context, clientID string) (exported.Clien
 	store := k.ClientStore(ctx, clientID)
 	bz := store.Get(host.KeyClientState())
 	if bz == nil {
+		fmt.Println("not found", clientID)
 		return nil, false
 	}
 
@@ -187,23 +186,29 @@ func (k Keeper) GetClientConsensusStateLTE(ctx sdk.Context, clientID string, max
 	return nil, false
 }
 
-// GetSelfConsensusState introspects the (self) past historical info at a given height
-// and returns the expected consensus state at that height.
+// Currently clientKeeper supports only tendermint client, so we modify this method to get a fabric consensus state.
+// // GetSelfConsensusState introspects the (self) past historical info at a given height
+// // and returns the expected consensus state at that height.
+// func (k Keeper) GetSelfConsensusState(ctx sdk.Context, height uint64) (exported.ConsensusState, bool) {
+// 	histInfo, found := k.stakingKeeper.GetHistoricalInfo(ctx, int64(height))
+// 	if !found {
+// 		return nil, false
+// 	}
+
+// 	valSet := stakingtypes.Validators(histInfo.Valset)
+
+// 	consensusState := ibctmtypes.ConsensusState{
+// 		Height:       height,
+// 		Timestamp:    histInfo.Header.Time,
+// 		Root:         commitmenttypes.NewMerkleRoot(histInfo.Header.AppHash),
+// 		ValidatorSet: tmtypes.NewValidatorSet(valSet.ToTmValidators()),
+// 	}
+// 	return consensusState, true
+// }
+
+// TODO GetSelfConsensusState should be given client type
 func (k Keeper) GetSelfConsensusState(ctx sdk.Context, height uint64) (exported.ConsensusState, bool) {
-	histInfo, found := k.stakingKeeper.GetHistoricalInfo(ctx, int64(height))
-	if !found {
-		return nil, false
-	}
-
-	valSet := stakingtypes.Validators(histInfo.Valset)
-
-	consensusState := ibctmtypes.ConsensusState{
-		Height:       height,
-		Timestamp:    histInfo.Header.Time,
-		Root:         commitmenttypes.NewMerkleRoot(histInfo.Header.AppHash),
-		ValidatorSet: tmtypes.NewValidatorSet(valSet.ToTmValidators()),
-	}
-	return consensusState, true
+	return k.selfConsensusStateKeeper.Get(ctx, height)
 }
 
 // IterateClients provides an iterator over all stored light client State

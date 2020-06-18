@@ -20,9 +20,12 @@ import (
 	port "github.com/cosmos/cosmos-sdk/x/ibc/05-port"
 	"github.com/cosmos/cosmos-sdk/x/params"
 	"github.com/cosmos/cosmos-sdk/x/staking"
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
+	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
 	ibcante "github.com/datachainlab/fabric-ibc/x/ibc/ante"
+	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
@@ -51,12 +54,14 @@ type AppRunner struct {
 	logger     log.Logger
 	traceStore io.Writer
 	dbProvider DBProvider
+	seqMgr     *commitment.SequenceManager
 }
 
-func NewAppRunner(logger log.Logger, dbProvider DBProvider) AppRunner {
+func NewAppRunner(logger log.Logger, dbProvider DBProvider, seqMgr *commitment.SequenceManager) AppRunner {
 	return AppRunner{
 		logger:     logger,
 		dbProvider: dbProvider,
+		seqMgr:     seqMgr,
 	}
 }
 
@@ -79,7 +84,7 @@ func (r AppRunner) setHeight(stub shim.ChaincodeStubInterface, height int64) {
 // TODO refactoring this func and RunMsg
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error) error {
 	db := r.dbProvider(stub)
-	app, err := NewApp(r.logger, db, r.traceStore, true, bam.SetPruning(storetypes.PruneEverything))
+	app, err := NewApp(r.logger, db, r.traceStore, true, r.getSelfConsensusStateProvider(stub), bam.SetPruning(storetypes.PruneEverything))
 	if err != nil {
 		return err
 	}
@@ -105,7 +110,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error)
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) error {
 	// FIXME can we reuse single instance instead of making new app per request?
 	db := r.dbProvider(stub)
-	app, err := NewApp(r.logger, db, r.traceStore, true, bam.SetPruning(storetypes.PruneEverything))
+	app, err := NewApp(r.logger, db, r.traceStore, true, r.getSelfConsensusStateProvider(stub), bam.SetPruning(storetypes.PruneEverything))
 	if err != nil {
 		return err
 	}
@@ -134,9 +139,16 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) erro
 	return nil
 }
 
+func (r AppRunner) getSelfConsensusStateProvider(stub shim.ChaincodeStubInterface) SelfConsensusStateKeeperProvider {
+	return func() client.SelfConsensusStateKeeper {
+		return fabric.NewConsensusStateKeeper(stub, r.seqMgr)
+	}
+}
+
 type App struct {
 	*bam.BaseApp
-	cdc *codec.Codec
+	cdc      *codec.Codec
+	appCodec *std.Codec
 
 	txDecoder sdk.TxDecoder
 
@@ -179,7 +191,7 @@ func JSONTxDecoder(cdc *codec.Codec) sdk.TxDecoder {
 
 // NewSimApp returns a reference to an initialized SimApp.
 func NewApp(
-	logger log.Logger, db dbm.DB, traceStore io.Writer, loadLatest bool, baseAppOptions ...func(*bam.BaseApp),
+	logger log.Logger, db dbm.DB, traceStore io.Writer, loadLatest bool, cskProvider SelfConsensusStateKeeperProvider, baseAppOptions ...func(*bam.BaseApp),
 ) (*App, error) {
 	appCodec, cdc := MakeCodecs()
 
@@ -195,6 +207,7 @@ func NewApp(
 	app := &App{
 		BaseApp:   bApp,
 		cdc:       cdc,
+		appCodec:  appCodec,
 		keys:      keys,
 		memKeys:   memKeys,
 		subspaces: make(map[string]params.Subspace),
@@ -204,7 +217,7 @@ func NewApp(
 	app.CapabilityKeeper = capability.NewKeeper(appCodec, keys[capability.StoreKey], memKeys[capability.MemStoreKey])
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibc.ModuleName)
 	app.IBCKeeper = ibc.NewKeeper(
-		app.cdc, appCodec, keys[ibc.StoreKey], nil, scopedIBCKeeper, // TODO set stakingKeeper
+		app.cdc, appCodec, keys[ibc.StoreKey], nil, cskProvider(), scopedIBCKeeper, // TODO set stakingKeeper
 	)
 
 	// Create static IBC router, add transfer route, then set and seal it
@@ -312,3 +325,5 @@ func NewAnteHandler(
 		ibcante.NewProofVerificationDecorator(ibcKeeper.ClientKeeper, ibcKeeper.ChannelKeeper), // innermost AnteDecorator
 	)
 }
+
+type SelfConsensusStateKeeperProvider func() client.SelfConsensusStateKeeper

@@ -18,6 +18,7 @@ func RegisterCodec(cdc *codec.Codec) {
 
 	// fabric-ibc types
 	cdc.RegisterConcrete(ClientState{}, "ibc/fabric/types/ClientState", nil)
+	cdc.RegisterConcrete(ConsensusState{}, "ibc/fabric/types/ConsensusState", nil)
 	cdc.RegisterConcrete(ChaincodeHeader{}, "ibc/fabric/types/ChaincodeHeader", nil)
 	cdc.RegisterConcrete(ChaincodeInfo{}, "ibc/fabric/types/ChaincodeInfo", nil)
 	cdc.RegisterConcrete(Proof{}, "ibc/fabric/types/Proof", nil)

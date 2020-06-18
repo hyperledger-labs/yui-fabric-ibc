@@ -32,7 +32,7 @@ func (cs ConsensusState) GetHeight() uint64 {
 }
 
 func (cs ConsensusState) GetRoot() commitmentexported.Root {
-	panic("fatal error")
+	return nil
 }
 
 func (cs ConsensusState) GetTimestamp() uint64 {

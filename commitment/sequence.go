@@ -94,6 +94,8 @@ func (m SequenceManager) getCurrentSequence(stub shim.ChaincodeStubInterface) (*
 	bz, err := stub.GetState(MakeCurrentSequenceKey(m.prefix))
 	if err != nil {
 		return nil, err
+	} else if bz == nil {
+		return nil, errors.New("key not found")
 	}
 	var seq Sequence
 	if err := proto.Unmarshal(bz, &seq); err != nil {
@@ -106,6 +108,8 @@ func (m SequenceManager) getSequence(stub shim.ChaincodeStubInterface, value uin
 	bz, err := stub.GetState(MakeSequenceKey(m.prefix, value))
 	if err != nil {
 		return nil, err
+	} else if bz == nil {
+		return nil, errors.New("key not found")
 	}
 	var seq Sequence
 	if err := proto.Unmarshal(bz, &seq); err != nil {

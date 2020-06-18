@@ -1,6 +1,7 @@
 package chaincode
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/std"
@@ -68,38 +69,49 @@ func MakeTestChaincodeApp(
 	}
 }
 
+func (ca TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) error {
+	err := ca.cc.InitChaincode(ctx)
+	if err != nil {
+		return err
+	}
+	seq, err := ca.cc.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+	if err != nil {
+		return err
+	}
+	fmt.Println("Currentseq:", seq.GetValue(), seq.GetTimestamp())
+	return nil
+}
+
 func (ca TestChaincodeApp) runMsg(stub shim.ChaincodeStubInterface, msgs ...sdk.Msg) error {
 	return ca.cc.runner.RunMsg(stub, string(makeStdTxBytes(ca.cdc, ca.prvKey, msgs...)))
 }
 
-func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T) *fabric.MsgCreateClient {
+func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.TransactionContextInterface) *fabric.MsgCreateClient {
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
-	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ccid, pcBytes, nil)
-	ch := fabric.NewChaincodeHeader(ca.seq, tmtime.Now().UnixNano(), fabric.Proof{})
+	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, nil)
+	seq, err := ca.getEndorsedCurrentSequence(ctx)
+	require.NoError(t, err)
+	require.Equal(t, ca.seq, seq.GetValue())
+	ch := fabric.NewChaincodeHeader(seq.Value, seq.Timestamp, fabric.Proof{})
 	h := fabric.NewHeader(ch, ci)
-	msg := fabric.NewMsgCreateClient(clientID0, h, ca.signer)
-	if err := msg.ValidateBasic(); err != nil {
-		require.NoError(t, err)
-	}
+	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
+	require.NoError(t, msg.ValidateBasic())
 	return &msg
 }
 
-func (ca TestChaincodeApp) updateMsgCreateClient(t *testing.T) *fabric.MsgUpdateClient {
+func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdateClient {
 	seq := ca.seq + 1
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
-	ci := fabric.NewChaincodeInfo(fabchannelID, ccid, pcBytes, sigs)
-	ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabric.Proof{})
+	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, sigs)
+	// TODO must use endorsed sequence
+	ch := fabric.NewChaincodeHeader(seq, tmtime.Now().Unix(), fabric.Proof{})
 	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ch.Proof = *proof
 	h := fabric.NewHeader(ch, ci)
-	msg := fabric.NewMsgUpdateClient(clientID0, h, ca.signer)
-	if err := msg.ValidateBasic(); err != nil {
-		panic(err)
-	}
+	msg := fabric.NewMsgUpdateClient(ca.clientID, h, ca.signer)
+	require.NoError(t, msg.ValidateBasic())
 	return &msg
 }
 
@@ -115,19 +127,16 @@ func (ca TestChaincodeApp) createMsgConnectionOpenInit(
 		commitmenttypes.NewMerklePrefix([]byte("ibc")),
 		ca.signer,
 	)
-	if err := msg.ValidateBasic(); err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, msg.ValidateBasic())
 	return msg
 }
 
-// TODO fix this
 func (ca TestChaincodeApp) createMsgConnectionOpenTry(
 	t *testing.T,
 	counterPartyCtx contractapi.TransactionContextInterface,
 	counterParty TestChaincodeApp,
 ) *connection.MsgConnectionOpenTry {
-	proofHeight, proofInit, err := counterParty.makeProofConnectionOpenInit(counterPartyCtx, counterParty.connectionID)
+	proofHeight, proofInit, err := counterParty.makeProofConnectionState(counterPartyCtx, counterParty.connectionID)
 	require.NoError(t, err)
 	consensusHeight, proofConsensus, err := counterParty.makeProofConsensus(counterPartyCtx, counterParty.clientID, 1) // TODO the height should be given from argument
 	require.NoError(t, err)
@@ -145,17 +154,68 @@ func (ca TestChaincodeApp) createMsgConnectionOpenTry(
 		consensusHeight,
 		ca.signer,
 	)
-	if err := msg.ValidateBasic(); err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, msg.ValidateBasic())
 	return msg
+}
+
+func (ca TestChaincodeApp) createMsgConnectionOpenAck(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+) *connection.MsgConnectionOpenAck {
+	proofHeight, proofTry, err := counterParty.makeProofConnectionState(counterPartyCtx, counterParty.connectionID)
+	require.NoError(t, err)
+	consensusHeight, proofConsensus, err := counterParty.makeProofConsensus(counterPartyCtx, counterParty.clientID, 1) // TODO the height should be given from argument
+	require.NoError(t, err)
+
+	msg := connection.NewMsgConnectionOpenAck(
+		ca.connectionID,
+		proofTry,
+		proofConsensus,
+		proofHeight,
+		consensusHeight,
+		"1.0.0",
+		ca.signer,
+	)
+	require.NoError(t, msg.ValidateBasic())
+	return msg
+}
+
+func (ca TestChaincodeApp) createMsgConnectionOpenConfirm(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+) *connection.MsgConnectionOpenConfirm {
+	proofHeight, proofConfirm, err := counterParty.makeProofConnectionState(counterPartyCtx, counterParty.connectionID)
+	require.NoError(t, err)
+
+	msg := connection.NewMsgConnectionOpenConfirm(
+		ca.connectionID,
+		proofConfirm,
+		proofHeight,
+		ca.signer,
+	)
+	require.NoError(t, msg.ValidateBasic())
+	return msg
+}
+
+func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
+	entry, err := ca.cc.EndorseSequenceCommitment(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var seq commitment.Sequence
+	if err := proto.Unmarshal(entry.Value, &seq); err != nil {
+		return nil, err
+	}
+	return &seq, nil
 }
 
 func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Entry) (*fabric.Proof, error) {
 	return tests.MakeProof(ca.endorser, entry.Key, entry.Value)
 }
 
-func (ca TestChaincodeApp) makeProofConnectionOpenInit(ctx contractapi.TransactionContextInterface, connectionID string) (uint64, []byte, error) {
+func (ca TestChaincodeApp) makeProofConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (uint64, []byte, error) {
 	entry, err := ca.cc.EndorseConnectionState(ctx, connectionID)
 	if err != nil {
 		return 0, nil, err
