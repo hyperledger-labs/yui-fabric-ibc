@@ -1,10 +1,12 @@
 package compat
 
 import (
+	"os"
 	"testing"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/ibc"
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
@@ -26,6 +28,8 @@ import (
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
@@ -54,6 +58,17 @@ func MakeCodec() *codec.Codec {
 	fabrictypes.RegisterCodec(cdc)
 	localhost.RegisterCodec(cdc)
 	return cdc
+}
+
+func MakeContext(stub shim.ChaincodeStubInterface, keys map[string]*sdk.KVStoreKey) sdk.Context {
+	cms := store.NewCommitMultiStore(NewDB(stub))
+	for _, key := range keys {
+		cms.MountStoreWithDB(key, sdk.StoreTypeIAVL, nil)
+	}
+	if err := cms.LoadLatestVersion(); err != nil {
+		panic(err)
+	}
+	return sdk.NewContext(cms, abci.Header{}, false, log.NewTMLogger(os.Stdout))
 }
 
 type LocalhostHeader struct {
