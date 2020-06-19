@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/cosmos/cosmos-sdk/baseapp"
 	bam "github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -39,6 +40,8 @@ import (
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/crypto"
+	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/log"
 	db "github.com/tendermint/tm-db"
 	dbm "github.com/tendermint/tm-db"
@@ -232,7 +235,7 @@ func NewApp(
 
 	keys := sdk.NewKVStoreKeys(
 		auth.StoreKey, banktypes.StoreKey,
-		staking.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capability.StoreKey,
+		staking.StoreKey, paramstypes.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capability.StoreKey,
 	)
 	memKeys := sdk.NewMemoryStoreKeys(capability.MemStoreKey)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
@@ -250,6 +253,9 @@ func NewApp(
 	app.ParamsKeeper = paramskeeper.NewKeeper(appCodec, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
 	app.subspaces[auth.ModuleName] = app.ParamsKeeper.Subspace(auth.DefaultParamspace)
 	app.subspaces[banktypes.ModuleName] = app.ParamsKeeper.Subspace(banktypes.DefaultParamspace)
+
+	// set the BaseApp's parameter store
+	bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(std.ConsensusParamsKeyTable()))
 
 	// add capability keeper and ScopeToModule for ibc module
 	app.CapabilityKeeper = capability.NewKeeper(appCodec, keys[capability.StoreKey], memKeys[capability.MemStoreKey])
@@ -304,6 +310,7 @@ func NewApp(
 
 	// initialize stores
 	app.MountKVStores(keys)
+	app.MountTransientStores(tkeys)
 	app.MountMemoryStores(memKeys)
 
 	// initialize BaseApp
@@ -355,12 +362,41 @@ func (app *App) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.Respo
 	return app.mm.EndBlock(ctx, req)
 }
 
+var MasterAccount crypto.PrivKey
+
+func init() {
+	MasterAccount = secp256k1.GenPrivKey()
+}
+
 // InitChainer application update at chain initialization
 func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 	var genesisState simapp.GenesisState
 	app.cdc.MustUnmarshalJSON(req.AppStateBytes, &genesisState)
 
 	res := app.mm.InitGenesis(ctx, app.cdc, genesisState)
+	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/simapp/cmd/simd/genaccounts.go#L73
+	// FIXME these states should be moved into genesisState
+	auth.InitGenesis(
+		ctx,
+		app.AccountKeeper,
+		auth.NewGenesisState(
+			auth.DefaultParams(),
+			auth.GenesisAccounts{
+				auth.NewBaseAccount(
+					sdk.AccAddress(MasterAccount.PubKey().Address()),
+					MasterAccount.PubKey(),
+					1,
+					1,
+				),
+			},
+		),
+	)
+	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
+	coins := sdk.NewCoins(sdk.NewCoin("ftk", sdk.NewInt(1000)))
+	balances := banktypes.Balance{Address: addr, Coins: coins.Sort()}
+	bankState := bank.DefaultGenesisState()
+	bankState.Balances = append(bankState.Balances, balances)
+	bank.InitGenesis(ctx, app.BankKeeper, bankState)
 	transfer.InitGenesis(ctx, app.TransferKeeper, ibctransfertypes.DefaultGenesisState())
 	return res
 }

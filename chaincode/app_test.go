@@ -1,6 +1,7 @@
 package chaincode
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -32,13 +33,13 @@ func TestApp(t *testing.T) {
 		clientID0     = "ibcclient0"
 		connectionID0 = "connection0"
 		portID0       = "transfer"
-		channelID0    = "channelID0"
+		channelID0    = "channelid0"
 		channelOrder0 = channel.ORDERED
 
 		clientID1     = "ibcclient1"
 		connectionID1 = "connection1"
 		portID1       = "transfer"
-		channelID1    = "channelID1"
+		channelID1    = "channelid1"
 		channelOrder1 = channel.ORDERED
 	)
 
@@ -108,6 +109,14 @@ func TestApp(t *testing.T) {
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenTry(t, ctx0, app0)))
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenAck(t, ctx1, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenConfirm(t, ctx0, app0)))
+
+	// Setup transfer
+	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/x/ibc-transfer/keeper/relay_test.go#L21
+	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
+	denom := fmt.Sprintf("%v/%v/ftk", app1.portID, app1.channelID)
+	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
+	app0.signer = addr
+	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
 }
 
 type mockContext struct {

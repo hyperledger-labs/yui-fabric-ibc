@@ -12,14 +12,6 @@ const (
 
 var _ exported.Proof = Proof{}
 
-// type Proof struct {
-// 	Proposal      []byte
-// 	NSIndex       uint32
-// 	WriteSetIndex uint32
-// 	Identities    [][]byte
-// 	Signatures    [][]byte // signatures of endorsers. This order must be equals consensState.endorsers order.
-// }
-
 // GetCommitmentType implements ProofI.
 func (Proof) GetCommitmentType() exported.Type {
 	return CommitmentTypeFabric
@@ -51,10 +43,6 @@ func (proof Proof) ValidateBasic() error {
 }
 
 var _ exported.Prefix = (*Prefix)(nil)
-
-// type Prefix struct {
-// 	Value []byte
-// }
 
 // NewPrefix constructs new Prefix instance
 func NewPrefix(value []byte) Prefix {

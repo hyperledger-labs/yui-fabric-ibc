@@ -5,6 +5,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	transfer "github.com/cosmos/cosmos-sdk/x/ibc-transfer"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
@@ -116,10 +117,9 @@ func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdate
 	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, sigs)
-	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.Proof{})
-	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ch.Sequence.Bytes())
+	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ca.seq.Bytes())
 	require.NoError(t, err)
-	ch.Proof = *proof
+	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, *proof)
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgUpdateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
@@ -287,6 +287,25 @@ func (ca TestChaincodeApp) createMsgChannelOpenConfirm(
 	)
 	require.NoError(t, msg.ValidateBasic())
 	return msg
+}
+
+func (ca TestChaincodeApp) createMsgTransfer(
+	t *testing.T,
+	counterParty TestChaincodeApp,
+	amount sdk.Coins,
+	receiver sdk.AccAddress,
+	timeoutHeight uint64,
+	timeoutTimestamp uint64,
+) *transfer.MsgTransfer {
+	return transfer.NewMsgTransfer(
+		ca.portID,
+		ca.channelID,
+		amount,
+		ca.signer,
+		receiver.String(),
+		timeoutHeight,
+		timeoutTimestamp,
+	)
 }
 
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
