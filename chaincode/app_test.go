@@ -117,6 +117,7 @@ func TestApp(t *testing.T) {
 	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
 	app0.signer = addr
 	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
+	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, coins)))
 }
 
 type mockContext struct {

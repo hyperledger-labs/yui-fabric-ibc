@@ -1,6 +1,7 @@
 package chaincode
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/std"
@@ -308,6 +309,26 @@ func (ca TestChaincodeApp) createMsgTransfer(
 	)
 }
 
+func (ca TestChaincodeApp) createMsgPacketForTransfer(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+	coins sdk.Coins,
+) *channel.MsgPacket {
+	data := ibctransfertypes.NewFungibleTokenPacketData(coins, counterParty.signer.String(), counterParty.signer.String())
+	packet := channel.NewPacket(data.GetBytes(), 1, counterParty.portID, counterParty.channelID, ca.portID, ca.channelID, 1000, 0)
+	fmt.Println("we expect packet:", data.String())
+	proofHeight, packetProof, err := counterParty.makeProofPacketCommitment(counterPartyCtx, counterParty.portID, counterParty.channelID, 1)
+	require.NoError(t, err)
+
+	return channel.NewMsgPacket(
+		packet,
+		packetProof,
+		proofHeight,
+		ca.signer,
+	)
+}
+
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
 	entry, err := ca.cc.EndorseSequenceCommitment(ctx)
 	if err != nil {
@@ -355,6 +376,22 @@ func (ca TestChaincodeApp) makeProofConnectionState(ctx contractapi.TransactionC
 
 func (ca TestChaincodeApp) makeProofChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (uint64, []byte, error) {
 	entry, err := ca.cc.EndorseChannelState(ctx, portID, channelID)
+	if err != nil {
+		return 0, nil, err
+	}
+	proof, err := ca.makeMockEndorsedCommitmentProof(entry)
+	if err != nil {
+		return 0, nil, err
+	}
+	bz, err := proto.Marshal(proof)
+	if err != nil {
+		return 0, nil, err
+	}
+	return 1, bz, nil // FIXME returns current height
+}
+
+func (ca TestChaincodeApp) makeProofPacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (uint64, []byte, error) {
+	entry, err := ca.cc.EndorsePacketCommitment(ctx, portID, channelID, sequence)
 	if err != nil {
 		return 0, nil, err
 	}

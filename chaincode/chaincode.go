@@ -123,15 +123,16 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 	return entry, nil
 }
 
-func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) error {
-	return c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.Entry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
 		c := app.NewContext(false, abci.Header{})
 		cmbz := app.IBCKeeper.ChannelKeeper.GetPacketCommitment(c, portID, channelID, sequence)
 		if cmbz == nil {
 			return errors.New("commitment not found")
 		}
 
-		entry, err := commitment.MakePacketCommitmentEntry(
+		e, err := commitment.MakePacketCommitmentEntry(
 			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
 			portID,
 			channelID,
@@ -141,9 +142,14 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 		if err != nil {
 			return err
 		}
+		fmt.Println("Endorse packet commitment:", cmbz)
+		entry = e
 		// TODO also put timestamp and sequence entry?
-		return ctx.GetStub().PutState(entry.Key, entry.Value)
-	})
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry, nil
 }
 
 func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.Entry, error) {
