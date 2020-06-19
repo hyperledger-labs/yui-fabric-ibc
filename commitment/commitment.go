@@ -159,3 +159,24 @@ func MakePacketAcknowledgementAbsenceEntryKey(
 	key := host.PacketAcknowledgementPath(portID, channelID, sequence)
 	return MakeEntryKey(prefix, key)
 }
+
+/// NextSequenceRecv
+
+func MakeNextSequenceRecvEntry(
+	prefix commitmentexported.Prefix,
+	portID, channelID string, seq uint64,
+) (*Entry, error) {
+	key := MakeNextSequenceRecvEntryKey(prefix, portID, channelID)
+	return &Entry{
+		Key:   key,
+		Value: sdk.Uint64ToBigEndian(seq),
+	}, nil
+}
+
+func MakeNextSequenceRecvEntryKey(
+	prefix commitmentexported.Prefix,
+	portID, channelID string,
+) string {
+	key := host.NextSequenceRecvPath(portID, channelID)
+	return MakeEntryKey(prefix, key)
+}

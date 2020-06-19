@@ -314,10 +314,12 @@ func (ca TestChaincodeApp) createMsgPacketForTransfer(
 	counterPartyCtx contractapi.TransactionContextInterface,
 	counterParty TestChaincodeApp,
 	coins sdk.Coins,
+	timeoutHeight uint64,
+	timeoutTimestamp uint64,
 ) *channel.MsgPacket {
 	data := ibctransfertypes.NewFungibleTokenPacketData(coins, counterParty.signer.String(), counterParty.signer.String())
-	packet := channel.NewPacket(data.GetBytes(), 1, counterParty.portID, counterParty.channelID, ca.portID, ca.channelID, 1000, 0)
-	fmt.Println("we expect packet:", data.String())
+	// TODO make timeout configurable
+	packet := channel.NewPacket(data.GetBytes(), 1, counterParty.portID, counterParty.channelID, ca.portID, ca.channelID, timeoutHeight, timeoutTimestamp)
 	proofHeight, packetProof, err := counterParty.makeProofPacketCommitment(counterPartyCtx, counterParty.portID, counterParty.channelID, 1)
 	require.NoError(t, err)
 
@@ -327,6 +329,42 @@ func (ca TestChaincodeApp) createMsgPacketForTransfer(
 		proofHeight,
 		ca.signer,
 	)
+}
+
+func (ca TestChaincodeApp) createMsgAcknowledgement(
+	t *testing.T,
+) *channel.MsgAcknowledgement {
+
+	// return channel.NewMsgAcknowledgement()
+	return nil
+}
+
+func (ca TestChaincodeApp) createMsgTimeoutPacket(
+	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+	coins sdk.Coins,
+	nextSequenceRecv uint64,
+	order channel.Order,
+	timeoutHeight uint64,
+	timeoutTimestamp uint64,
+) *channel.MsgTimeout {
+	data := ibctransfertypes.NewFungibleTokenPacketData(coins, ca.signer.String(), ca.signer.String())
+	packet := channel.NewPacket(data.GetBytes(), 1, ca.portID, ca.channelID, counterParty.portID, counterParty.channelID, timeoutHeight, timeoutTimestamp)
+
+	var proofHeight uint64
+	var proof []byte
+	var err error
+	if order == channel.UNORDERED {
+		panic("not implemented error")
+	} else if order == channel.ORDERED {
+		proofHeight, proof, err = counterParty.makeProofNextSequenceRecv(counterPartyCtx, counterParty.portID, counterParty.channelID, nextSequenceRecv)
+		require.NoError(t, err)
+	} else {
+		panic(fmt.Sprintf("unknown channel order type: %v", order.String()))
+	}
+
+	return channel.NewMsgTimeout(packet, nextSequenceRecv, proof, proofHeight, ca.signer)
 }
 
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
@@ -404,4 +442,20 @@ func (ca TestChaincodeApp) makeProofPacketCommitment(ctx contractapi.Transaction
 		return 0, nil, err
 	}
 	return 1, bz, nil // FIXME returns current height
+}
+
+func (ca TestChaincodeApp) makeProofNextSequenceRecv(ctx contractapi.TransactionContextInterface, portID, channelID string, nextSequenceRecv uint64) (uint64, []byte, error) {
+	entry, err := ca.cc.EndorseNextSequenceRecv(ctx, portID, channelID)
+	if err != nil {
+		return 0, nil, err
+	}
+	proof, err := ca.makeMockEndorsedCommitmentProof(entry)
+	if err != nil {
+		return 0, nil, err
+	}
+	bz, err := proto.Marshal(proof)
+	if err != nil {
+		return 0, nil, err
+	}
+	return ca.seq.Value, bz, nil
 }

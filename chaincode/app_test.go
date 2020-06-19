@@ -116,8 +116,32 @@ func TestApp(t *testing.T) {
 	denom := fmt.Sprintf("%v/%v/ftk", app1.portID, app1.channelID)
 	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
 	app0.signer = addr
-	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
-	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, coins)))
+
+	// // Success
+	// require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
+	// require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, coins, 1000, 0)))
+	// // TODO ACK?
+
+	// Timeout
+	var timeoutHeight uint64 = 3
+	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, timeoutHeight, 0)))
+	// require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, coins, timeoutHeight, 0)))
+
+	// Update Clients
+	{
+		app0Tk.Add(5 * time.Second)
+		_, err = app0.updateSequence(ctx0)
+		require.NoError(err)
+		require.NoError(app0.runMsg(stub0, app0.createMsgUpdateClient(t)))
+
+		app1Tk.Add(5 * time.Second)
+		_, err = app1.updateSequence(ctx1)
+		require.NoError(err)
+		require.NoError(app1.runMsg(stub1, app1.createMsgUpdateClient(t)))
+	}
+
+	require.NoError(app0.runMsg(stub0, app0.createMsgTimeoutPacket(t, ctx1, app1, coins, 1, channel.ORDERED, timeoutHeight, 0)))
+
 }
 
 type mockContext struct {

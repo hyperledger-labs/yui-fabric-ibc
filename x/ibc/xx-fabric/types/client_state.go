@@ -244,13 +244,9 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketAcknowledgementPath(portID, channelID, sequence))
-	if err != nil {
-		return err
-	}
-
+	key := commitment.MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
 	bz := channeltypes.CommitAcknowledgement(acknowledgement)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -277,12 +273,8 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketAcknowledgementPath(portID, channelID, sequence))
-	if err != nil {
-		return err
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), nil); err != nil {
+	key := commitment.MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, nil); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -308,13 +300,9 @@ func (cs ClientState) VerifyNextSequenceRecv(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.NextSequenceRecvPath(portID, channelID))
-	if err != nil {
-		return err
-	}
-
+	key := commitment.MakeNextSequenceRecvEntryKey(prefix, portID, channelID)
 	bz := sdk.Uint64ToBigEndian(nextSequenceRecv)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
