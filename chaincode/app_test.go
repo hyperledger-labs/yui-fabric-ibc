@@ -127,7 +127,7 @@ func TestApp(t *testing.T) {
 	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
 	packet := createPacket(app0, app1, coins, 1000, 0)
 	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, packet)))
-	// require.NoError(app0.runMsg(stub0, app0.createMsgAcknowledgement(t, ctx1, app1, packet)))
+	require.NoError(app0.runMsg(stub0, app0.createMsgAcknowledgement(t, ctx1, app1, packet)))
 
 	// // Timeout
 	// var timeoutHeight uint64 = 3
