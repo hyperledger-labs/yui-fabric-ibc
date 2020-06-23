@@ -313,16 +313,10 @@ func (ca TestChaincodeApp) createMsgPacketForTransfer(
 	t *testing.T,
 	counterPartyCtx contractapi.TransactionContextInterface,
 	counterParty TestChaincodeApp,
-	coins sdk.Coins,
-	timeoutHeight uint64,
-	timeoutTimestamp uint64,
+	packet channel.Packet,
 ) *channel.MsgPacket {
-	data := ibctransfertypes.NewFungibleTokenPacketData(coins, counterParty.signer.String(), counterParty.signer.String())
-	// TODO make timeout configurable
-	packet := channel.NewPacket(data.GetBytes(), 1, counterParty.portID, counterParty.channelID, ca.portID, ca.channelID, timeoutHeight, timeoutTimestamp)
 	proofHeight, packetProof, err := counterParty.makeProofPacketCommitment(counterPartyCtx, counterParty.portID, counterParty.channelID, 1)
 	require.NoError(t, err)
-
 	return channel.NewMsgPacket(
 		packet,
 		packetProof,
@@ -333,10 +327,14 @@ func (ca TestChaincodeApp) createMsgPacketForTransfer(
 
 func (ca TestChaincodeApp) createMsgAcknowledgement(
 	t *testing.T,
+	counterPartyCtx contractapi.TransactionContextInterface,
+	counterParty TestChaincodeApp,
+	packet channel.Packet,
 ) *channel.MsgAcknowledgement {
-
-	// return channel.NewMsgAcknowledgement()
-	return nil
+	proofHeight, proof, err := counterParty.makeProofPacketAcknowledgement(counterPartyCtx, counterParty.portID, counterParty.channelID, 1)
+	require.NoError(t, err)
+	ack := ibctransfertypes.FungibleTokenPacketAcknowledgement{Success: true}
+	return channel.NewMsgAcknowledgement(packet, ack.GetBytes(), proof, proofHeight, ca.signer)
 }
 
 func (ca TestChaincodeApp) createMsgTimeoutPacket(
@@ -430,6 +428,22 @@ func (ca TestChaincodeApp) makeProofChannelState(ctx contractapi.TransactionCont
 
 func (ca TestChaincodeApp) makeProofPacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (uint64, []byte, error) {
 	entry, err := ca.cc.EndorsePacketCommitment(ctx, portID, channelID, sequence)
+	if err != nil {
+		return 0, nil, err
+	}
+	proof, err := ca.makeMockEndorsedCommitmentProof(entry)
+	if err != nil {
+		return 0, nil, err
+	}
+	bz, err := proto.Marshal(proof)
+	if err != nil {
+		return 0, nil, err
+	}
+	return 1, bz, nil // FIXME returns current height
+}
+
+func (ca TestChaincodeApp) makeProofPacketAcknowledgement(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (uint64, []byte, error) {
+	entry, err := ca.cc.EndorsePacketAcknowledgement(ctx, portID, channelID, sequence)
 	if err != nil {
 		return 0, nil, err
 	}

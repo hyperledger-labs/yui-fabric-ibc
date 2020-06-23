@@ -274,7 +274,7 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 	}
 
 	key := commitment.MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, nil); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")

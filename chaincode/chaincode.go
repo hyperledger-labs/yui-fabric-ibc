@@ -144,7 +144,57 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 			return err
 		}
 		entry = e
-		// TODO also put timestamp and sequence entry?
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
+
+func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.Entry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+		c := app.NewContext(false, abci.Header{})
+		ackBytes, ok := app.IBCKeeper.ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
+		if !ok {
+			return errors.New("acknowledgement packet not found")
+		}
+		e, err := commitment.MakePacketAcknowledgementEntry(
+			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			portID,
+			channelID,
+			sequence,
+			ackBytes,
+		)
+		if err != nil {
+			return err
+		}
+		entry = e
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
+
+func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.Entry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
+		c := app.NewContext(false, abci.Header{})
+		_, ok := app.IBCKeeper.ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
+		if ok {
+			return errors.New("acknowledgement packet found")
+		}
+		e, err := commitment.MakePacketAcknowledgementAbsenceEntry(
+			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			portID,
+			channelID,
+			sequence,
+		)
+		if err != nil {
+			return err
+		}
+		entry = e
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err

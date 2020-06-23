@@ -1,11 +1,9 @@
 package commitment
 
 import (
-	"errors"
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	commitmentexported "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
 )
@@ -109,19 +107,12 @@ func MakePacketCommitmentEntryKey(
 /// PacketAcknowledgement
 
 func MakePacketAcknowledgementEntry(
-	ctx sdk.Context,
-	channelKeeper channel.Keeper,
 	prefix commitmentexported.Prefix,
-	portID, channelID string, sequence uint64) (*Entry, error) {
-
-	ackbz, ok := channelKeeper.GetPacketAcknowledgement(ctx, portID, channelID, sequence)
-	if !ok {
-		return nil, errors.New("acknowledgement packet not found")
-	}
+	portID, channelID string, sequence uint64, ackBytes []byte) (*Entry, error) {
 	key := MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
 	return &Entry{
 		Key:   key,
-		Value: ackbz,
+		Value: ackBytes,
 	}, nil
 }
 
@@ -136,15 +127,8 @@ func MakePacketAcknowledgementEntryKey(
 /// PacketAcknowledgementAbsence
 
 func MakePacketAcknowledgementAbsenceEntry(
-	ctx sdk.Context,
-	channelKeeper channel.Keeper,
 	prefix commitmentexported.Prefix,
 	portID, channelID string, sequence uint64) (*Entry, error) {
-
-	_, ok := channelKeeper.GetPacketAcknowledgement(ctx, portID, channelID, sequence)
-	if ok {
-		return nil, errors.New("acknowledgement packet found")
-	}
 	key := MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
 	return &Entry{
 		Key:   key,
