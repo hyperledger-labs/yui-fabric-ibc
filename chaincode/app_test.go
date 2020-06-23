@@ -1,12 +1,14 @@
 package chaincode
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/std"
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
@@ -32,13 +34,13 @@ func TestApp(t *testing.T) {
 		clientID0     = "ibcclient0"
 		connectionID0 = "connection0"
 		portID0       = "transfer"
-		channelID0    = "channelID0"
+		channelID0    = "channelid0"
 		channelOrder0 = channel.ORDERED
 
 		clientID1     = "ibcclient1"
 		connectionID1 = "connection1"
 		portID1       = "transfer"
-		channelID1    = "channelID1"
+		channelID1    = "channelid1"
 		channelOrder1 = channel.ORDERED
 	)
 
@@ -108,6 +110,44 @@ func TestApp(t *testing.T) {
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenTry(t, ctx0, app0)))
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenAck(t, ctx1, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenConfirm(t, ctx0, app0)))
+
+	var createPacket = func(src, dst TestChaincodeApp, coins sdk.Coins, seq, timeoutHeight, timeoutTimestamp uint64) channel.Packet {
+		data := ibctransfertypes.NewFungibleTokenPacketData(coins, src.signer.String(), src.signer.String())
+		return channel.NewPacket(data.GetBytes(), seq, src.portID, src.channelID, dst.portID, dst.channelID, timeoutHeight, timeoutTimestamp)
+	}
+
+	// Setup transfer
+	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/x/ibc-transfer/keeper/relay_test.go#L21
+	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
+	denom := fmt.Sprintf("%v/%v/ftk", app1.portID, app1.channelID)
+	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
+	app0.signer = addr
+
+	// Success
+	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
+	packet0 := createPacket(app0, app1, coins, 1, 1000, 0)
+	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, packet0)))
+	require.NoError(app0.runMsg(stub0, app0.createMsgAcknowledgement(t, ctx1, app1, packet0)))
+
+	// Timeout
+	var timeoutHeight uint64 = 3
+	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, timeoutHeight, 0)))
+	packet1 := createPacket(app0, app1, coins, 2, timeoutHeight, 0)
+
+	// Update Clients
+	{
+		app0Tk.Add(5 * time.Second)
+		_, err = app0.updateSequence(ctx0)
+		require.NoError(err)
+		require.NoError(app0.runMsg(stub0, app0.createMsgUpdateClient(t)))
+
+		app1Tk.Add(5 * time.Second)
+		_, err = app1.updateSequence(ctx1)
+		require.NoError(err)
+		require.NoError(app1.runMsg(stub1, app1.createMsgUpdateClient(t)))
+	}
+
+	require.NoError(app0.runMsg(stub0, app0.createMsgTimeoutPacket(t, ctx1, app1, 2, channel.ORDERED, packet1)))
 }
 
 type mockContext struct {
@@ -130,10 +170,10 @@ func makePolicy(mspids []string) []byte {
 	})
 }
 
-func makeStdTxBytes(cdc *std.Codec, prv crypto.PrivKey, msgs ...sdk.Msg) []byte {
-	tx := auth.StdTx{
+func makeStdTxBytes(cdc codec.Marshaler, prv crypto.PrivKey, msgs ...sdk.Msg) []byte {
+	tx := authtypes.StdTx{
 		Msgs: msgs,
-		Signatures: []auth.StdSignature{
+		Signatures: []authtypes.StdSignature{
 			{PubKey: prv.PubKey().Bytes(), Signature: make([]byte, 64)}, // FIXME set valid signature
 		},
 	}

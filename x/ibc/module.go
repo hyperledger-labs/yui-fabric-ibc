@@ -68,12 +68,12 @@ func (AppModuleBasic) RegisterRESTRoutes(clientCtx client.Context, rtr *mux.Rout
 
 // GetTxCmd returns the root tx command for the ibc module.
 func (AppModuleBasic) GetTxCmd(clientCtx client.Context) *cobra.Command {
-	return cli.GetTxCmd(StoreKey, clientCtx.Codec)
+	return cli.GetTxCmd(clientCtx)
 }
 
 // GetQueryCmd returns no root query command for the ibc module.
 func (AppModuleBasic) GetQueryCmd(clientCtx client.Context) *cobra.Command {
-	return cli.GetQueryCmd(QuerierRoute, clientCtx.Codec)
+	return cli.GetQueryCmd(clientCtx)
 }
 
 // RegisterInterfaceTypes registers module concrete types into protobuf Any.

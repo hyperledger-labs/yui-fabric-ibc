@@ -4,7 +4,8 @@ go 1.14
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
-	github.com/cosmos/cosmos-sdk v0.34.4-0.20200611221925-9048ffa8d351
+	github.com/confio/ics23/go v0.0.0-20200604202538-6e2c36a74465
+	github.com/cosmos/cosmos-sdk v0.34.4-0.20200622203133-4716260a6e2d
 	github.com/fsouza/go-dockerclient v1.6.5 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
@@ -29,3 +30,5 @@ require (
 )
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.2-alpha.regen.4
+
+replace github.com/cosmos/cosmos-sdk => github.com/datachainlab/cosmos-sdk v0.34.4-0.20200623040429-5c9fe2c0d7e5

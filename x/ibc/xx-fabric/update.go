@@ -102,19 +102,24 @@ func checkValidity(
 }
 
 func update(clientState ClientState, header Header) (ClientState, *ConsensusState) {
+	var consensusState *ConsensusState
+
+	if header.ChaincodeInfo == nil && header.ChaincodeHeader == nil {
+		panic("either ChaincodeHeader or ChaincodeInfo must be non-nil value")
+	}
+
 	if header.ChaincodeInfo != nil {
 		clientState.LastChaincodeInfo = *header.ChaincodeInfo
-		return clientState, nil
 	}
 
 	if header.ChaincodeHeader != nil {
 		clientState.LastChaincodeHeader = *header.ChaincodeHeader
-		consensusState := NewConsensusState(
+		cs := NewConsensusState(
 			header.ChaincodeHeader.Sequence.Timestamp,
 			header.GetHeight(),
 		)
-		return clientState, &consensusState
+		consensusState = &cs
 	}
 
-	panic("either ChaincodeHeader or ChaincodeInfo must be non-nil value")
+	return clientState, consensusState
 }
