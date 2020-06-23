@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	ics23 "github.com/confio/ics23/go"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -88,6 +89,12 @@ func (cs ClientState) Validate() error {
 		return fmt.Errorf("height must be positive: %d", cs.GetLatestHeight())
 	}
 	return host.ClientIdentifierValidator(cs.ID)
+}
+
+// GetProofSpecs returns the format the client expects for proof verification
+// as a string array specifying the proof type for each position in chained proof
+func (cs ClientState) GetProofSpecs() []*ics23.ProofSpec {
+	return nil
 }
 
 // VerifyClientConsensusState verifies a proof of the consensus state of the

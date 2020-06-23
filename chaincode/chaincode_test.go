@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/std"
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	transfer "github.com/cosmos/cosmos-sdk/x/ibc-transfer"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
@@ -28,7 +27,7 @@ type TestChaincodeApp struct {
 
 	signer sdk.AccAddress
 	prvKey crypto.PrivKey
-	cdc    *std.Codec
+	cdc    codec.Marshaler
 
 	// Fabric
 	fabChannelID   string
@@ -297,8 +296,8 @@ func (ca TestChaincodeApp) createMsgTransfer(
 	receiver sdk.AccAddress,
 	timeoutHeight uint64,
 	timeoutTimestamp uint64,
-) *transfer.MsgTransfer {
-	return transfer.NewMsgTransfer(
+) *ibctransfertypes.MsgTransfer {
+	return ibctransfertypes.NewMsgTransfer(
 		ca.portID,
 		ca.channelID,
 		amount,

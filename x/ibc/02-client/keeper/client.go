@@ -154,7 +154,7 @@ func (k Keeper) CheckMisbehaviourAndUpdateState(ctx sdk.Context, misbehaviour ex
 	switch e := misbehaviour.(type) {
 	case ibctmtypes.Evidence:
 		clientState, err = tendermint.CheckMisbehaviourAndUpdateState(
-			clientState, consensusState, misbehaviour, consensusState.GetHeight(), ctx.BlockTime(),
+			clientState, consensusState, misbehaviour, consensusState.GetHeight(), ctx.BlockTime(), ctx.ConsensusParams(),
 		)
 
 	default:
@@ -173,6 +173,7 @@ func (k Keeper) CheckMisbehaviourAndUpdateState(ctx sdk.Context, misbehaviour ex
 			types.EventTypeSubmitMisbehaviour,
 			sdk.NewAttribute(types.AttributeKeyClientID, misbehaviour.GetClientID()),
 			sdk.NewAttribute(types.AttributeKeyClientType, misbehaviour.ClientType().String()),
+			sdk.NewAttribute(types.AttributeKeyConsensusHeight, fmt.Sprintf("%d", consensusState.GetHeight())),
 		),
 	)
 

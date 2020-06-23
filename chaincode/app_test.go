@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/std"
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	"github.com/datachainlab/fabric-ibc/x/compat"
@@ -170,10 +170,10 @@ func makePolicy(mspids []string) []byte {
 	})
 }
 
-func makeStdTxBytes(cdc *std.Codec, prv crypto.PrivKey, msgs ...sdk.Msg) []byte {
-	tx := auth.StdTx{
+func makeStdTxBytes(cdc codec.Marshaler, prv crypto.PrivKey, msgs ...sdk.Msg) []byte {
+	tx := authtypes.StdTx{
 		Msgs: msgs,
-		Signatures: []auth.StdSignature{
+		Signatures: []authtypes.StdSignature{
 			{PubKey: prv.PubKey().Bytes(), Signature: make([]byte, 64)}, // FIXME set valid signature
 		},
 	}

@@ -8,9 +8,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/ibc"
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	localhost "github.com/cosmos/cosmos-sdk/x/ibc/09-localhost/types"
+	ibchost "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/tests"
@@ -149,7 +149,7 @@ func TestCreateClient(t *testing.T) {
 
 	/// Setup context
 	keys := sdk.NewKVStoreKeys(
-		ibc.StoreKey,
+		ibchost.StoreKey,
 		client.SubModuleName,
 	)
 	stub := NewMockStub()
@@ -158,7 +158,7 @@ func TestCreateClient(t *testing.T) {
 	cdc := MakeCodec()
 	sk := NewStakingKeeper()
 	csk := fabric.NewConsensusStateKeeper(stub, nil)
-	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibc.StoreKey], sk, csk)
+	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibchost.StoreKey], sk, csk)
 	/// END
 
 	var seq uint64 = 1

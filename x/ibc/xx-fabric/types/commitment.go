@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 
+	ics23 "github.com/confio/ics23/go"
 	"github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
 )
 
@@ -18,12 +19,12 @@ func (Proof) GetCommitmentType() exported.Type {
 }
 
 // VerifyMembership implements ProofI.
-func (Proof) VerifyMembership(exported.Root, exported.Path, []byte) error {
+func (Proof) VerifyMembership([]*ics23.ProofSpec, exported.Root, exported.Path, []byte) error {
 	return nil
 }
 
 // VerifyNonMembership implements ProofI.
-func (Proof) VerifyNonMembership(exported.Root, exported.Path) error {
+func (Proof) VerifyNonMembership([]*ics23.ProofSpec, exported.Root, exported.Path) error {
 	return nil
 }
 

@@ -7,8 +7,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	bam "github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/simapp"
+	simappparams "github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/std"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -17,10 +17,13 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/capability"
+	capabilitykeeper "github.com/cosmos/cosmos-sdk/x/capability/keeper"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	transfer "github.com/cosmos/cosmos-sdk/x/ibc-transfer"
@@ -31,7 +34,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/params"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
-	"github.com/cosmos/cosmos-sdk/x/staking"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
@@ -63,9 +66,9 @@ var (
 
 	// module account permissions
 	maccPerms = map[string][]string{
-		auth.FeeCollectorName:       nil,
+		authtypes.FeeCollectorName:  nil,
 		distrtypes.ModuleName:       nil,
-		ibctransfertypes.ModuleName: {auth.Minter, auth.Burner},
+		ibctransfertypes.ModuleName: {authtypes.Minter, authtypes.Burner},
 	}
 
 	// module accounts that are allowed to receive tokens
@@ -178,7 +181,7 @@ func (r AppRunner) getSelfConsensusStateProvider(stub shim.ChaincodeStubInterfac
 type App struct {
 	*bam.BaseApp
 	cdc      *codec.Codec
-	appCodec *std.Codec
+	appCodec codec.Marshaler
 
 	txDecoder sdk.TxDecoder
 
@@ -187,18 +190,18 @@ type App struct {
 	memKeys map[string]*sdk.MemoryStoreKey
 
 	// subspaces
-	subspaces map[string]params.Subspace
+	subspaces map[string]paramstypes.Subspace
 
 	// keepers
-	AccountKeeper    auth.AccountKeeper
+	AccountKeeper    authkeeper.AccountKeeper
 	BankKeeper       bankkeeper.Keeper
-	CapabilityKeeper *capability.Keeper
+	CapabilityKeeper *capabilitykeeper.Keeper
 	ParamsKeeper     paramskeeper.Keeper
 	IBCKeeper        *ibc.Keeper
 	TransferKeeper   ibctransferkeeper.Keeper
 
 	// make scoped keepers public for test purposes
-	ScopedIBCKeeper capability.ScopedKeeper
+	ScopedIBCKeeper capabilitykeeper.ScopedKeeper
 
 	// the module manager
 	mm *module.Manager
@@ -206,7 +209,7 @@ type App struct {
 
 func JSONTxDecoder(cdc *codec.Codec) sdk.TxDecoder {
 	return func(txBytes []byte) (sdk.Tx, error) {
-		var tx = auth.StdTx{}
+		var tx = authtypes.StdTx{}
 
 		if len(txBytes) == 0 {
 			return nil, sdkerrors.Wrap(sdkerrors.ErrTxDecode, "tx bytes are empty")
@@ -234,10 +237,10 @@ func NewApp(
 	bApp.SetAppVersion(version.Version)
 
 	keys := sdk.NewKVStoreKeys(
-		auth.StoreKey, banktypes.StoreKey,
-		staking.StoreKey, paramstypes.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capability.StoreKey,
+		authtypes.StoreKey, banktypes.StoreKey,
+		stakingtypes.StoreKey, paramstypes.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey,
 	)
-	memKeys := sdk.NewMemoryStoreKeys(capability.MemStoreKey)
+	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
 
 	app := &App{
@@ -246,25 +249,25 @@ func NewApp(
 		appCodec:  appCodec,
 		keys:      keys,
 		memKeys:   memKeys,
-		subspaces: make(map[string]params.Subspace),
+		subspaces: make(map[string]paramstypes.Subspace),
 	}
 
 	// init params keeper and subspaces
 	app.ParamsKeeper = paramskeeper.NewKeeper(appCodec, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
-	app.subspaces[auth.ModuleName] = app.ParamsKeeper.Subspace(auth.DefaultParamspace)
+	app.subspaces[authtypes.ModuleName] = app.ParamsKeeper.Subspace(authtypes.DefaultParamspace)
 	app.subspaces[banktypes.ModuleName] = app.ParamsKeeper.Subspace(banktypes.DefaultParamspace)
 
 	// set the BaseApp's parameter store
 	bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(std.ConsensusParamsKeyTable()))
 
 	// add capability keeper and ScopeToModule for ibc module
-	app.CapabilityKeeper = capability.NewKeeper(appCodec, keys[capability.StoreKey], memKeys[capability.MemStoreKey])
+	app.CapabilityKeeper = capabilitykeeper.NewKeeper(appCodec, keys[capabilitytypes.StoreKey], memKeys[capabilitytypes.MemStoreKey])
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibc.ModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
 
 	// add keepers
-	app.AccountKeeper = auth.NewAccountKeeper(
-		appCodec, keys[auth.StoreKey], app.subspaces[auth.ModuleName], auth.ProtoBaseAccount, maccPerms,
+	app.AccountKeeper = authkeeper.NewAccountKeeper(
+		appCodec, keys[authtypes.StoreKey], app.subspaces[authtypes.ModuleName], authtypes.ProtoBaseAccount, maccPerms,
 	)
 	app.BankKeeper = bankkeeper.NewBaseKeeper(
 		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.subspaces[banktypes.ModuleName], app.BlacklistedAccAddrs(),
@@ -283,7 +286,7 @@ func NewApp(
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := port.NewRouter()
-	ibcRouter.AddRoute(transfer.ModuleName, transferModule)
+	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferModule)
 	app.IBCKeeper.SetRouter(ibcRouter)
 
 	// NOTE: Any module instantiated in the module manager that is later modified
@@ -302,7 +305,7 @@ func NewApp(
 		ibchost.ModuleName,
 	)
 	app.mm.SetOrderInitGenesis(
-		capabilitytypes.ModuleName, auth.ModuleName, distrtypes.ModuleName, banktypes.ModuleName,
+		capabilitytypes.ModuleName, authtypes.ModuleName, distrtypes.ModuleName, banktypes.ModuleName,
 		ibchost.ModuleName, ibctransfertypes.ModuleName,
 	)
 
@@ -340,13 +343,21 @@ func NewApp(
 // MakeCodecs constructs the *std.Codec and *codec.Codec instances used by
 // simapp. It is useful for tests and clients who do not want to construct the
 // full simapp
-func MakeCodecs() (*std.Codec, *codec.Codec) {
-	cdc := std.MakeCodec(ModuleBasics)
-	interfaceRegistry := types.NewInterfaceRegistry()
-	std.RegisterInterfaces(interfaceRegistry)
-	ModuleBasics.RegisterInterfaceModules(interfaceRegistry)
-	appCodec := std.NewAppCodec(cdc, interfaceRegistry)
-	return appCodec, cdc
+func MakeCodecs() (codec.Marshaler, *codec.Codec) {
+	config := MakeEncodingConfig()
+	return config.Marshaler, config.Amino
+}
+
+// MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
+//
+// TODO: this file should add a "+build test_amino" flag for #6190 and a proto.go file with a protobuf configuration
+func MakeEncodingConfig() simappparams.EncodingConfig {
+	encodingConfig := simappparams.MakeEncodingConfig()
+	std.RegisterCodec(encodingConfig.Amino)
+	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	ModuleBasics.RegisterCodec(encodingConfig.Amino)
+	ModuleBasics.RegisterInterfaceModules(encodingConfig.InterfaceRegistry)
+	return encodingConfig
 }
 
 // Name returns the name of the App
@@ -379,10 +390,10 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 	auth.InitGenesis(
 		ctx,
 		app.AccountKeeper,
-		auth.NewGenesisState(
-			auth.DefaultParams(),
-			auth.GenesisAccounts{
-				auth.NewBaseAccount(
+		authtypes.NewGenesisState(
+			authtypes.DefaultParams(),
+			authtypes.GenesisAccounts{
+				authtypes.NewBaseAccount(
 					sdk.AccAddress(MasterAccount.PubKey().Address()),
 					MasterAccount.PubKey(),
 					1,
@@ -394,7 +405,7 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
 	coins := sdk.NewCoins(sdk.NewCoin("ftk", sdk.NewInt(1000)))
 	balances := banktypes.Balance{Address: addr, Coins: coins.Sort()}
-	bankState := bank.DefaultGenesisState()
+	bankState := banktypes.DefaultGenesisState()
 	bankState.Balances = append(bankState.Balances, balances)
 	bank.InitGenesis(ctx, app.BankKeeper, bankState)
 	transfer.InitGenesis(ctx, app.TransferKeeper, ibctransfertypes.DefaultGenesisState())
@@ -405,7 +416,7 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 func (app *App) BlacklistedAccAddrs() map[string]bool {
 	blacklistedAddrs := make(map[string]bool)
 	for acc := range maccPerms {
-		blacklistedAddrs[auth.NewModuleAddress(acc).String()] = !allowedReceivingModAcc[acc]
+		blacklistedAddrs[authtypes.NewModuleAddress(acc).String()] = !allowedReceivingModAcc[acc]
 	}
 
 	return blacklistedAddrs
