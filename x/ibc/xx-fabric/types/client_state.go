@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	ics23 "github.com/confio/ics23/go"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -88,6 +89,12 @@ func (cs ClientState) Validate() error {
 		return fmt.Errorf("height must be positive: %d", cs.GetLatestHeight())
 	}
 	return host.ClientIdentifierValidator(cs.ID)
+}
+
+// GetProofSpecs returns the format the client expects for proof verification
+// as a string array specifying the proof type for each position in chained proof
+func (cs ClientState) GetProofSpecs() []*ics23.ProofSpec {
+	return nil
 }
 
 // VerifyClientConsensusState verifies a proof of the consensus state of the
@@ -244,13 +251,9 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketAcknowledgementPath(portID, channelID, sequence))
-	if err != nil {
-		return err
-	}
-
+	key := commitment.MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
 	bz := channeltypes.CommitAcknowledgement(acknowledgement)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -277,12 +280,8 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.PacketAcknowledgementPath(portID, channelID, sequence))
-	if err != nil {
-		return err
-	}
-
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), nil); err != nil {
+	key := commitment.MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -308,13 +307,9 @@ func (cs ClientState) VerifyNextSequenceRecv(
 		return err
 	}
 
-	path, err := commitmenttypes.ApplyPrefix(prefix, host.NextSequenceRecvPath(portID, channelID))
-	if err != nil {
-		return err
-	}
-
+	key := commitment.MakeNextSequenceRecvEntryKey(prefix, portID, channelID)
 	bz := sdk.Uint64ToBigEndian(nextSequenceRecv)
-	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, path.String(), bz); err != nil {
+	if ok, err := VerifyEndorsement(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")

@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 
+	ics23 "github.com/confio/ics23/go"
 	"github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
 )
 
@@ -12,26 +13,18 @@ const (
 
 var _ exported.Proof = Proof{}
 
-// type Proof struct {
-// 	Proposal      []byte
-// 	NSIndex       uint32
-// 	WriteSetIndex uint32
-// 	Identities    [][]byte
-// 	Signatures    [][]byte // signatures of endorsers. This order must be equals consensState.endorsers order.
-// }
-
 // GetCommitmentType implements ProofI.
 func (Proof) GetCommitmentType() exported.Type {
 	return CommitmentTypeFabric
 }
 
 // VerifyMembership implements ProofI.
-func (Proof) VerifyMembership(exported.Root, exported.Path, []byte) error {
+func (Proof) VerifyMembership([]*ics23.ProofSpec, exported.Root, exported.Path, []byte) error {
 	return nil
 }
 
 // VerifyNonMembership implements ProofI.
-func (Proof) VerifyNonMembership(exported.Root, exported.Path) error {
+func (Proof) VerifyNonMembership([]*ics23.ProofSpec, exported.Root, exported.Path) error {
 	return nil
 }
 
@@ -51,10 +44,6 @@ func (proof Proof) ValidateBasic() error {
 }
 
 var _ exported.Prefix = (*Prefix)(nil)
-
-// type Prefix struct {
-// 	Value []byte
-// }
 
 // NewPrefix constructs new Prefix instance
 func NewPrefix(value []byte) Prefix {
