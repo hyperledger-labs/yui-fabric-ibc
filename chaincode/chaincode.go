@@ -1,6 +1,7 @@
 package chaincode
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,7 +20,12 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 )
 
+const (
+	EventIBC = "ibc"
+)
+
 type IBCChaincode struct {
+	logger log.Logger
 	contractapi.Contract
 	sequenceMgr commitment.SequenceManager
 	runner      AppRunner
@@ -31,7 +37,15 @@ func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface
 }
 
 func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface, msgJSON string) error {
-	return c.runner.RunMsg(ctx.GetStub(), msgJSON)
+	events, err := c.runner.RunMsg(ctx.GetStub(), msgJSON)
+	if err != nil {
+		return err
+	}
+	bz, err := json.Marshal(events)
+	if err != nil {
+		return err
+	}
+	return ctx.GetStub().SetEvent(EventIBC, bz)
 }
 
 func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {

@@ -140,12 +140,12 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error)
 	return nil
 }
 
-func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) error {
+func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) ([]abci.Event, error) {
 	// FIXME can we reuse single instance instead of making new app per request?
 	db := r.dbProvider(stub)
 	app, err := NewApp(r.logger, db, r.traceStore, true, r.getSelfConsensusStateProvider(stub), bam.SetPruning(storetypes.PruneEverything))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	height := r.getHeight(stub)
 	if height == 1 {
@@ -163,16 +163,13 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) erro
 		},
 	)
 	if res.IsErr() {
-		return errors.New(res.String())
+		return nil, errors.New(res.String())
 	}
-	// for _, ev := range res.Events {
-	// 	fmt.Println(ev.String())
-	// }
 	app.EndBlock(abci.RequestEndBlock{Height: height})
 	_ = app.Commit()
 	height++
 	r.setHeight(stub, height)
-	return nil
+	return res.Events, nil
 }
 
 func (r AppRunner) getSelfConsensusStateProvider(stub shim.ChaincodeStubInterface) SelfConsensusStateKeeperProvider {

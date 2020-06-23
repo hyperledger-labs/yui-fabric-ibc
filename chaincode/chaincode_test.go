@@ -2,6 +2,7 @@ package chaincode
 
 import (
 	"fmt"
+	"log"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -91,7 +92,16 @@ func (ca *TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) er
 }
 
 func (ca TestChaincodeApp) runMsg(stub shim.ChaincodeStubInterface, msgs ...sdk.Msg) error {
-	return ca.cc.runner.RunMsg(stub, string(makeStdTxBytes(ca.cdc, ca.prvKey, msgs...)))
+	events, err := ca.cc.runner.RunMsg(stub, string(makeStdTxBytes(ca.cdc, ca.prvKey, msgs...)))
+	if err != nil {
+		return err
+	}
+	if testing.Verbose() {
+		for _, event := range events {
+			log.Println(event.String())
+		}
+	}
+	return nil
 }
 
 func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
