@@ -111,6 +111,11 @@ func TestApp(t *testing.T) {
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenAck(t, ctx1, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenConfirm(t, ctx0, app0)))
 
+	var createPacket = func(src, dst TestChaincodeApp, coins sdk.Coins, seq, timeoutHeight, timeoutTimestamp uint64) channel.Packet {
+		data := ibctransfertypes.NewFungibleTokenPacketData(coins, src.signer.String(), src.signer.String())
+		return channel.NewPacket(data.GetBytes(), seq, src.portID, src.channelID, dst.portID, dst.channelID, timeoutHeight, timeoutTimestamp)
+	}
+
 	// Setup transfer
 	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/x/ibc-transfer/keeper/relay_test.go#L21
 	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
@@ -118,36 +123,31 @@ func TestApp(t *testing.T) {
 	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
 	app0.signer = addr
 
-	var createPacket = func(src, dst TestChaincodeApp, coins sdk.Coins, timeoutHeight, timeoutTimestamp uint64) channel.Packet {
-		data := ibctransfertypes.NewFungibleTokenPacketData(coins, src.signer.String(), src.signer.String())
-		return channel.NewPacket(data.GetBytes(), 1, src.portID, src.channelID, dst.portID, dst.channelID, timeoutHeight, timeoutTimestamp)
-	}
-
 	// Success
 	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
-	packet := createPacket(app0, app1, coins, 1000, 0)
-	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, packet)))
-	require.NoError(app0.runMsg(stub0, app0.createMsgAcknowledgement(t, ctx1, app1, packet)))
+	packet0 := createPacket(app0, app1, coins, 1, 1000, 0)
+	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, packet0)))
+	require.NoError(app0.runMsg(stub0, app0.createMsgAcknowledgement(t, ctx1, app1, packet0)))
 
-	// // Timeout
-	// var timeoutHeight uint64 = 3
-	// require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, timeoutHeight, 0)))
+	// Timeout
+	var timeoutHeight uint64 = 3
+	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, timeoutHeight, 0)))
+	packet1 := createPacket(app0, app1, coins, 2, timeoutHeight, 0)
 
-	// // Update Clients
-	// {
-	// 	app0Tk.Add(5 * time.Second)
-	// 	_, err = app0.updateSequence(ctx0)
-	// 	require.NoError(err)
-	// 	require.NoError(app0.runMsg(stub0, app0.createMsgUpdateClient(t)))
+	// Update Clients
+	{
+		app0Tk.Add(5 * time.Second)
+		_, err = app0.updateSequence(ctx0)
+		require.NoError(err)
+		require.NoError(app0.runMsg(stub0, app0.createMsgUpdateClient(t)))
 
-	// 	app1Tk.Add(5 * time.Second)
-	// 	_, err = app1.updateSequence(ctx1)
-	// 	require.NoError(err)
-	// 	require.NoError(app1.runMsg(stub1, app1.createMsgUpdateClient(t)))
-	// }
+		app1Tk.Add(5 * time.Second)
+		_, err = app1.updateSequence(ctx1)
+		require.NoError(err)
+		require.NoError(app1.runMsg(stub1, app1.createMsgUpdateClient(t)))
+	}
 
-	// require.NoError(app0.runMsg(stub0, app0.createMsgTimeoutPacket(t, ctx1, app1, coins, 1, channel.ORDERED, timeoutHeight, 0)))
-
+	require.NoError(app0.runMsg(stub0, app0.createMsgTimeoutPacket(t, ctx1, app1, 2, channel.ORDERED, packet1)))
 }
 
 type mockContext struct {

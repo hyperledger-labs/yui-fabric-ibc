@@ -165,6 +165,9 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) erro
 	if res.IsErr() {
 		return errors.New(res.String())
 	}
+	// for _, ev := range res.Events {
+	// 	fmt.Println(ev.String())
+	// }
 	app.EndBlock(abci.RequestEndBlock{Height: height})
 	_ = app.Commit()
 	height++

@@ -340,15 +340,10 @@ func (ca TestChaincodeApp) createMsgTimeoutPacket(
 	t *testing.T,
 	counterPartyCtx contractapi.TransactionContextInterface,
 	counterParty TestChaincodeApp,
-	coins sdk.Coins,
 	nextSequenceRecv uint64,
 	order channel.Order,
-	timeoutHeight uint64,
-	timeoutTimestamp uint64,
+	packet channel.Packet,
 ) *channel.MsgTimeout {
-	data := ibctransfertypes.NewFungibleTokenPacketData(coins, ca.signer.String(), ca.signer.String())
-	packet := channel.NewPacket(data.GetBytes(), 1, ca.portID, ca.channelID, counterParty.portID, counterParty.channelID, timeoutHeight, timeoutTimestamp)
-
 	var proofHeight uint64
 	var proof []byte
 	var err error
