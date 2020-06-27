@@ -10,6 +10,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
+	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -118,7 +119,7 @@ func TestApp(t *testing.T) {
 
 	// Setup transfer
 	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/x/ibc-transfer/keeper/relay_test.go#L21
-	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
+	addr := sdk.AccAddress(app.MasterAccount.PubKey().Address())
 	denom := fmt.Sprintf("%v/%v/ftk", app1.portID, app1.channelID)
 	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
 	app0.signer = addr
