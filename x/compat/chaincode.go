@@ -17,20 +17,21 @@ func MakeFakeStub() *mock.ChaincodeStub {
 	fakeStub.GetChannelIDReturns("test-channel")
 
 	fakeStub.GetStateStub = func(key string) ([]byte, error) {
-		// log.Printf("Get key=%v(%v) value=%v(%x)", decodeHex(key), key, fakePublicKVStore[key], fakePublicKVStore[key])
+		// fmt.Printf("Get key=%v(%v)\n", decodeHex(key), key)
 		return fakePublicKVStore[key], nil
 	}
 	fakeStub.PutStateStub = func(key string, value []byte) error {
-		// log.Printf("Put key=%v(%v) value=%v(%x)", decodeHex(key), key, value, value)
+		// fmt.Printf("Put key=%v(%v)\n", decodeHex(key), key)
 		fakePublicKVStore[key] = value
 		return nil
 	}
 	fakeStub.DelStateStub = func(key string) error {
-		// log.Printf("Delete key=%v(%v)", decodeHex(key), key)
+		// fmt.Printf("Delete key=%v(%v)\n", decodeHex(key), key)
 		delete(fakePublicKVStore, key)
 		return nil
 	}
 	fakeStub.GetStateByRangeStub = func(start, end string) (shim.StateQueryIteratorInterface, error) {
+		// fmt.Printf("GetStateByRange start=%v(%v) end=%v(%v)\n", decodeHex(start), start, decodeHex(end), end)
 		fakeIterator := &mock.StateIterator{}
 		var items []item
 		for key, value := range fakePublicKVStore {
@@ -58,7 +59,7 @@ func MakeFakeStub() *mock.ChaincodeStub {
 func decodeHex(s string) string {
 	bz, err := hex.DecodeString(s)
 	if err != nil {
-		panic(err)
+		return s
 	}
 	return string(bz)
 }
