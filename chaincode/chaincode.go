@@ -26,12 +26,26 @@ const (
 )
 
 type IBCChaincode struct {
-	logger log.Logger
 	contractapi.Contract
+	logger      log.Logger
 	sequenceMgr commitment.SequenceManager
 	runner      AppRunner
 }
 
+func NewIBCChaincode() *IBCChaincode {
+	logger := log.NewTMLogger(os.Stdout)
+	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
+	runner := NewAppRunner(logger, DefaultDBProvider, &sequenceMgr)
+	c := &IBCChaincode{
+		logger:      logger,
+		sequenceMgr: sequenceMgr,
+		runner:      runner,
+	}
+	return c
+}
+
+// InitChaincode initialize the state of the chaincode
+// This must be called when the chaincode is initialized
 func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface, appStateJSON string) error {
 	if err := c.runner.Init(ctx.GetStub(), []byte(appStateJSON)); err != nil {
 		return err
@@ -42,7 +56,8 @@ func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface
 	return nil
 }
 
-func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface, txJSON string) error {
+// HandleIBCTx handles IBC Transaction
+func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, txJSON string) error {
 	events, err := c.runner.RunMsg(ctx.GetStub(), []byte(txJSON))
 	if err != nil {
 		return err
@@ -54,6 +69,12 @@ func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface,
 	return ctx.GetStub().SetEvent(EventIBC, bz)
 }
 
+// GetSequence returns current Sequence
+func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
+	return c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+}
+
+// UpdateSequence updates Sequence
 func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
 	return c.sequenceMgr.UpdateSequence(ctx.GetStub())
 }
@@ -284,15 +305,4 @@ func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContex
 		return nil, err
 	}
 	return entry, nil
-}
-
-func NewIBCChaincode() *IBCChaincode {
-	logger := log.NewTMLogger(os.Stdout)
-	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
-	runner := NewAppRunner(logger, DefaultDBProvider, &sequenceMgr)
-	c := &IBCChaincode{
-		sequenceMgr: sequenceMgr,
-		runner:      runner,
-	}
-	return c
 }
