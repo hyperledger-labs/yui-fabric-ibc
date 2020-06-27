@@ -11,6 +11,7 @@ import (
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/log"
+	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -22,15 +23,14 @@ type BaseApp struct {
 	router      sdk.Router      // handle any kind of message
 	queryRouter sdk.QueryRouter // router for redirecting query calls
 
-	txDecoder   sdk.TxDecoder
-	anteHandler sdk.AnteHandler // ante handler for fee and auth
-	initChainer InitChainer
+	txDecoder     sdk.TxDecoder
+	anteHandler   sdk.AnteHandler // ante handler for fee and auth
+	initChainer   InitChainer
+	blockProvider BlockProvider
 
 	// flag for sealing options and parameters to a BaseApp
 	sealed bool
 }
-
-type InitChainer func(ctx sdk.Context, appStateBytes []byte) error
 
 func NewBaseApp(
 	name string, logger log.Logger, db dbm.DB, txDecoder sdk.TxDecoder,
@@ -145,6 +145,14 @@ func (app *BaseApp) InitChain(appStateBytes []byte) error {
 	return nil
 }
 
+func (app *BaseApp) getBlockHeader() abci.Header {
+	block := app.blockProvider()
+	return abci.Header{
+		Height: block.Height() + 1,
+		Time:   tmtime.Now(),
+	}
+}
+
 func (app *BaseApp) RunTx(txBytes []byte) (result *sdk.Result, err error) {
 	tx, err := app.txDecoder(txBytes)
 	if err != nil {
@@ -152,8 +160,7 @@ func (app *BaseApp) RunTx(txBytes []byte) (result *sdk.Result, err error) {
 	}
 
 	ms := app.cms.CacheMultiStore()
-	// TODO set valid height from sequence mgr
-	ctx := sdk.NewContext(ms, abci.Header{Height: 100}, false, app.logger)
+	ctx := sdk.NewContext(ms, app.getBlockHeader(), false, app.logger)
 
 	msgs := tx.GetMsgs()
 	if err := validateBasicTxMsgs(msgs); err != nil {
@@ -323,8 +330,21 @@ func (app *BaseApp) SetRouter(router sdk.Router) {
 	app.router = router
 }
 
+type InitChainer func(ctx sdk.Context, appStateBytes []byte) error
+
 func (app *BaseApp) SetInitChainer(initChainer InitChainer) {
 	app.initChainer = initChainer
+}
+
+type Block interface {
+	Height() int64
+	Timestamp() int64
+}
+
+type BlockProvider func() Block
+
+func (app *BaseApp) SetBlockProvider(blockProvider BlockProvider) {
+	app.blockProvider = blockProvider
 }
 
 //----------------------------------------

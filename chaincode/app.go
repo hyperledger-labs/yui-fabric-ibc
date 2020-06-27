@@ -37,7 +37,7 @@ func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) 
 
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*app.IBCApp) error) error {
 	db := r.dbProvider(stub)
-	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub))
+	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*app.IBCApp)
 
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]abci.Event, error) {
 	db := r.dbProvider(stub)
-	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub))
+	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +63,29 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]a
 func (r AppRunner) getSelfConsensusStateProvider(stub shim.ChaincodeStubInterface) app.SelfConsensusStateKeeperProvider {
 	return func() client.SelfConsensusStateKeeper {
 		return fabric.NewConsensusStateKeeper(stub, r.seqMgr)
+	}
+}
+
+type block struct {
+	height    int64
+	timestamp int64
+}
+
+func (bk block) Height() int64 {
+	return bk.height
+}
+
+func (bk block) Timestamp() int64 {
+	return bk.timestamp
+}
+
+func (r AppRunner) getBlockProvider(stub shim.ChaincodeStubInterface) app.BlockProvider {
+	return func() app.Block {
+		seq, err := r.seqMgr.GetCurrentSequence(stub)
+		if err != nil {
+			panic(err)
+		}
+		return block{height: int64(seq.Value), timestamp: seq.Timestamp}
 	}
 }
 

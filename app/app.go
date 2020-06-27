@@ -95,7 +95,7 @@ type IBCApp struct {
 	mm *module.Manager
 }
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider SelfConsensusStateKeeperProvider) (*IBCApp, error) {
+func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider SelfConsensusStateKeeperProvider, blockProvider BlockProvider) (*IBCApp, error) {
 	appCodec, cdc := MakeCodecs()
 	bApp := NewBaseApp(appName, logger, db, JSONTxDecoder(cdc))
 	keys := sdk.NewKVStoreKeys(
@@ -173,6 +173,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider S
 	// initialize BaseApp
 	app.SetAnteHandler(NewAnteHandler(*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer))
 	app.SetInitChainer(app.InitChainer)
+	app.SetBlockProvider(blockProvider)
 
 	if err := app.LoadLatestVersion(); err != nil {
 		return nil, err
