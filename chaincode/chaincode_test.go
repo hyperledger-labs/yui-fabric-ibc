@@ -11,6 +11,7 @@ import (
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/tests"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
@@ -57,7 +58,7 @@ func MakeTestChaincodeApp(
 	channelID string,
 	channelOrder channel.Order,
 ) TestChaincodeApp {
-	cdc, _ := MakeCodecs()
+	cdc, _ := app.MakeCodecs()
 	cc := NewIBCChaincode()
 	return TestChaincodeApp{
 		cc: cc,
@@ -79,7 +80,7 @@ func MakeTestChaincodeApp(
 }
 
 func (ca *TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) error {
-	err := ca.cc.InitChaincode(ctx)
+	err := ca.cc.InitChaincode(ctx, "{}")
 	if err != nil {
 		return err
 	}
@@ -92,7 +93,7 @@ func (ca *TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) er
 }
 
 func (ca TestChaincodeApp) runMsg(stub shim.ChaincodeStubInterface, msgs ...sdk.Msg) error {
-	events, err := ca.cc.runner.RunMsg(stub, string(makeStdTxBytes(ca.cdc, ca.prvKey, msgs...)))
+	events, err := ca.cc.runner.RunMsg(stub, makeStdTxBytes(ca.cdc, ca.prvKey, msgs...))
 	if err != nil {
 		return err
 	}

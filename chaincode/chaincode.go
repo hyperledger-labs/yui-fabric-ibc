@@ -12,6 +12,7 @@ import (
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
 	"github.com/golang/protobuf/proto"
@@ -25,19 +26,39 @@ const (
 )
 
 type IBCChaincode struct {
-	logger log.Logger
 	contractapi.Contract
+	logger      log.Logger
 	sequenceMgr commitment.SequenceManager
 	runner      AppRunner
 }
 
-func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface) error {
-	_, err := c.sequenceMgr.InitSequence(ctx.GetStub())
-	return err
+func NewIBCChaincode() *IBCChaincode {
+	logger := log.NewTMLogger(os.Stdout)
+	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
+	runner := NewAppRunner(logger, DefaultDBProvider, &sequenceMgr)
+	c := &IBCChaincode{
+		logger:      logger,
+		sequenceMgr: sequenceMgr,
+		runner:      runner,
+	}
+	return c
 }
 
-func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface, msgJSON string) error {
-	events, err := c.runner.RunMsg(ctx.GetStub(), msgJSON)
+// InitChaincode initialize the state of the chaincode
+// This must be called when the chaincode is initialized
+func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface, appStateJSON string) error {
+	if err := c.runner.Init(ctx.GetStub(), []byte(appStateJSON)); err != nil {
+		return err
+	}
+	if _, err := c.sequenceMgr.InitSequence(ctx.GetStub()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// HandleIBCTx handles IBC Transaction
+func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, txJSON string) error {
+	events, err := c.runner.RunMsg(ctx.GetStub(), []byte(txJSON))
 	if err != nil {
 		return err
 	}
@@ -48,6 +69,12 @@ func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface,
 	return ctx.GetStub().SetEvent(EventIBC, bz)
 }
 
+// GetSequence returns current Sequence
+func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
+	return c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+}
+
+// UpdateSequence updates Sequence
 func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
 	return c.sequenceMgr.UpdateSequence(ctx.GetStub())
 }
@@ -81,8 +108,8 @@ func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionCont
 
 func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 
 		connection, found := app.IBCKeeper.ConnectionKeeper.GetConnection(c, connectionID)
 		if !found {
@@ -101,6 +128,7 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
@@ -110,8 +138,8 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 
 func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 
 		channel, found := app.IBCKeeper.ChannelKeeper.GetChannel(c, portID, channelID)
 		if !found {
@@ -131,6 +159,7 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
@@ -140,8 +169,8 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 
 func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 		cmbz := app.IBCKeeper.ChannelKeeper.GetPacketCommitment(c, portID, channelID, sequence)
 		if cmbz == nil {
 			return errors.New("commitment not found")
@@ -158,6 +187,7 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
@@ -167,8 +197,8 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 
 func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 		ackBytes, ok := app.IBCKeeper.ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
 		if !ok {
 			return errors.New("acknowledgement packet not found")
@@ -184,6 +214,7 @@ func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionC
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
@@ -193,8 +224,8 @@ func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionC
 
 func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 		_, ok := app.IBCKeeper.ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
 		if ok {
 			return errors.New("acknowledgement packet found")
@@ -209,6 +240,7 @@ func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.Trans
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
@@ -218,13 +250,13 @@ func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.Trans
 
 func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 		cs, ok := app.IBCKeeper.ClientKeeper.GetClientConsensusState(c, clientID, height)
 		if !ok {
 			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
 		}
-		bz, err := app.cdc.Amino.MarshalBinaryBare(cs)
+		bz, err := app.Codec().Amino.MarshalBinaryBare(cs)
 		if err != nil {
 			return err
 		}
@@ -238,6 +270,7 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
@@ -247,8 +280,8 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 
 func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.Entry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *App) error {
-		c := app.NewContext(false, abci.Header{})
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+		c, writer := app.MakeContext(abci.Header{})
 		seq, found := app.IBCKeeper.ChannelKeeper.GetNextSequenceRecv(c, portID, channelID)
 		if !found {
 			return sdkerrors.Wrapf(
@@ -266,20 +299,10 @@ func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContex
 			return err
 		}
 		entry = e
+		writer()
 		return ctx.GetStub().PutState(e.Key, e.Value)
 	}); err != nil {
 		return nil, err
 	}
 	return entry, nil
-}
-
-func NewIBCChaincode() *IBCChaincode {
-	logger := log.NewTMLogger(os.Stdout)
-	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
-	runner := NewAppRunner(logger, DefaultDBProvider, &sequenceMgr)
-	c := &IBCChaincode{
-		sequenceMgr: sequenceMgr,
-		runner:      runner,
-	}
-	return c
 }
