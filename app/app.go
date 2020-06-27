@@ -1,20 +1,15 @@
-package chaincode
+package app
 
 import (
-	"errors"
 	"io"
 
-	"github.com/cosmos/cosmos-sdk/baseapp"
-	bam "github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	simappparams "github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/std"
-	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/module"
-	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
@@ -30,23 +25,17 @@ import (
 	ibctransferkeeper "github.com/cosmos/cosmos-sdk/x/ibc-transfer/keeper"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	port "github.com/cosmos/cosmos-sdk/x/ibc/05-port"
-	ibchost "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
 	"github.com/cosmos/cosmos-sdk/x/params"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/x/compat"
 	"github.com/datachainlab/fabric-ibc/x/ibc"
 	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
 	ibcante "github.com/datachainlab/fabric-ibc/x/ibc/ante"
-	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
-	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/log"
-	db "github.com/tendermint/tm-db"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -77,113 +66,8 @@ var (
 	}
 )
 
-type DBProvider func(shim.ChaincodeStubInterface) dbm.DB
-
-func DefaultDBProvider(stub shim.ChaincodeStubInterface) db.DB {
-	return compat.NewDB(stub)
-}
-
-type AppRunner struct {
-	logger     log.Logger
-	traceStore io.Writer
-	dbProvider DBProvider
-	seqMgr     *commitment.SequenceManager
-}
-
-func NewAppRunner(logger log.Logger, dbProvider DBProvider, seqMgr *commitment.SequenceManager) AppRunner {
-	return AppRunner{
-		logger:     logger,
-		dbProvider: dbProvider,
-		seqMgr:     seqMgr,
-	}
-}
-
-func (r AppRunner) getHeight(stub shim.ChaincodeStubInterface) int64 {
-	bz, err := stub.GetState("height")
-	if err != nil {
-		panic(err)
-	} else if bz == nil {
-		return 1
-	}
-	return int64(sdk.BigEndianToUint64(bz))
-}
-
-func (r AppRunner) setHeight(stub shim.ChaincodeStubInterface, height int64) {
-	if err := stub.PutState("height", sdk.Uint64ToBigEndian(uint64(height))); err != nil {
-		panic(err)
-	}
-}
-
-func (r AppRunner) Init(stub shim.ChaincodeStubInterface) error {
-	return nil
-}
-
-// TODO refactoring this func and RunMsg
-func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*App) error) error {
-	db := r.dbProvider(stub)
-	app, err := NewApp(r.logger, db, r.traceStore, true, r.getSelfConsensusStateProvider(stub), bam.SetPruning(storetypes.PruneEverything))
-	if err != nil {
-		return err
-	}
-	height := r.getHeight(stub)
-	if height == 1 {
-		_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
-		_ = app.Commit()
-		height++
-		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
-	} else {
-		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
-	}
-	if err := f(app); err != nil {
-		return err
-	}
-	app.EndBlock(abci.RequestEndBlock{Height: height})
-	_ = app.Commit()
-	height++
-	r.setHeight(stub, height)
-	return nil
-}
-
-func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, msgJSON string) ([]abci.Event, error) {
-	// FIXME can we reuse single instance instead of making new app per request?
-	db := r.dbProvider(stub)
-	app, err := NewApp(r.logger, db, r.traceStore, true, r.getSelfConsensusStateProvider(stub), bam.SetPruning(storetypes.PruneEverything))
-	if err != nil {
-		return nil, err
-	}
-	height := r.getHeight(stub)
-	if height == 1 {
-		_ = app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}")})
-		_ = app.Commit()
-		height++
-		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
-	} else {
-		app.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: height}})
-	}
-
-	res := app.DeliverTx(
-		abci.RequestDeliverTx{
-			Tx: []byte(msgJSON),
-		},
-	)
-	if res.IsErr() {
-		return nil, errors.New(res.String())
-	}
-	app.EndBlock(abci.RequestEndBlock{Height: height})
-	_ = app.Commit()
-	height++
-	r.setHeight(stub, height)
-	return res.Events, nil
-}
-
-func (r AppRunner) getSelfConsensusStateProvider(stub shim.ChaincodeStubInterface) SelfConsensusStateKeeperProvider {
-	return func() client.SelfConsensusStateKeeper {
-		return fabric.NewConsensusStateKeeper(stub, r.seqMgr)
-	}
-}
-
-type App struct {
-	*bam.BaseApp
+type IBCApp struct {
+	*BaseApp
 	cdc      *codec.Codec
 	appCodec codec.Marshaler
 
@@ -211,35 +95,9 @@ type App struct {
 	mm *module.Manager
 }
 
-func JSONTxDecoder(cdc *codec.Codec) sdk.TxDecoder {
-	return func(txBytes []byte) (sdk.Tx, error) {
-		var tx = authtypes.StdTx{}
-
-		if len(txBytes) == 0 {
-			return nil, sdkerrors.Wrap(sdkerrors.ErrTxDecode, "tx bytes are empty")
-		}
-
-		// StdTx.Msg is an interface. The concrete types
-		// are registered by MakeTxCodec
-		err := cdc.UnmarshalJSON(txBytes, &tx)
-		if err != nil {
-			return nil, sdkerrors.Wrap(sdkerrors.ErrTxDecode, err.Error())
-		}
-
-		return tx, nil
-	}
-}
-
-// NewSimApp returns a reference to an initialized SimApp.
-func NewApp(
-	logger log.Logger, db dbm.DB, traceStore io.Writer, loadLatest bool, cskProvider SelfConsensusStateKeeperProvider, baseAppOptions ...func(*bam.BaseApp),
-) (*App, error) {
+func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider SelfConsensusStateKeeperProvider) (*IBCApp, error) {
 	appCodec, cdc := MakeCodecs()
-
-	bApp := bam.NewBaseApp(appName, logger, db, JSONTxDecoder(cdc), baseAppOptions...)
-	bApp.SetCommitMultiStoreTracer(traceStore)
-	bApp.SetAppVersion(version.Version)
-
+	bApp := NewBaseApp(appName, logger, db, JSONTxDecoder(cdc))
 	keys := sdk.NewKVStoreKeys(
 		authtypes.StoreKey, banktypes.StoreKey,
 		stakingtypes.StoreKey, paramstypes.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey,
@@ -247,13 +105,13 @@ func NewApp(
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
 
-	app := &App{
+	app := &IBCApp{
 		BaseApp:   bApp,
 		cdc:       cdc,
 		appCodec:  appCodec,
 		keys:      keys,
 		memKeys:   memKeys,
-		subspaces: make(map[string]paramstypes.Subspace),
+		txDecoder: JSONTxDecoder(cdc),
 	}
 
 	// init params keeper and subspaces
@@ -261,8 +119,8 @@ func NewApp(
 	app.subspaces[authtypes.ModuleName] = app.ParamsKeeper.Subspace(authtypes.DefaultParamspace)
 	app.subspaces[banktypes.ModuleName] = app.ParamsKeeper.Subspace(banktypes.DefaultParamspace)
 
-	// set the BaseApp's parameter store
-	bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(std.ConsensusParamsKeyTable()))
+	// // set the BaseApp's parameter store
+	// bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(std.ConsensusParamsKeyTable()))
 
 	// add capability keeper and ScopeToModule for ibc module
 	app.CapabilityKeeper = capabilitykeeper.NewKeeper(appCodec, keys[capabilitytypes.StoreKey], memKeys[capabilitytypes.MemStoreKey])
@@ -274,7 +132,7 @@ func NewApp(
 		appCodec, keys[authtypes.StoreKey], app.subspaces[authtypes.ModuleName], authtypes.ProtoBaseAccount, maccPerms,
 	)
 	app.BankKeeper = bankkeeper.NewBaseKeeper(
-		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.subspaces[banktypes.ModuleName], app.BlacklistedAccAddrs(),
+		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.subspaces[banktypes.ModuleName], make(map[string]bool),
 	)
 	app.IBCKeeper = ibc.NewKeeper(
 		app.cdc, appCodec, keys[ibc.StoreKey], nil, cskProvider(), scopedIBCKeeper, // TODO set stakingKeeper
@@ -304,77 +162,24 @@ func NewApp(
 		transferModule,
 	)
 
-	app.mm.SetOrderBeginBlockers(
-		// distrtypes.ModuleName,
-		ibchost.ModuleName,
-	)
-	app.mm.SetOrderInitGenesis(
-		capabilitytypes.ModuleName, authtypes.ModuleName, distrtypes.ModuleName, banktypes.ModuleName,
-		ibchost.ModuleName, ibctransfertypes.ModuleName,
-	)
-
-	app.mm.RegisterRoutes(app.Router(), app.QueryRouter())
-
-	// initialize stores
-	app.MountKVStores(keys)
-	app.MountTransientStores(tkeys)
-	app.MountMemoryStores(memKeys)
-
-	// initialize BaseApp
-	app.SetInitChainer(app.InitChainer)
-	app.SetBeginBlocker(app.BeginBlocker)
-	app.SetAnteHandler(NewAnteHandler(*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer))
-	app.SetEndBlocker(app.EndBlocker)
-
-	if loadLatest {
-		err := app.LoadLatestVersion()
-		if err != nil {
-			return nil, err
-		}
+	if err := app.LoadLatestVersion(); err != nil {
+		return nil, err
 	}
+
+	app.SetAnteHandler(NewAnteHandler(*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer))
+	app.SetInitChainer(app.InitChainer)
 
 	// Initialize and seal the capability keeper so all persistent capabilities
 	// are loaded in-memory and prevent any further modules from creating scoped
 	// sub-keepers.
-	ctx := app.BaseApp.NewUncachedContext(true, abci.Header{})
+	ms := app.cms.CacheMultiStore()
+	ctx := sdk.NewContext(ms, abci.Header{}, false, app.logger)
 	app.CapabilityKeeper.InitializeAndSeal(ctx)
+	ms.Write()
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
 
 	return app, nil
-}
-
-// MakeCodecs constructs the *std.Codec and *codec.Codec instances used by
-// simapp. It is useful for tests and clients who do not want to construct the
-// full simapp
-func MakeCodecs() (codec.Marshaler, *codec.Codec) {
-	config := MakeEncodingConfig()
-	return config.Marshaler, config.Amino
-}
-
-// MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
-//
-// TODO: this file should add a "+build test_amino" flag for #6190 and a proto.go file with a protobuf configuration
-func MakeEncodingConfig() simappparams.EncodingConfig {
-	encodingConfig := simappparams.MakeEncodingConfig()
-	std.RegisterCodec(encodingConfig.Amino)
-	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-	ModuleBasics.RegisterCodec(encodingConfig.Amino)
-	ModuleBasics.RegisterInterfaceModules(encodingConfig.InterfaceRegistry)
-	return encodingConfig
-}
-
-// Name returns the name of the App
-func (app *App) Name() string { return app.BaseApp.Name() }
-
-// BeginBlocker application updates every begin block
-func (app *App) BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock) abci.ResponseBeginBlock {
-	return app.mm.BeginBlock(ctx, req)
-}
-
-// EndBlocker application updates every end block
-func (app *App) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.ResponseEndBlock {
-	return app.mm.EndBlock(ctx, req)
 }
 
 var MasterAccount crypto.PrivKey
@@ -383,12 +188,11 @@ func init() {
 	MasterAccount = secp256k1.GenPrivKey()
 }
 
-// InitChainer application update at chain initialization
-func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
+func (app *IBCApp) InitChainer(ctx sdk.Context, appStateBytes []byte) error {
 	var genesisState simapp.GenesisState
-	app.cdc.MustUnmarshalJSON(req.AppStateBytes, &genesisState)
+	app.cdc.MustUnmarshalJSON(appStateBytes, &genesisState)
 
-	res := app.mm.InitGenesis(ctx, app.cdc, genesisState)
+	// res := app.mm.InitGenesis(ctx, app.cdc, genesisState)
 	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/simapp/cmd/simd/genaccounts.go#L73
 	// FIXME these states should be moved into genesisState
 	auth.InitGenesis(
@@ -413,18 +217,50 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 	bankState.Balances = append(bankState.Balances, balances)
 	bank.InitGenesis(ctx, app.BankKeeper, bankState)
 	transfer.InitGenesis(ctx, app.TransferKeeper, ibctransfertypes.DefaultGenesisState())
-	return res
+
+	return nil
 }
 
-// BlacklistedAccAddrs returns all the app's module account addresses black listed for receiving tokens.
-func (app *App) BlacklistedAccAddrs() map[string]bool {
-	blacklistedAddrs := make(map[string]bool)
-	for acc := range maccPerms {
-		blacklistedAddrs[authtypes.NewModuleAddress(acc).String()] = !allowedReceivingModAcc[acc]
+// MakeCodecs constructs the *std.Codec and *codec.Codec instances used by
+// simapp. It is useful for tests and clients who do not want to construct the
+// full simapp
+func MakeCodecs() (codec.Marshaler, *codec.Codec) {
+	config := MakeEncodingConfig()
+	return config.Marshaler, config.Amino
+}
+
+// MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
+//
+// TODO: this file should add a "+build test_amino" flag for #6190 and a proto.go file with a protobuf configuration
+func MakeEncodingConfig() simappparams.EncodingConfig {
+	encodingConfig := simappparams.MakeEncodingConfig()
+	std.RegisterCodec(encodingConfig.Amino)
+	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	ModuleBasics.RegisterCodec(encodingConfig.Amino)
+	ModuleBasics.RegisterInterfaceModules(encodingConfig.InterfaceRegistry)
+	return encodingConfig
+}
+
+func JSONTxDecoder(cdc *codec.Codec) sdk.TxDecoder {
+	return func(txBytes []byte) (sdk.Tx, error) {
+		var tx = authtypes.StdTx{}
+
+		if len(txBytes) == 0 {
+			return nil, sdkerrors.Wrap(sdkerrors.ErrTxDecode, "tx bytes are empty")
+		}
+
+		// StdTx.Msg is an interface. The concrete types
+		// are registered by MakeTxCodec
+		err := cdc.UnmarshalJSON(txBytes, &tx)
+		if err != nil {
+			return nil, sdkerrors.Wrap(sdkerrors.ErrTxDecode, err.Error())
+		}
+
+		return tx, nil
 	}
-
-	return blacklistedAddrs
 }
+
+type SelfConsensusStateKeeperProvider func() client.SelfConsensusStateKeeper
 
 // NewAnteHandler returns an AnteHandler that checks and increments sequence
 // numbers, checks signatures & account numbers, and deducts fees from the first
@@ -448,5 +284,3 @@ func NewAnteHandler(
 		ibcante.NewProofVerificationDecorator(ibcKeeper.ClientKeeper, ibcKeeper.ChannelKeeper), // innermost AnteDecorator
 	)
 }
-
-type SelfConsensusStateKeeperProvider func() client.SelfConsensusStateKeeper

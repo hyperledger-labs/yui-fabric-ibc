@@ -132,7 +132,7 @@ func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	if err != nil {
 		return err
 	} else if !ok {
-		return errors.New("failed to verify endorsement")
+		return errors.New("failed to verify the endorsement")
 	}
 	return nil
 }

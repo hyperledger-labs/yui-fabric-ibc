@@ -32,8 +32,13 @@ type IBCChaincode struct {
 }
 
 func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface) error {
-	_, err := c.sequenceMgr.InitSequence(ctx.GetStub())
-	return err
+	if err := c.runner.Init(ctx.GetStub()); err != nil {
+		return err
+	}
+	if _, err := c.sequenceMgr.InitSequence(ctx.GetStub()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *IBCChaincode) HandleIBCMsg(ctx contractapi.TransactionContextInterface, msgJSON string) error {
