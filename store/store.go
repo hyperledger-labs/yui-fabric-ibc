@@ -24,7 +24,12 @@ type Store struct {
 }
 
 func NewStore(db dbm.DB) *Store {
-	return &Store{db: db}
+	return &Store{
+		db:           db,
+		storesParams: make(map[types.StoreKey]storeParams),
+		stores:       make(map[types.StoreKey]types.CommitKVStore),
+		keysByName:   make(map[string]types.StoreKey),
+	}
 }
 
 // GetStoreType implements Store.

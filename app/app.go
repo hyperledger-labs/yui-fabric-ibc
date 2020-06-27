@@ -112,6 +112,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider S
 		keys:      keys,
 		memKeys:   memKeys,
 		txDecoder: JSONTxDecoder(cdc),
+		subspaces: make(map[string]paramstypes.Subspace),
 	}
 
 	// init params keeper and subspaces
@@ -162,12 +163,20 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider S
 		transferModule,
 	)
 
+	app.mm.RegisterRoutes(app.Router(), app.QueryRouter())
+
+	// initialize stores
+	app.MountKVStores(keys)
+	app.MountTransientStores(tkeys)
+	app.MountMemoryStores(memKeys)
+
+	// initialize BaseApp
+	app.SetAnteHandler(NewAnteHandler(*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer))
+	app.SetInitChainer(app.InitChainer)
+
 	if err := app.LoadLatestVersion(); err != nil {
 		return nil, err
 	}
-
-	app.SetAnteHandler(NewAnteHandler(*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer))
-	app.SetInitChainer(app.InitChainer)
 
 	// Initialize and seal the capability keeper so all persistent capabilities
 	// are loaded in-memory and prevent any further modules from creating scoped
@@ -182,6 +191,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider S
 	return app, nil
 }
 
+// This key was created for ICS-20 testing
 var MasterAccount crypto.PrivKey
 
 func init() {
@@ -219,6 +229,10 @@ func (app *IBCApp) InitChainer(ctx sdk.Context, appStateBytes []byte) error {
 	transfer.InitGenesis(ctx, app.TransferKeeper, ibctransfertypes.DefaultGenesisState())
 
 	return nil
+}
+
+func (app *IBCApp) Codec() *codec.Codec {
+	return app.cdc
 }
 
 // MakeCodecs constructs the *std.Codec and *codec.Codec instances used by

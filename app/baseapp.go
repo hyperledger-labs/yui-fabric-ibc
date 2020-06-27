@@ -15,11 +15,12 @@ import (
 )
 
 type BaseApp struct {
-	logger log.Logger
-	name   string       // application name from abci.Info
-	db     dbm.DB       // common DB backend
-	cms    *store.Store // Main (uncached) state
-	router sdk.Router   // handle any kind of message
+	logger      log.Logger
+	name        string          // application name from abci.Info
+	db          dbm.DB          // common DB backend
+	cms         *store.Store    // Main (uncached) state
+	router      sdk.Router      // handle any kind of message
+	queryRouter sdk.QueryRouter // router for redirecting query calls
 
 	txDecoder   sdk.TxDecoder
 	anteHandler sdk.AnteHandler // ante handler for fee and auth
@@ -35,12 +36,13 @@ func NewBaseApp(
 	name string, logger log.Logger, db dbm.DB, txDecoder sdk.TxDecoder,
 ) *BaseApp {
 	app := &BaseApp{
-		logger:    logger,
-		name:      name,
-		db:        db,
-		cms:       store.NewStore(db),
-		router:    NewRouter(),
-		txDecoder: txDecoder,
+		logger:      logger,
+		name:        name,
+		db:          db,
+		cms:         store.NewStore(db),
+		router:      NewRouter(),
+		queryRouter: NewQueryRouter(),
+		txDecoder:   txDecoder,
 	}
 
 	return app
@@ -65,6 +67,23 @@ func (app *BaseApp) Router() sdk.Router {
 	}
 
 	return app.router
+}
+
+// QueryRouter returns the QueryRouter of a BaseApp.
+func (app *BaseApp) QueryRouter() sdk.QueryRouter { return app.queryRouter }
+
+// Seal seals a BaseApp. It prohibits any further modifications to a BaseApp.
+func (app *BaseApp) Seal() { app.sealed = true }
+
+// IsSealed returns true if the BaseApp is sealed and false otherwise.
+func (app *BaseApp) IsSealed() bool { return app.sealed }
+
+// MountStores mounts all IAVL or DB stores to the provided keys in the BaseApp
+// multistore.
+func (app *BaseApp) MountKVStores(keys map[string]*sdk.KVStoreKey) {
+	for _, key := range keys {
+		app.MountStore(key, sdk.StoreTypeDB)
+	}
 }
 
 // MountStores mounts all IAVL or DB stores to the provided keys in the BaseApp
@@ -94,12 +113,6 @@ func (app *BaseApp) MountStoreWithDB(key sdk.StoreKey, typ sdk.StoreType, db dbm
 func (app *BaseApp) MountStore(key sdk.StoreKey, typ sdk.StoreType) {
 	app.cms.MountStoreWithDB(key, typ, nil)
 }
-
-// Seal seals a BaseApp. It prohibits any further modifications to a BaseApp.
-func (app *BaseApp) Seal() { app.sealed = true }
-
-// IsSealed returns true if the BaseApp is sealed and false otherwise.
-func (app *BaseApp) IsSealed() bool { return app.sealed }
 
 func (app *BaseApp) LoadLatestVersion() error {
 	if err := app.cms.LoadStores(); err != nil {
@@ -139,7 +152,8 @@ func (app *BaseApp) RunTx(txBytes []byte) (result *sdk.Result, err error) {
 	}
 
 	ms := app.cms.CacheMultiStore()
-	ctx := sdk.NewContext(ms, abci.Header{}, false, app.logger)
+	// TODO set valid height from sequence mgr
+	ctx := sdk.NewContext(ms, abci.Header{Height: 100}, false, app.logger)
 
 	msgs := tx.GetMsgs()
 	if err := validateBasicTxMsgs(msgs); err != nil {
@@ -198,6 +212,8 @@ func (app *BaseApp) RunTx(txBytes []byte) (result *sdk.Result, err error) {
 			// append the events in the order of occurrence
 			result.Events = append(events.ToABCIEvents(), result.Events...)
 		}
+	} else {
+		return result, err
 	}
 
 	// commit
@@ -309,4 +325,12 @@ func (app *BaseApp) SetRouter(router sdk.Router) {
 
 func (app *BaseApp) SetInitChainer(initChainer InitChainer) {
 	app.initChainer = initChainer
+}
+
+//----------------------------------------
+// +Helpers
+
+func (app *BaseApp) MakeContext(header abci.Header) (ctx sdk.Context, writer func()) {
+	ms := app.cms.CacheMultiStore()
+	return sdk.NewContext(ms, header, false, app.logger), ms.Write
 }
