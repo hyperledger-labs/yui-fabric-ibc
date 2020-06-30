@@ -70,8 +70,13 @@ func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, 
 }
 
 // GetSequence returns current Sequence
-func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
-	return c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) (string, error) {
+	seq, err :=  c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+	if err != nil {
+		return "", err
+	}
+
+	return seq.String(), nil
 }
 
 // UpdateSequence updates Sequence

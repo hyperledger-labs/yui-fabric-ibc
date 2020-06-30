@@ -1,0 +1,5 @@
+!config
+/dev.block
+/*.tar.gz
+/log.txt
+/artifacts
