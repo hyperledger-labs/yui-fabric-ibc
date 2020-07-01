@@ -17,30 +17,25 @@ import (
 	"github.com/hyperledger/fabric/protoutil"
 )
 
-func GetLocalDeserializer() msp.IdentityDeserializer {
-	// TODO fix msp config
-	// setup the MSP manager so that we can sign/verify
-	mgr, err := LoadMSPs(DefaultConfig())
-	if err != nil {
-		panic(err)
-	}
+func GetLocalDeserializer(config Config) msp.IdentityDeserializer {
+	mgr, err := LoadMSPs(config)
 	if err != nil {
 		panic(err)
 	}
 	return mgr
 }
 
-func GetPolicyEvaluator(policyBytes []byte) (policies.Policy, error) {
+func GetPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, error) {
 	var ap peer.ApplicationPolicy
 	if err := proto.Unmarshal(policyBytes, &ap); err != nil {
 		return nil, err
 	}
 	sigp := ap.Type.(*peer.ApplicationPolicy_SignaturePolicy)
-	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: GetLocalDeserializer()}
+	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: GetLocalDeserializer(config)}
 	return pp.NewPolicy(sigp.SignaturePolicy)
 }
 
-func makeSignedDataList(pr *Proof) []*protoutil.SignedData {
+func MakeSignedDataList(pr *Proof) []*protoutil.SignedData {
 	var sigSet []*protoutil.SignedData
 	for i := 0; i < len(pr.Signatures); i++ {
 		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
@@ -97,8 +92,10 @@ func EnsureWriteSetIncludesCommitment(set []*rwset.NsReadWriteSet, nsIdx, rwsIdx
 }
 
 func VerifyEndorsement(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, path string, value []byte) (bool, error) {
-	sigSet := makeSignedDataList(&proof)
-	policy, err := GetPolicyEvaluator(policyBytes)
+	// TODO parameterize
+	config := DefaultConfig()
+	sigSet := MakeSignedDataList(&proof)
+	policy, err := GetPolicyEvaluator(policyBytes, config)
 	if err != nil {
 		return false, err
 	}
@@ -141,23 +138,30 @@ func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 }
 
 func LoadMSPs(conf Config) (msp.MSPManager, error) {
-	mgr := msp.NewMSPManager()
 	msps := []msp.MSP{}
 	// if in local, this would depend `peer.localMspType` config
-	opts := msp.Options[msp.ProviderTypeToString(msp.FABRIC)]
 	for _, id := range conf.MSPIDs {
 		dir := filepath.Join(conf.MSPsDir, id)
-		mspConf, err := msp.GetLocalMspConfig(dir, nil, id)
+		bccspConfig := factory.GetDefaultOpts()
+		mspConf, err := msp.GetLocalMspConfig(dir, bccspConfig, id)
 		if err != nil {
 			return nil, err
 		}
-		m, err := msp.New(opts, factory.GetDefault())
+		opts := msp.Options[msp.ProviderTypeToString(msp.FABRIC)]
+		cryptoProvider, err := (&factory.SWFactory{}).Get(bccspConfig)
 		if err != nil {
 			return nil, err
 		}
-		m.Setup(mspConf)
+		m, err := msp.New(opts, cryptoProvider)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.Setup(mspConf); err != nil {
+			return nil, err
+		}
 		msps = append(msps, m)
 	}
+	mgr := msp.NewMSPManager()
 	err := mgr.Setup(msps)
 	if err != nil {
 		return nil, err
