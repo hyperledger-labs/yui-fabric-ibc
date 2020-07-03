@@ -21,7 +21,9 @@ func TestCommitment(t *testing.T) {
 	require := require.New(t)
 
 	// setup the MSP manager so that we can sign/verify
-	mgr, err := LoadMSPs(DefaultConfig())
+	config, err := DefaultConfig()
+	require.NoError(err)
+	mgr, err := LoadMSPs(config)
 	require.NoError(err)
 	msps, err := mgr.GetMSPs()
 	require.NoError(err)

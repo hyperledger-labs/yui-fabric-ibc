@@ -130,7 +130,10 @@ func MarshalOrPanic(msg proto.Message) []byte {
 }
 
 func GetLocalMspConfig(mspID string) (msp.MSP, error) {
-	conf := fabrictypes.DefaultConfig()
+	conf, err := fabrictypes.DefaultConfig()
+	if err != nil {
+		return nil, err
+	}
 	mgr, err := fabrictypes.LoadMSPs(conf)
 	if err != nil {
 		return nil, err

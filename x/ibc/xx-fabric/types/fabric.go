@@ -93,7 +93,10 @@ func EnsureWriteSetIncludesCommitment(set []*rwset.NsReadWriteSet, nsIdx, rwsIdx
 
 func VerifyEndorsement(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, path string, value []byte) (bool, error) {
 	// TODO parameterize
-	config := DefaultConfig()
+	config, err := DefaultConfig()
+	if err != nil {
+		return false, err
+	}
 	sigSet := MakeSignedDataList(&proof)
 	policy, err := GetPolicyEvaluator(policyBytes, config)
 	if err != nil {
