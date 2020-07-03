@@ -209,6 +209,10 @@ func (iter *Iterator) Valid() bool {
 }
 
 func (iter *Iterator) Next() {
+	if !iter.qi.HasNext() {
+		iter.current = nil
+		return
+	}
 	kv, err := iter.qi.Next()
 	if err != nil {
 		panic(err)

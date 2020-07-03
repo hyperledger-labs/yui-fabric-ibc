@@ -2,6 +2,7 @@ package compat
 
 import (
 	"encoding/hex"
+	"fmt"
 	"sort"
 
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -42,18 +43,33 @@ func MakeFakeStub() *mock.ChaincodeStub {
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].key < items[j].key
 		})
-		for i := 0; i < len(items); i++ {
-			key, value := items[i].key, items[i].value
-			fakeIterator.HasNextReturnsOnCall(i, true)
-			fakeIterator.NextReturnsOnCall(i, &queryresult.KV{
-				Key:   key,
-				Value: value,
-			}, nil)
-		}
+
+		iter := &itemIterator{seq: 0, items: items}
+		fakeIterator.HasNextCalls(iter.HasNext)
+		fakeIterator.NextCalls(iter.Next)
+
 		return fakeIterator, nil
 	}
 
 	return fakeStub
+}
+
+type itemIterator struct {
+	seq   int
+	items []item
+}
+
+func (it *itemIterator) HasNext() bool {
+	return it.seq < len(it.items)
+}
+
+func (it *itemIterator) Next() (*queryresult.KV, error) {
+	if !it.HasNext() {
+		return nil, fmt.Errorf("no such kv")
+	}
+	item := it.items[it.seq]
+	it.seq++
+	return &queryresult.KV{Key: item.key, Value: item.value}, nil
 }
 
 func decodeHex(s string) string {
