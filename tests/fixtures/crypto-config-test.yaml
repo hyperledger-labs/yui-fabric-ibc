@@ -7,6 +7,15 @@ OrdererOrgs:
         SANS:
           - localhost
 PeerOrgs:
+  - Name: SampleOrg
+    Domain: sampleorg.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+    Users:
+      Count: 1
   - Name: Org1
     Domain: org1.example.com
     EnableNodeOUs: true
@@ -18,15 +27,6 @@ PeerOrgs:
       Count: 1
   - Name: Org2
     Domain: org2.example.com
-    EnableNodeOUs: true
-    Template:
-      Count: 1
-      SANS:
-        - localhost
-    Users:
-      Count: 1
-  - Name: Org3
-    Domain: org3.example.com
     EnableNodeOUs: true
     Template:
       Count: 1

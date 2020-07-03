@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+const envFabricIbcMSPsDir = "FABRIC_IBC_MSPS_DIR"
+
 type Config struct {
 	MSPsDir string
 	MSPIDs  []string
@@ -13,7 +15,7 @@ type Config struct {
 func DefaultConfig() Config {
 	var ids []string
 
-	dir := os.Getenv("FABRIC_IBC_MSPS_DIR")
+	dir := os.Getenv(envFabricIbcMSPsDir)
 	if dir != "" {
 		fis, err := ioutil.ReadDir(dir)
 		if err == nil {

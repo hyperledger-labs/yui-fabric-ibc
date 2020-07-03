@@ -12,16 +12,14 @@ import (
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/x/compat"
+	"github.com/datachainlab/fabric-ibc/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
-	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/policydsl"
-	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
-	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
@@ -57,10 +55,8 @@ func TestApp(t *testing.T) {
 	require := require.New(t)
 
 	// setup the MSP manager so that we can sign/verify
-	require.NoError(msptesttools.LoadMSPSetupForTesting())
-	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
+	lcMSP, err := tests.GetLocalMspConfig("SampleOrgMSP")
 	require.NoError(err)
-	lcMSP := mspmgmt.GetLocalMSP(cryptoProvider)
 	endorser, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
 
