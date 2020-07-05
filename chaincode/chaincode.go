@@ -80,8 +80,13 @@ func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) 
 }
 
 // UpdateSequence updates Sequence
-func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
-	return c.sequenceMgr.UpdateSequence(ctx.GetStub())
+func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (string, error) {
+	seq, err :=  c.sequenceMgr.UpdateSequence(ctx.GetStub())
+	if err != nil {
+		return "", err
+	}
+
+	return seq.String(), nil
 }
 
 func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) (*commitment.Entry, error) {
