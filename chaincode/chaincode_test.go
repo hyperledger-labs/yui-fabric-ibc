@@ -1,6 +1,7 @@
 package chaincode
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"testing"
@@ -106,8 +107,12 @@ func (ca TestChaincodeApp) runMsg(stub shim.ChaincodeStubInterface, msgs ...sdk.
 }
 
 func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
-	seq, err := ca.cc.UpdateSequence(ctx)
+	seqJson, err := ca.cc.UpdateSequence(ctx)
 	if err != nil {
+		return nil, err
+	}
+	seq := new(commitment.Sequence)
+	if err = json.Unmarshal([]byte(seqJson), seq); err != nil {
 		return nil, err
 	}
 	ca.seq = seq

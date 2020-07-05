@@ -12,13 +12,14 @@ import (
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/x/ibc"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
+
+	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/datachainlab/fabric-ibc/x/ibc"
 )
 
 const (
@@ -71,22 +72,28 @@ func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, 
 
 // GetSequence returns current Sequence
 func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) (string, error) {
-	seq, err :=  c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
+	seq, err := c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
 	if err != nil {
 		return "", err
 	}
-
-	return seq.String(), nil
+	b, err := json.Marshal(seq)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 // UpdateSequence updates Sequence
 func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterface) (string, error) {
-	seq, err :=  c.sequenceMgr.UpdateSequence(ctx.GetStub())
+	seq, err := c.sequenceMgr.UpdateSequence(ctx.GetStub())
 	if err != nil {
 		return "", err
 	}
-
-	return seq.String(), nil
+	b, err := json.Marshal(seq)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) (*commitment.Entry, error) {
