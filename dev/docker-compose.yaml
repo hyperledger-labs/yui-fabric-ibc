@@ -8,7 +8,7 @@ networks:
 services:
   orderer.dev.com:
     container_name: orderer.dev.com
-    image: hyperledger/fabric-orderer:2.1.1
+    image: hyperledger/fabric-orderer:${IMAGE_TAG}
     environment:
       - FABRIC_LOGGING_SPEC=INFO
       - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
@@ -31,7 +31,7 @@ services:
 
   peer0.peerorg.dev.com:
     container_name: peer0.peerorg.dev.com
-    image: hyperledger/fabric-peer:2.1.1
+    image: hyperledger/fabric-peer:${IMAGE_TAG}
     environment:
       - FABRIC_LOGGING_SPEC=INFO
       - CORE_PEER_ID=peer0.peerorg.dev.com
@@ -62,7 +62,7 @@ services:
 
   cli:
     container_name: cli
-    image: hyperledger/fabric-tools:2.1.1
+    image: hyperledger/fabric-tools:${IMAGE_TAG}
     tty: true
     environment:
       - FABRIC_LOGGING_SPEC=INFO
@@ -88,7 +88,7 @@ services:
 
 #  chaincode:
 #    container_name: chaincode
-#    image: hyperledger/fabric-ccenv:2.1.1
+#    image: hyperledger/fabric-ccenv:${IMAGE_TAG}
 #    tty: true
 #    environment:
 #      - FABRIC_LOGGING_SPEC=INFO
