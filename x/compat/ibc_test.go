@@ -21,10 +21,7 @@ import (
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
-	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/policydsl"
-	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
-	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,10 +137,8 @@ func TestCreateClient(t *testing.T) {
 	require := require.New(t)
 
 	// setup the MSP manager so that we can sign/verify
-	require.NoError(msptesttools.LoadMSPSetupForTesting())
-	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
+	lcMSP, err := tests.GetLocalMspConfig("SampleOrgMSP")
 	require.NoError(err)
-	lcMSP := mspmgmt.GetLocalMSP(cryptoProvider)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
 
@@ -166,7 +161,7 @@ func TestCreateClient(t *testing.T) {
 	{
 		/// Build Msg
 		var sigs [][]byte
-		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
+		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
 		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
@@ -188,7 +183,7 @@ func TestCreateClient(t *testing.T) {
 	{
 		/// Build Msg
 		var sigs [][]byte
-		var pcBytes []byte = makePolicy([]string{"SampleOrg"})
+		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
 		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
