@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 )
@@ -15,7 +16,9 @@ type Config struct {
 func DefaultConfig() (Config, error) {
 	var ids []string
 	dir := os.Getenv(envFabricIbcMSPsDir)
-	if dir != "" {
+	if dir == "" {
+		return Config{}, fmt.Errorf("environment variable '%v' must be set", envFabricIbcMSPsDir)
+	} else {
 		fis, err := ioutil.ReadDir(dir)
 		if err != nil {
 			return Config{}, err
