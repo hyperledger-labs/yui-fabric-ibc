@@ -4,45 +4,38 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset/kvrwset"
 	"github.com/hyperledger/fabric-protos-go/peer"
-	"github.com/hyperledger/fabric/bccsp/sw"
+	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/msp"
-	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
-	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
 )
 
-func GetLocalDeserializer() msp.IdentityDeserializer {
-	// TODO fix msp config
-	// setup the MSP manager so that we can sign/verify
-	err := msptesttools.LoadMSPSetupForTesting()
+func GetLocalDeserializer(config Config) msp.IdentityDeserializer {
+	mgr, err := LoadMSPs(config)
 	if err != nil {
 		panic(err)
 	}
-	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
-	if err != nil {
-		panic(err)
-	}
-	return mspmgmt.NewDeserializersManager(cryptoProvider).GetLocalDeserializer()
+	return mgr
 }
 
-func GetPolicyEvaluator(policyBytes []byte) (policies.Policy, error) {
+func GetPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, error) {
 	var ap peer.ApplicationPolicy
 	if err := proto.Unmarshal(policyBytes, &ap); err != nil {
 		return nil, err
 	}
 	sigp := ap.Type.(*peer.ApplicationPolicy_SignaturePolicy)
-	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: GetLocalDeserializer()}
+	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: GetLocalDeserializer(config)}
 	return pp.NewPolicy(sigp.SignaturePolicy)
 }
 
-func makeSignedDataList(pr *Proof) []*protoutil.SignedData {
+func MakeSignedDataList(pr *Proof) []*protoutil.SignedData {
 	var sigSet []*protoutil.SignedData
 	for i := 0; i < len(pr.Signatures); i++ {
 		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
@@ -99,8 +92,13 @@ func EnsureWriteSetIncludesCommitment(set []*rwset.NsReadWriteSet, nsIdx, rwsIdx
 }
 
 func VerifyEndorsement(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, path string, value []byte) (bool, error) {
-	sigSet := makeSignedDataList(&proof)
-	policy, err := GetPolicyEvaluator(policyBytes)
+	// TODO parameterize
+	config, err := DefaultConfig()
+	if err != nil {
+		return false, err
+	}
+	sigSet := MakeSignedDataList(&proof)
+	policy, err := GetPolicyEvaluator(policyBytes, config)
 	if err != nil {
 		return false, err
 	}
@@ -140,4 +138,36 @@ func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	// TODO implement
 	return nil
+}
+
+func LoadMSPs(conf Config) (msp.MSPManager, error) {
+	msps := []msp.MSP{}
+	// if in local, this would depend `peer.localMspType` config
+	for _, id := range conf.MSPIDs {
+		dir := filepath.Join(conf.MSPsDir, id)
+		bccspConfig := factory.GetDefaultOpts()
+		mspConf, err := msp.GetLocalMspConfig(dir, bccspConfig, id)
+		if err != nil {
+			return nil, err
+		}
+		opts := msp.Options[msp.ProviderTypeToString(msp.FABRIC)]
+		cryptoProvider, err := (&factory.SWFactory{}).Get(bccspConfig)
+		if err != nil {
+			return nil, err
+		}
+		m, err := msp.New(opts, cryptoProvider)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.Setup(mspConf); err != nil {
+			return nil, err
+		}
+		msps = append(msps, m)
+	}
+	mgr := msp.NewMSPManager()
+	err := mgr.Setup(msps)
+	if err != nil {
+		return nil, err
+	}
+	return mgr, nil
 }

@@ -10,11 +10,8 @@ import (
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset/kvrwset"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
-	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/policydsl"
-	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
-	msptesttools "github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -24,15 +21,16 @@ func TestCommitment(t *testing.T) {
 	require := require.New(t)
 
 	// setup the MSP manager so that we can sign/verify
-	err := msptesttools.LoadMSPSetupForTesting()
+	config, err := DefaultConfig()
 	require.NoError(err)
-	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
+	mgr, err := LoadMSPs(config)
 	require.NoError(err)
-	lcMSP := mspmgmt.GetLocalMSP(cryptoProvider)
+	msps, err := mgr.GetMSPs()
+	require.NoError(err)
+	lcMSP := msps["SampleOrgMSP"]
+	require.NoError(err)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
-
-	mm := mspmgmt.NewDeserializersManager(cryptoProvider).GetLocalDeserializer()
 
 	pr, err := makeProof(signer)
 	require.NoError(err)
@@ -66,7 +64,7 @@ func TestCommitment(t *testing.T) {
 		)
 	}
 
-	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mm}
+	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mgr}
 	policy, err := pp.NewPolicy(ap.SignaturePolicy)
 	require.NoError(err)
 	require.NoError(policy.EvaluateSignedData(sigSet))

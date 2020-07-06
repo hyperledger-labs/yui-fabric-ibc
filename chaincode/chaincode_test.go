@@ -115,7 +115,7 @@ func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInt
 }
 
 func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.TransactionContextInterface) *fabric.MsgCreateClient {
-	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
+	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, nil)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.Proof{})
 	h := fabric.NewHeader(ch, ci)
@@ -126,7 +126,7 @@ func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.T
 
 func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdateClient {
 	var sigs [][]byte
-	var pcBytes []byte = makePolicy([]string{"SampleOrg"})
+	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, sigs)
 	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ca.seq.Bytes())
 	require.NoError(t, err)
