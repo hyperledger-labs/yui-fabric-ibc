@@ -11,8 +11,8 @@ import (
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/tests"
 	"github.com/datachainlab/fabric-ibc/x/compat"
+	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
@@ -54,8 +54,10 @@ func TestApp(t *testing.T) {
 
 	require := require.New(t)
 
+	conf, err := fabrictypes.DefaultConfig()
+	require.NoError(err)
 	// setup the MSP manager so that we can sign/verify
-	lcMSP, err := tests.GetLocalMspConfig("SampleOrgMSP")
+	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")
 	require.NoError(err)
 	endorser, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
