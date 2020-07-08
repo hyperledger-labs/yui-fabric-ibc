@@ -376,10 +376,15 @@ func (ca TestChaincodeApp) createMsgTimeoutPacket(
 }
 
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
-	entry, err := ca.cc.EndorseSequenceCommitment(ctx)
+	entryJson, err := ca.cc.EndorseSequenceCommitment(ctx)
 	if err != nil {
 		return nil, err
 	}
+	entry := new(commitment.Entry)
+	if err = json.Unmarshal([]byte(entryJson), entry); err != nil {
+		return nil, err
+	}
+
 	var seq commitment.Sequence
 	if err := proto.Unmarshal(entry.Value, &seq); err != nil {
 		return nil, err

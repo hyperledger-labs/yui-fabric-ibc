@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/ibc/03-connection/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
@@ -96,31 +96,39 @@ func (c *IBCChaincode) UpdateSequence(ctx contractapi.TransactionContextInterfac
 	return string(b), nil
 }
 
-func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) (*commitment.Entry, error) {
+func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionContextInterface) (string, error) {
 	var (
 		seq *commitment.Sequence
 		err error
 	)
 
-	args := ctx.GetStub().GetArgs()
-	if len(args) > 0 {
-		seqValue := sdk.BigEndianToUint64(args[0])
-		seq, err = c.sequenceMgr.GetSequence(ctx.GetStub(), seqValue)
+	args := ctx.GetStub().GetStringArgs()
+	if len(args) > 1 {
+		arg, err := strconv.ParseUint(args[1], 10, 64)
+		if err != nil {
+			return "", err
+		}
+		seq, err = c.sequenceMgr.GetSequence(ctx.GetStub(), arg)
 	} else {
 		seq, err = c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
 	}
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	entry, err := commitment.MakeSequenceCommitmentEntry(seq)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if err := ctx.GetStub().PutState(entry.Key, entry.Value); err != nil {
-		return nil, err
+		return "", err
 	}
-	return entry, nil
+
+	b, err := json.Marshal(entry)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.Entry, error) {
