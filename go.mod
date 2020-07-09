@@ -21,6 +21,7 @@ require (
 	github.com/tedsuo/ifrit v0.0.0-20191009134036-9a97d0632f00 // indirect
 	github.com/tendermint/tendermint v0.33.5
 	github.com/tendermint/tm-db v0.5.1
+	google.golang.org/protobuf v1.24.0
 )
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.2-alpha.regen.4
