@@ -1,6 +1,7 @@
 package commitment
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -11,6 +12,24 @@ import (
 type Entry struct {
 	Key   string
 	Value []byte
+}
+
+func (e Entry) ToCommitment() *CommitmentEntry {
+	return &CommitmentEntry{
+		Key:   e.Key,
+		Value: base64.StdEncoding.EncodeToString(e.Value),
+	}
+}
+
+func EntryFromCommitment(ce *CommitmentEntry) (*Entry, error) {
+	v, err := base64.StdEncoding.DecodeString(ce.Value)
+	if err != nil {
+		return nil, err
+	}
+	return &Entry{
+		Key:   ce.Key,
+		Value: v,
+	}, nil
 }
 
 /// ConsensusStateCommitment
