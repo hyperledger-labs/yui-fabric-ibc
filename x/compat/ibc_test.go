@@ -17,6 +17,7 @@ import (
 	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
 	clientkeeper "github.com/datachainlab/fabric-ibc/x/ibc/02-client/keeper"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
+	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
@@ -136,8 +137,10 @@ func TestCodec(t *testing.T) {
 func TestCreateClient(t *testing.T) {
 	require := require.New(t)
 
+	conf, err := fabrictypes.DefaultConfig()
+	require.NoError(err)
 	// setup the MSP manager so that we can sign/verify
-	lcMSP, err := tests.GetLocalMspConfig("SampleOrgMSP")
+	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")
 	require.NoError(err)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)

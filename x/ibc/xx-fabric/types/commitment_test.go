@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/datachainlab/fabric-ibc/commitment"
+	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
@@ -23,11 +24,7 @@ func TestCommitment(t *testing.T) {
 	// setup the MSP manager so that we can sign/verify
 	config, err := DefaultConfig()
 	require.NoError(err)
-	mgr, err := LoadMSPs(config)
-	require.NoError(err)
-	msps, err := mgr.GetMSPs()
-	require.NoError(err)
-	lcMSP := msps["SampleOrgMSP"]
+	lcMSP, err := fabrictests.GetLocalMsp(config.MSPsDir, "SampleOrgMSP")
 	require.NoError(err)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
@@ -64,7 +61,10 @@ func TestCommitment(t *testing.T) {
 		)
 	}
 
-	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mgr}
+	deserializer, err := LoadVerifyingMsps(config)
+	require.NoError(err)
+
+	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: deserializer}
 	policy, err := pp.NewPolicy(ap.SignaturePolicy)
 	require.NoError(err)
 	require.NoError(policy.EvaluateSignedData(sigSet))
