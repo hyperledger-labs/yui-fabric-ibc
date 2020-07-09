@@ -1,16 +1,12 @@
 package tests
 
 import (
-	"fmt"
-
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
-	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset/kvrwset"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
-	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
 )
 
@@ -127,24 +123,4 @@ func MarshalOrPanic(msg proto.Message) []byte {
 		panic(err)
 	}
 	return b
-}
-
-func GetLocalMspConfig(mspID string) (msp.MSP, error) {
-	conf, err := fabrictypes.DefaultConfig()
-	if err != nil {
-		return nil, err
-	}
-	mgr, err := fabrictypes.LoadMSPs(conf)
-	if err != nil {
-		return nil, err
-	}
-	msps, err := mgr.GetMSPs()
-	if err != nil {
-		return nil, err
-	}
-	msp, ok := msps[mspID]
-	if !ok {
-		return nil, fmt.Errorf("mspID %s is not found\n", mspID)
-	}
-	return msp, nil
 }

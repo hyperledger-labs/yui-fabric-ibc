@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/datachainlab/fabric-ibc/tests"
+	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	"github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
@@ -15,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadMSPs(t *testing.T) {
+func TestLoadVerifyingMSPs(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
-	msps, err := types.LoadMSPs(configForTest())
+	msps, err := types.LoadVerifyingMsps(configForTest())
 	require.NoError(err)
 
 	dict, err := msps.GetMSPs()
@@ -30,22 +31,19 @@ func TestLoadMSPs(t *testing.T) {
 	id, err := dict[mspID].GetIdentifier()
 	require.NoError(err)
 	assert.Equal(mspID, id)
-
-	t.Logf("%+v", dict[mspID])
-	si, err := dict[mspID].GetDefaultSigningIdentity()
-	require.NoError(err)
-	assert.Equal(mspID, si.GetMSPIdentifier())
 }
 
 func TestGetPolicyEvaluator(t *testing.T) {
 	config := configForTest()
 	mspID := "Org2MSP"
 	plcBytes := makePolicy([]string{mspID})
+	// load verifying msp configs inside it
 	plc, err := types.GetPolicyEvaluator(plcBytes, config)
 
-	msps, _ := types.LoadMSPs(config)
-	dict, _ := msps.GetMSPs()
-	si, _ := dict[mspID].GetDefaultSigningIdentity()
+	msp, err := fabrictests.GetLocalMsp(config.MSPsDir, mspID)
+	require.NoError(t, err)
+	si, err := msp.GetDefaultSigningIdentity()
+	require.NoError(t, err)
 
 	proof, err := tests.MakeProof(si, "key1", []byte("val1"))
 	require.NoError(t, err)

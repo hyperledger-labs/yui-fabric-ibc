@@ -17,21 +17,17 @@ import (
 	"github.com/hyperledger/fabric/protoutil"
 )
 
-func GetLocalDeserializer(config Config) msp.IdentityDeserializer {
-	mgr, err := LoadMSPs(config)
-	if err != nil {
-		panic(err)
-	}
-	return mgr
-}
-
 func GetPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, error) {
 	var ap peer.ApplicationPolicy
 	if err := proto.Unmarshal(policyBytes, &ap); err != nil {
 		return nil, err
 	}
 	sigp := ap.Type.(*peer.ApplicationPolicy_SignaturePolicy)
-	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: GetLocalDeserializer(config)}
+	mgr, err := LoadVerifyingMsps(config)
+	if err != nil {
+		return nil, err
+	}
+	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mgr}
 	return pp.NewPolicy(sigp.SignaturePolicy)
 }
 
@@ -140,13 +136,14 @@ func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	return nil
 }
 
-func LoadMSPs(conf Config) (msp.MSPManager, error) {
+func LoadVerifyingMsps(conf Config) (msp.MSPManager, error) {
 	msps := []msp.MSP{}
 	// if in local, this would depend `peer.localMspType` config
 	for _, id := range conf.MSPIDs {
 		dir := filepath.Join(conf.MSPsDir, id)
 		bccspConfig := factory.GetDefaultOpts()
-		mspConf, err := msp.GetLocalMspConfig(dir, bccspConfig, id)
+		// XXX provider type should be selectable
+		mspConf, err := msp.GetVerifyingMspConfig(dir, id, msp.ProviderTypeToString(msp.FABRIC))
 		if err != nil {
 			return nil, err
 		}
