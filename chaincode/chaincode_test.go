@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -14,6 +15,7 @@ import (
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/tests"
+	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/gogo/protobuf/proto"
@@ -22,6 +24,7 @@ import (
 	"github.com/hyperledger/fabric/msp"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type TestChaincodeApp struct {
@@ -371,7 +374,11 @@ func (ca TestChaincodeApp) createMsgTimeoutPacket(
 }
 
 func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
-	entry, err := ca.cc.EndorseSequenceCommitment(ctx)
+	ce, err := ca.cc.EndorseSequenceCommitment(ctx)
+	if err != nil {
+		return nil, err
+	}
+	entry, err := commitment.EntryFromCommitment(ce)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +394,11 @@ func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Ent
 }
 
 func (ca TestChaincodeApp) makeProofConsensus(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorseConsensusStateCommitment(ctx, clientID, height)
+	ce, err := ca.cc.EndorseConsensusStateCommitment(ctx, clientID, height)
+	entry, err := commitment.EntryFromCommitment(ce)
+	if err != nil {
+		return 0, nil, err
+	}
 	proof, err := ca.makeMockEndorsedCommitmentProof(entry)
 	if err != nil {
 		return 0, nil, err
@@ -400,7 +411,11 @@ func (ca TestChaincodeApp) makeProofConsensus(ctx contractapi.TransactionContext
 }
 
 func (ca TestChaincodeApp) makeProofConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorseConnectionState(ctx, connectionID)
+	ce, err := ca.cc.EndorseConnectionState(ctx, connectionID)
+	if err != nil {
+		return 0, nil, err
+	}
+	entry, err := commitment.EntryFromCommitment(ce)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -416,7 +431,11 @@ func (ca TestChaincodeApp) makeProofConnectionState(ctx contractapi.TransactionC
 }
 
 func (ca TestChaincodeApp) makeProofChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorseChannelState(ctx, portID, channelID)
+	ce, err := ca.cc.EndorseChannelState(ctx, portID, channelID)
+	if err != nil {
+		return 0, nil, err
+	}
+	entry, err := commitment.EntryFromCommitment(ce)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -432,7 +451,11 @@ func (ca TestChaincodeApp) makeProofChannelState(ctx contractapi.TransactionCont
 }
 
 func (ca TestChaincodeApp) makeProofPacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorsePacketCommitment(ctx, portID, channelID, sequence)
+	ce, err := ca.cc.EndorsePacketCommitment(ctx, portID, channelID, sequence)
+	if err != nil {
+		return 0, nil, err
+	}
+	entry, err := commitment.EntryFromCommitment(ce)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -448,7 +471,11 @@ func (ca TestChaincodeApp) makeProofPacketCommitment(ctx contractapi.Transaction
 }
 
 func (ca TestChaincodeApp) makeProofPacketAcknowledgement(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorsePacketAcknowledgement(ctx, portID, channelID, sequence)
+	ce, err := ca.cc.EndorsePacketAcknowledgement(ctx, portID, channelID, sequence)
+	if err != nil {
+		return 0, nil, err
+	}
+	entry, err := commitment.EntryFromCommitment(ce)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -464,7 +491,11 @@ func (ca TestChaincodeApp) makeProofPacketAcknowledgement(ctx contractapi.Transa
 }
 
 func (ca TestChaincodeApp) makeProofNextSequenceRecv(ctx contractapi.TransactionContextInterface, portID, channelID string, nextSequenceRecv uint64) (uint64, []byte, error) {
-	entry, err := ca.cc.EndorseNextSequenceRecv(ctx, portID, channelID)
+	ce, err := ca.cc.EndorseNextSequenceRecv(ctx, portID, channelID)
+	if err != nil {
+		return 0, nil, err
+	}
+	entry, err := commitment.EntryFromCommitment(ce)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -477,4 +508,38 @@ func (ca TestChaincodeApp) makeProofNextSequenceRecv(ctx contractapi.Transaction
 		return 0, nil, err
 	}
 	return ca.seq.Value, bz, nil
+}
+
+func TestResponseSerializer(t *testing.T) {
+	require := require.New(t)
+
+	cc := NewIBCChaincode()
+	chaincode, err := contractapi.NewChaincode(cc)
+	require.NoError(err)
+
+	stub0 := compat.MakeFakeStub()
+
+	// Initialize chaincode
+	res := chaincode.Init(stub0)
+	require.EqualValues(200, res.Status, res.String())
+
+	now := time.Now()
+	stub0.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: now.Unix()}, nil)
+	stub0.GetFunctionAndParametersReturns("InitChaincode", []string{"{}"})
+	res = chaincode.Invoke(stub0)
+	require.EqualValues(200, res.Status, res.String())
+
+	// UpdateSequence
+	now = now.Add(10 * time.Second)
+	stub0.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: now.Unix()}, nil)
+	stub0.GetFunctionAndParametersReturns("UpdateSequence", nil)
+	res = chaincode.Invoke(stub0)
+	require.EqualValues(200, res.Status, res.String())
+
+	// EndorseSequenceCommitment
+	now = now.Add(10 * time.Second)
+	stub0.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: now.Unix()}, nil)
+	stub0.GetFunctionAndParametersReturns("EndorseSequenceCommitment", []string{"2"})
+	res = chaincode.Invoke(stub0)
+	require.EqualValues(200, res.Status, res.String())
 }
