@@ -13,6 +13,7 @@ import (
 	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/policydsl"
+	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -76,11 +77,11 @@ func TestCommitment(t *testing.T) {
 	var cact pb.ChaincodeAction
 	require.NoError(proto.Unmarshal(payload.Extension, &cact))
 
-	var result rwset.TxReadWriteSet
-	require.NoError(proto.Unmarshal(cact.Results, &result))
+	result := &rwsetutil.TxRwSet{}
+	require.NoError(result.FromProtoBytes(cact.Results))
 
 	targetKey := "commitment/{channel}/{port}/{seq}"
-	ok, err := EnsureWriteSetIncludesCommitment(result.GetNsRwset(), pr.NsIndex, pr.WriteSetIndex, targetKey, []byte("true"))
+	ok, err := EnsureWriteSetIncludesCommitment(result.NsRwSets, pr.NsIndex, pr.WriteSetIndex, targetKey, []byte("true"))
 	require.NoError(err)
 	require.True(ok)
 }

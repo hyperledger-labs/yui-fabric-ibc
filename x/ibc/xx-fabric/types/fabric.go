@@ -7,12 +7,11 @@ import (
 	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
-	"github.com/hyperledger/fabric-protos-go/ledger/rwset/kvrwset"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/policies"
+	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
 )
@@ -50,7 +49,7 @@ func MakeSignedDataList(pr *Proof) []*protoutil.SignedData {
 	return sigSet
 }
 
-func GetTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.ChaincodeID, *rwset.TxReadWriteSet, error) {
+func GetTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.ChaincodeID, *rwsetutil.TxRwSet, error) {
 	var payload peer.ProposalResponsePayload
 	if err := proto.Unmarshal(proposal, &payload); err != nil {
 		return nil, nil, err
@@ -59,19 +58,15 @@ func GetTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.Chainc
 	if err := proto.Unmarshal(payload.Extension, &cact); err != nil {
 		return nil, nil, err
 	}
-	var result rwset.TxReadWriteSet
-	if err := proto.Unmarshal(cact.Results, &result); err != nil {
+	txRWSet := &rwsetutil.TxRwSet{}
+	if err := txRWSet.FromProtoBytes(cact.Results); err != nil {
 		return nil, nil, err
 	}
-	return cact.GetChaincodeId(), &result, nil
+	return cact.GetChaincodeId(), txRWSet, nil
 }
 
-func EnsureWriteSetIncludesCommitment(set []*rwset.NsReadWriteSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {
-	ws := set[nsIdx].Rwset
-	var rws kvrwset.KVRWSet
-	if err := proto.Unmarshal(ws, &rws); err != nil {
-		return false, err
-	}
+func EnsureWriteSetIncludesCommitment(set []*rwsetutil.NsRwSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {
+	rws := set[nsIdx].KvRwSet
 	if len(rws.Writes) <= int(rwsIdx) {
 		return false, fmt.Errorf("not found index '%v'(length=%v)", int(rwsIdx), len(rws.Writes))
 	}
@@ -109,7 +104,7 @@ func VerifyEndorsement(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, p
 	if !equalChaincodeID(ccID, *id) {
 		return false, fmt.Errorf("unexpected chaincodID: %v", *id)
 	}
-	return EnsureWriteSetIncludesCommitment(rwset.GetNsRwset(), proof.NsIndex, proof.WriteSetIndex, path, value)
+	return EnsureWriteSetIncludesCommitment(rwset.NsRwSets, proof.NsIndex, proof.WriteSetIndex, path, value)
 }
 
 func equalChaincodeID(a, b peer.ChaincodeID) bool {
