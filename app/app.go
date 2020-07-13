@@ -196,7 +196,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider S
 var MasterAccount crypto.PrivKey
 
 func init() {
-	MasterAccount = secp256k1.GenPrivKey()
+	MasterAccount = secp256k1.GenPrivKeySecp256k1([]byte{})
 }
 
 func (app *IBCApp) InitChainer(ctx sdk.Context, appStateBytes []byte) error {
