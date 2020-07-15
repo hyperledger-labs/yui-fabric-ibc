@@ -53,7 +53,7 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]a
 	if err != nil {
 		return nil, err
 	}
-	res, err := app.RunTx(txBytes)
+	res, err := app.RunTx(stub, txBytes)
 	if err != nil {
 		return nil, err
 	}
