@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/datachainlab/fabric-ibc/auth/types"
+	"github.com/datachainlab/fabric-ibc/x/auth/types"
 	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
 )
 
