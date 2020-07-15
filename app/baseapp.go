@@ -8,6 +8,7 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/datachainlab/fabric-ibc/store"
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/log"
@@ -153,14 +154,14 @@ func (app *BaseApp) getBlockHeader() abci.Header {
 	}
 }
 
-func (app *BaseApp) RunTx(txBytes []byte) (result *sdk.Result, err error) {
+func (app *BaseApp) RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (result *sdk.Result, err error) {
 	tx, err := app.txDecoder(txBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	ms := app.cms.CacheMultiStore()
-	ctx := sdk.NewContext(ms, app.getBlockHeader(), false, app.logger)
+	ctx := setupContext(sdk.NewContext(ms, app.getBlockHeader(), false, app.logger), stub)
 
 	msgs := tx.GetMsgs()
 	if err := validateBasicTxMsgs(msgs); err != nil {
