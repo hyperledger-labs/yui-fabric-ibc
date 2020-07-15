@@ -39,7 +39,7 @@ func (dec FabricIDVerificationDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, 
 	signer := stdTx.GetSigners()[0]
 
 	if !bytes.Equal(signer, []byte(id)) {
-		return ctx, fmt.Errorf("got unexpected signer: expected=%X actual=%v", signer, []byte(id))
+		return ctx, fmt.Errorf("got unexpected signer: expected=%X actual=%X", signer, []byte(id))
 	}
 
 	return next(ctx, stdTx, simulate)
