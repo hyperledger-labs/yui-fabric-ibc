@@ -2,7 +2,7 @@ package app
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/datachainlab/fabric-ibc/auth/ante"
+	"github.com/datachainlab/fabric-ibc/x/auth/ante"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 )
 
