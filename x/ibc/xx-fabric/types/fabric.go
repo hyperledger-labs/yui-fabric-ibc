@@ -23,13 +23,16 @@ func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	if err != nil {
 		return err
 	} else if !ok {
-		return errors.New("failed to verify the endorsement")
+		return errors.New("failed to verify a endorsed commitment")
 	}
 	return nil
 }
 
 // VerifyChaincodeInfo verifies ChaincodeInfo with last IBC Policy
 func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
+	if info.Proof == nil {
+		return errors.New("a proof is empty")
+	}
 	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *info.Proof, info.GetSignBytes())
 }
 
@@ -71,7 +74,7 @@ func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof C
 		return false, err
 	}
 	if !equalChaincodeID(ccID, *id) {
-		return false, fmt.Errorf("unexpected chaincodID: %v", *id)
+		return false, fmt.Errorf("got unexpected chaincodeID: expected=%v actual=%v", ccID, *id)
 	}
 	return ensureWriteSetIncludesCommitment(rwset.NsRwSets, proof.NsIndex, proof.WriteSetIndex, key, value)
 }

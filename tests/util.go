@@ -18,7 +18,7 @@ func MakeCommitmentProof(signer protoutil.Signer, key string, value []byte) (*fa
 		NsRwset: []*rwset.NsReadWriteSet{
 			{
 				Namespace: "lscc",
-				Rwset: MarshalOrPanic(&kvrwset.KVRWSet{
+				Rwset: marshalOrPanic(&kvrwset.KVRWSet{
 					Writes: []*kvrwset.KVWrite{
 						{
 							Key:   key,
@@ -93,7 +93,29 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 	return res, err
 }
 
-func MarshalOrPanic(msg proto.Message) []byte {
+// MakeMessageProof returns a MessageProof
+func MakeMessageProof(signer protoutil.Signer, value []byte) (*fabric.MessageProof, error) {
+	pr := &fabric.MessageProof{}
+	sig, err := signer.Sign(value)
+	if err != nil {
+		return nil, err
+	}
+	id, err := signer.Serialize()
+	if err != nil {
+		return nil, err
+	}
+	pr.Signatures = append(
+		pr.Signatures,
+		sig,
+	)
+	pr.Identities = append(
+		pr.Identities,
+		id,
+	)
+	return pr, nil
+}
+
+func marshalOrPanic(msg proto.Message) []byte {
 	b, err := proto.Marshal(msg)
 	if err != nil {
 		panic(err)

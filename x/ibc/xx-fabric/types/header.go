@@ -34,11 +34,12 @@ func (h ChaincodeHeader) ValidateBasic() error {
 	return nil
 }
 
-func NewChaincodeInfo(chanID string, ccID ChaincodeID, policyBytes []byte, proof *MessageProof) ChaincodeInfo {
+func NewChaincodeInfo(chanID string, ccID ChaincodeID, endorsementPolicy, ibcPolicy []byte, proof *MessageProof) ChaincodeInfo {
 	return ChaincodeInfo{
 		ChannelId:         chanID,
 		ChaincodeId:       ccID,
-		EndorsementPolicy: policyBytes,
+		EndorsementPolicy: endorsementPolicy,
+		IbcPolicy:         ibcPolicy,
 		Proof:             proof,
 	}
 }

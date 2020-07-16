@@ -33,7 +33,7 @@ func TestCommitment(t *testing.T) {
 	targetKey := "commitment/{channel}/{port}/{seq}"
 	targetValue := []byte("true")
 
-	pr, err := makeProof(signer, targetKey, targetValue)
+	pr, err := makeCommitmentProof(signer, targetKey, targetValue)
 	require.NoError(err)
 
 	var mspids []string
@@ -150,7 +150,7 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 	return res, err
 }
 
-func makeProof(signer protoutil.Signer, key string, value []byte) (*CommitmentProof, error) {
+func makeCommitmentProof(signer protoutil.Signer, key string, value []byte) (*CommitmentProof, error) {
 	pr := &CommitmentProof{}
 	result := &rwset.TxReadWriteSet{
 		DataModel: rwset.TxReadWriteSet_KV,
