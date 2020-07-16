@@ -5,6 +5,7 @@ import (
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
+	"github.com/datachainlab/fabric-ibc/x/ibc/types"
 )
 
 // ProofVerificationDecorator handles messages that contains application specific packet types,
@@ -12,11 +13,11 @@ import (
 // MsgUpdateClients are also handled here to perform atomic multimsg transaction
 type ProofVerificationDecorator struct {
 	clientKeeper  client.Keeper
-	channelKeeper channel.Keeper
+	channelKeeper types.ChannelKeeper
 }
 
 // NewProofVerificationDecorator constructs new ProofverificationDecorator
-func NewProofVerificationDecorator(clientKeeper client.Keeper, channelKeeper channel.Keeper) ProofVerificationDecorator {
+func NewProofVerificationDecorator(clientKeeper client.Keeper, channelKeeper types.ChannelKeeper) ProofVerificationDecorator {
 	return ProofVerificationDecorator{
 		clientKeeper:  clientKeeper,
 		channelKeeper: channelKeeper,
