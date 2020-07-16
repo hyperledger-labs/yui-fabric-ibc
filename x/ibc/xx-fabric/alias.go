@@ -5,6 +5,7 @@ import (
 	"github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 )
 
+// nolint: golint
 type (
 	ClientState          = types.ClientState
 	Header               = types.Header
@@ -13,11 +14,13 @@ type (
 	ChaincodeInfo        = types.ChaincodeInfo
 	MsgCreateClient      = types.MsgCreateClient
 	MsgUpdateClient      = types.MsgUpdateClient
-	Proof                = types.Proof
+	CommitmentProof      = types.CommitmentProof
+	MessageProof         = types.MessageProof
 	ChaincodeID          = types.ChaincodeID
 	ConsensusStateKeeper = keeper.ConsensusStateKeeper
 )
 
+// nolint: golint
 var (
 	NewHeader               = types.NewHeader
 	NewMsgCreateClient      = types.NewMsgCreateClient

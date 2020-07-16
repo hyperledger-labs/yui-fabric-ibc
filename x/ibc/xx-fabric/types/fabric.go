@@ -23,30 +23,49 @@ func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 	if err != nil {
 		return err
 	} else if !ok {
-		return errors.New("failed to verify the endorsement")
+		return errors.New("failed to verify a endorsed commitment")
 	}
 	return nil
 }
 
 // VerifyChaincodeInfo verifies ChaincodeInfo with last IBC Policy
 func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
-	// TODO implement
+	if info.Proof == nil {
+		return errors.New("a proof is empty")
+	}
+	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *info.Proof, info.GetSignBytes())
+}
+
+// VerifyEndorsedMessage verifies a value with given policy
+func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte) error {
+	// TODO parameterize
+	config, err := DefaultConfig()
+	if err != nil {
+		return err
+	}
+	policy, err := getPolicyEvaluator(policyBytes, config)
+	if err != nil {
+		return err
+	}
+	sigs := makeSignedDataListWithMessageProof(proof, value)
+	if err := policy.EvaluateSignedData(sigs); err != nil {
+		return err
+	}
 	return nil
 }
 
 // VerifyEndorsedCommitment verifies a key-value entry with a policy
-func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, key string, value []byte) (bool, error) {
+func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof CommitmentProof, key string, value []byte) (bool, error) {
 	// TODO parameterize
 	config, err := DefaultConfig()
 	if err != nil {
 		return false, err
 	}
-	sigSet := makeSignedDataList(&proof)
 	policy, err := getPolicyEvaluator(policyBytes, config)
 	if err != nil {
 		return false, err
 	}
-	if err := policy.EvaluateSignedData(sigSet); err != nil {
+	if err := policy.EvaluateSignedData(proof.ToSignedData()); err != nil {
 		return false, err
 	}
 
@@ -55,7 +74,7 @@ func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof P
 		return false, err
 	}
 	if !equalChaincodeID(ccID, *id) {
-		return false, fmt.Errorf("unexpected chaincodID: %v", *id)
+		return false, fmt.Errorf("got unexpected chaincodeID: expected=%v actual=%v", ccID, *id)
 	}
 	return ensureWriteSetIncludesCommitment(rwset.NsRwSets, proof.NsIndex, proof.WriteSetIndex, key, value)
 }
@@ -72,25 +91,6 @@ func getPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, err
 	}
 	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mgr}
 	return pp.NewPolicy(sigp.SignaturePolicy)
-}
-
-func makeSignedDataList(pr *Proof) []*protoutil.SignedData {
-	var sigSet []*protoutil.SignedData
-	for i := 0; i < len(pr.Signatures); i++ {
-		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
-		copy(msg[:len(pr.Proposal)], pr.Proposal)
-		copy(msg[len(pr.Proposal):], pr.Identities[i])
-
-		sigSet = append(
-			sigSet,
-			&protoutil.SignedData{
-				Data:      msg,
-				Identity:  pr.Identities[i],
-				Signature: pr.Signatures[i],
-			},
-		)
-	}
-	return sigSet
 }
 
 func ensureWriteSetIncludesCommitment(set []*rwsetutil.NsRwSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {
@@ -165,4 +165,19 @@ func loadVerifyingMsps(conf Config) (msp.MSPManager, error) {
 		return nil, err
 	}
 	return mgr, nil
+}
+
+func makeSignedDataListWithMessageProof(proof MessageProof, value []byte) []*protoutil.SignedData {
+	var sigSet []*protoutil.SignedData
+	for i := 0; i < len(proof.Signatures); i++ {
+		sigSet = append(
+			sigSet,
+			&protoutil.SignedData{
+				Data:      value,
+				Identity:  proof.Identities[i],
+				Signature: proof.Signatures[i],
+			},
+		)
+	}
+	return sigSet
 }

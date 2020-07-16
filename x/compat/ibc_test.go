@@ -163,11 +163,10 @@ func TestCreateClient(t *testing.T) {
 	// CreateClient
 	{
 		/// Build Msg
-		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
-		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
-		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
-		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
+		proof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
@@ -185,13 +184,15 @@ func TestCreateClient(t *testing.T) {
 	// UpdateClient
 	{
 		/// Build Msg
-		var sigs [][]byte
 		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
-		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, sigs)
-		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.Proof{})
-		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
+		mproof, err := tests.MakeMessageProof(signer, ci.GetSignBytes())
 		require.NoError(err)
-		ch.Proof = *proof
+		ci.Proof = mproof
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
+		cproof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		require.NoError(err)
+		ch.Proof = *cproof
 
 		h := fabric.NewHeader(ch, ci)
 		signer := sdk.AccAddress("signer0")
@@ -203,25 +204,6 @@ func TestCreateClient(t *testing.T) {
 		require.NoError(err)
 		seq++
 	}
-}
-
-func makeSignedDataList(pr *fabric.Proof) []*protoutil.SignedData {
-	var sigSet []*protoutil.SignedData
-	for i := 0; i < len(pr.Signatures); i++ {
-		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
-		copy(msg[:len(pr.Proposal)], pr.Proposal)
-		copy(msg[len(pr.Proposal):], pr.Identities[i])
-
-		sigSet = append(
-			sigSet,
-			&protoutil.SignedData{
-				Data:      msg,
-				Identity:  pr.Identities[i],
-				Signature: pr.Signatures[i],
-			},
-		)
-	}
-	return sigSet
 }
 
 func makePolicy(mspids []string) []byte {

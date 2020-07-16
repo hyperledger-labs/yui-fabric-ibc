@@ -327,47 +327,47 @@ func sanitizeVerificationArgs(
 	prefix commitmentexported.Prefix,
 	proofBytes []byte,
 	consensusState clientexported.ConsensusState,
-) (proof Proof, err error) {
+) (proof CommitmentProof, err error) {
 	if cs.GetLatestHeight() < height {
-		return Proof{}, sdkerrors.Wrapf(
+		return CommitmentProof{}, sdkerrors.Wrapf(
 			sdkerrors.ErrInvalidHeight,
 			"client state (%s) height < proof height (%d < %d)", cs.ID, cs.GetLatestHeight(), height,
 		)
 	}
 
 	if cs.IsFrozen() {
-		return Proof{}, clienttypes.ErrClientFrozen
+		return CommitmentProof{}, clienttypes.ErrClientFrozen
 	}
 
 	if prefix == nil {
-		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidPrefix, "prefix cannot be empty")
+		return CommitmentProof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidPrefix, "prefix cannot be empty")
 	}
 
 	// FIXME comment out this
 	// _, ok := prefix.(*Prefix)
 	// if !ok {
-	// 	return Proof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *Prefix", prefix)
+	// 	return CommitmentProof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *Prefix", prefix)
 	// }
 	_, ok := prefix.(*commitmenttypes.MerklePrefix)
 	if !ok {
-		return Proof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *MerklePrefix", prefix)
+		return CommitmentProof{}, sdkerrors.Wrapf(commitmenttypes.ErrInvalidPrefix, "invalid prefix type %T, expected *MerklePrefix", prefix)
 	}
 
 	if proofBytes == nil {
-		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "proof cannot be empty")
+		return CommitmentProof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "proof cannot be empty")
 	}
 
 	if err = cdc.UnmarshalBinaryBare(proofBytes, &proof); err != nil {
-		return Proof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "failed to unmarshal proof into commitment merkle proof")
+		return CommitmentProof{}, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "failed to unmarshal proof into commitment merkle proof")
 	}
 
 	if consensusState == nil {
-		return Proof{}, sdkerrors.Wrap(clienttypes.ErrInvalidConsensus, "consensus state cannot be empty")
+		return CommitmentProof{}, sdkerrors.Wrap(clienttypes.ErrInvalidConsensus, "consensus state cannot be empty")
 	}
 
 	_, ok = consensusState.(ConsensusState)
 	if !ok {
-		return Proof{}, sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "invalid consensus type %T, expected %T", consensusState, ConsensusState{})
+		return CommitmentProof{}, sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "invalid consensus type %T, expected %T", consensusState, ConsensusState{})
 	}
 
 	return proof, nil
