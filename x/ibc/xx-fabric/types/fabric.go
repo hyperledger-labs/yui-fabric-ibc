@@ -13,6 +13,7 @@ import (
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	"github.com/hyperledger/fabric/msp"
+	"github.com/hyperledger/fabric/protoutil"
 )
 
 // VerifyChaincodeHeader verifies ChaincodeHeader with last Endorsement Policy
@@ -29,24 +30,24 @@ func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 
 // VerifyChaincodeInfo verifies ChaincodeInfo with last IBC Policy
 func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
-	// TODO implement
-	// return VerifyEndorsedValue(clientState.LastChaincodeInfo.IbcPolicy, info.GetSignBytes())
-	return nil
+	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *info.Proof, info.GetSignBytes())
 }
 
-// VerifyEndorsedValue verifies a value with given policy
-func VerifyEndorsedValue(policyBytes []byte, value []byte) error {
-	// // TODO parameterize
-	// config, err := DefaultConfig()
-	// if err != nil {
-	// 	return err
-	// }
-	// policy, err := getPolicyEvaluator(policyBytes, config)
-	// if err != nil {
-	// 	return err
-	// }
-	// _ = policy
-
+// VerifyEndorsedMessage verifies a value with given policy
+func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte) error {
+	// TODO parameterize
+	config, err := DefaultConfig()
+	if err != nil {
+		return err
+	}
+	policy, err := getPolicyEvaluator(policyBytes, config)
+	if err != nil {
+		return err
+	}
+	sigs := makeSignedDataListWithMessageProof(proof, value)
+	if err := policy.EvaluateSignedData(sigs); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -161,4 +162,19 @@ func loadVerifyingMsps(conf Config) (msp.MSPManager, error) {
 		return nil, err
 	}
 	return mgr, nil
+}
+
+func makeSignedDataListWithMessageProof(proof MessageProof, value []byte) []*protoutil.SignedData {
+	var sigSet []*protoutil.SignedData
+	for i := 0; i < len(proof.Signatures); i++ {
+		sigSet = append(
+			sigSet,
+			&protoutil.SignedData{
+				Data:      value,
+				Identity:  proof.Identities[i],
+				Signature: proof.Signatures[i],
+			},
+		)
+	}
+	return sigSet
 }

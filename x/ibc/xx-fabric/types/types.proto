@@ -54,7 +54,6 @@ message CommitmentProof {
 message MessageProof {
   option (gogoproto.equal) = true;
 
-  bytes value = 1;
-  repeated bytes identities = 2;
-  repeated bytes signatures = 3;
+  repeated bytes identities = 1;
+  repeated bytes signatures = 2;
 }
