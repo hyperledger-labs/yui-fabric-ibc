@@ -16,13 +16,57 @@ import (
 	"github.com/hyperledger/fabric/protoutil"
 )
 
-func GetPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, error) {
+// VerifyChaincodeHeader verifies ChaincodeHeader with last Endorsement Policy
+func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
+	lastci := clientState.LastChaincodeInfo
+	ok, err := VerifyEndorsedCommitment(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentEntryKey(h.Sequence.Value), h.Sequence.Bytes())
+	if err != nil {
+		return err
+	} else if !ok {
+		return errors.New("failed to verify the endorsement")
+	}
+	return nil
+}
+
+// VerifyChaincodeInfo verifies ChaincodeInfo with last IBC Policy
+func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
+	// TODO implement
+	return nil
+}
+
+// VerifyEndorsedCommitment verifies a key-value entry with a policy
+func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, key string, value []byte) (bool, error) {
+	// TODO parameterize
+	config, err := DefaultConfig()
+	if err != nil {
+		return false, err
+	}
+	sigSet := makeSignedDataList(&proof)
+	policy, err := getPolicyEvaluator(policyBytes, config)
+	if err != nil {
+		return false, err
+	}
+	if err := policy.EvaluateSignedData(sigSet); err != nil {
+		return false, err
+	}
+
+	id, rwset, err := getTxReadWriteSetFromProposalResponsePayload(proof.Proposal)
+	if err != nil {
+		return false, err
+	}
+	if !equalChaincodeID(ccID, *id) {
+		return false, fmt.Errorf("unexpected chaincodID: %v", *id)
+	}
+	return ensureWriteSetIncludesCommitment(rwset.NsRwSets, proof.NsIndex, proof.WriteSetIndex, key, value)
+}
+
+func getPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, error) {
 	var ap peer.ApplicationPolicy
 	if err := proto.Unmarshal(policyBytes, &ap); err != nil {
 		return nil, err
 	}
 	sigp := ap.Type.(*peer.ApplicationPolicy_SignaturePolicy)
-	mgr, err := LoadVerifyingMsps(config)
+	mgr, err := loadVerifyingMsps(config)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +74,7 @@ func GetPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, err
 	return pp.NewPolicy(sigp.SignaturePolicy)
 }
 
-func MakeSignedDataList(pr *Proof) []*protoutil.SignedData {
+func makeSignedDataList(pr *Proof) []*protoutil.SignedData {
 	var sigSet []*protoutil.SignedData
 	for i := 0; i < len(pr.Signatures); i++ {
 		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
@@ -49,23 +93,7 @@ func MakeSignedDataList(pr *Proof) []*protoutil.SignedData {
 	return sigSet
 }
 
-func GetTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.ChaincodeID, *rwsetutil.TxRwSet, error) {
-	var payload peer.ProposalResponsePayload
-	if err := proto.Unmarshal(proposal, &payload); err != nil {
-		return nil, nil, err
-	}
-	var cact peer.ChaincodeAction
-	if err := proto.Unmarshal(payload.Extension, &cact); err != nil {
-		return nil, nil, err
-	}
-	txRWSet := &rwsetutil.TxRwSet{}
-	if err := txRWSet.FromProtoBytes(cact.Results); err != nil {
-		return nil, nil, err
-	}
-	return cact.GetChaincodeId(), txRWSet, nil
-}
-
-func EnsureWriteSetIncludesCommitment(set []*rwsetutil.NsRwSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {
+func ensureWriteSetIncludesCommitment(set []*rwsetutil.NsRwSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {
 	rws := set[nsIdx].KvRwSet
 	if len(rws.Writes) <= int(rwsIdx) {
 		return false, fmt.Errorf("not found index '%v'(length=%v)", int(rwsIdx), len(rws.Writes))
@@ -82,31 +110,6 @@ func EnsureWriteSetIncludesCommitment(set []*rwsetutil.NsRwSet, nsIdx, rwsIdx ui
 	}
 }
 
-func VerifyEndorsement(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, path string, value []byte) (bool, error) {
-	// TODO parameterize
-	config, err := DefaultConfig()
-	if err != nil {
-		return false, err
-	}
-	sigSet := MakeSignedDataList(&proof)
-	policy, err := GetPolicyEvaluator(policyBytes, config)
-	if err != nil {
-		return false, err
-	}
-	if err := policy.EvaluateSignedData(sigSet); err != nil {
-		return false, err
-	}
-
-	id, rwset, err := GetTxReadWriteSetFromProposalResponsePayload(proof.Proposal)
-	if err != nil {
-		return false, err
-	}
-	if !equalChaincodeID(ccID, *id) {
-		return false, fmt.Errorf("unexpected chaincodID: %v", *id)
-	}
-	return EnsureWriteSetIncludesCommitment(rwset.NsRwSets, proof.NsIndex, proof.WriteSetIndex, path, value)
-}
-
 func equalChaincodeID(a, b peer.ChaincodeID) bool {
 	if a.Name == b.Name && a.Path == b.Path && a.Version == b.Version {
 		return true
@@ -115,23 +118,23 @@ func equalChaincodeID(a, b peer.ChaincodeID) bool {
 	}
 }
 
-func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
-	lastci := clientState.LastChaincodeInfo
-	ok, err := VerifyEndorsement(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentEntryKey(h.Sequence.Value), h.Sequence.Bytes())
-	if err != nil {
-		return err
-	} else if !ok {
-		return errors.New("failed to verify the endorsement")
+func getTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.ChaincodeID, *rwsetutil.TxRwSet, error) {
+	var payload peer.ProposalResponsePayload
+	if err := proto.Unmarshal(proposal, &payload); err != nil {
+		return nil, nil, err
 	}
-	return nil
+	var cact peer.ChaincodeAction
+	if err := proto.Unmarshal(payload.Extension, &cact); err != nil {
+		return nil, nil, err
+	}
+	txRWSet := &rwsetutil.TxRwSet{}
+	if err := txRWSet.FromProtoBytes(cact.Results); err != nil {
+		return nil, nil, err
+	}
+	return cact.GetChaincodeId(), txRWSet, nil
 }
 
-func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
-	// TODO implement
-	return nil
-}
-
-func LoadVerifyingMsps(conf Config) (msp.MSPManager, error) {
+func loadVerifyingMsps(conf Config) (msp.MSPManager, error) {
 	msps := []msp.MSP{}
 	// if in local, this would depend `peer.localMspType` config
 	for _, id := range conf.MSPIDs {
