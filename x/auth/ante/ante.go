@@ -27,7 +27,7 @@ func (dec FabricIDVerificationDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, 
 		return next(ctx, stdTx, simulate)
 	}
 
-	stub := StubFromContext(ctx)
+	stub := types.StubFromContext(ctx)
 	ci, err := cid.New(stub)
 	if err != nil {
 		return ctx, err
