@@ -8,6 +8,7 @@ import (
 // ModuleCdc defines the IBC client codec.
 var ModuleCdc *codec.Codec
 
+// RegisterCodec registers concrete types and interfaces on the given codec.
 func RegisterCodec(cdc *codec.Codec) {
 	// msg types
 	cdc.RegisterConcrete(MsgCreateClient{}, "ibc/fabric/MsgCreateClient", nil)
@@ -21,7 +22,8 @@ func RegisterCodec(cdc *codec.Codec) {
 	cdc.RegisterConcrete(ConsensusState{}, "ibc/fabric/types/ConsensusState", nil)
 	cdc.RegisterConcrete(ChaincodeHeader{}, "ibc/fabric/types/ChaincodeHeader", nil)
 	cdc.RegisterConcrete(ChaincodeInfo{}, "ibc/fabric/types/ChaincodeInfo", nil)
-	cdc.RegisterConcrete(Proof{}, "ibc/fabric/types/Proof", nil)
+	cdc.RegisterConcrete(CommitmentProof{}, "ibc/fabric/types/CommitmentProof", nil)
+	cdc.RegisterConcrete(MessageProof{}, "ibc/fabric/types/MessageProof", nil)
 	cdc.RegisterConcrete(peer.ChaincodeID{}, "ibc/fabric/types/ChaincodeID", nil)
 }
 

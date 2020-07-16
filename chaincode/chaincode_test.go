@@ -119,8 +119,8 @@ func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInt
 
 func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.TransactionContextInterface) *fabric.MsgCreateClient {
 	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
-	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, nil)
-	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.Proof{})
+	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, pcBytes, nil)
+	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.CommitmentProof{})
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
@@ -128,12 +128,14 @@ func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.T
 }
 
 func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdateClient {
-	var sigs [][]byte
 	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
-	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, sigs)
-	proof, err := tests.MakeProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ca.seq.Bytes())
+	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, pcBytes, nil)
+	mproof, err := tests.MakeMessageProof(ca.endorser, ci.GetSignBytes())
 	require.NoError(t, err)
-	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, *proof)
+	ci.Proof = mproof
+	cproof, err := tests.MakeCommitmentProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ca.seq.Bytes())
+	require.NoError(t, err)
+	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, *cproof)
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgUpdateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
@@ -389,8 +391,8 @@ func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.Transactio
 	return &seq, nil
 }
 
-func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Entry) (*fabric.Proof, error) {
-	return tests.MakeProof(ca.endorser, entry.Key, entry.Value)
+func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Entry) (*fabric.CommitmentProof, error) {
+	return tests.MakeCommitmentProof(ca.endorser, entry.Key, entry.Value)
 }
 
 func (ca TestChaincodeApp) makeProofConsensus(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (uint64, []byte, error) {
