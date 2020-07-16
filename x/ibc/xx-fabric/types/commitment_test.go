@@ -97,7 +97,7 @@ func makeClientState(mspids []string) ClientState {
 	cs := ClientState{
 		LastChaincodeHeader: ChaincodeHeader{
 			Sequence: commitment.NewSequence(1, tmtime.Now().UnixNano()),
-			Proof:    Proof{}, // TODO fix
+			Proof:    CommitmentProof{}, // TODO fix
 		},
 		LastChaincodeInfo: ChaincodeInfo{
 			ChannelId: "dummyChannel",
@@ -150,8 +150,8 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 	return res, err
 }
 
-func makeProof(signer protoutil.Signer, key string, value []byte) (*Proof, error) {
-	pr := &Proof{}
+func makeProof(signer protoutil.Signer, key string, value []byte) (*CommitmentProof, error) {
+	pr := &CommitmentProof{}
 	result := &rwset.TxReadWriteSet{
 		DataModel: rwset.TxReadWriteSet_KV,
 		NsRwset: []*rwset.NsReadWriteSet{

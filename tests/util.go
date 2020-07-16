@@ -10,8 +10,8 @@ import (
 	"github.com/hyperledger/fabric/protoutil"
 )
 
-func MakeProof(signer protoutil.Signer, key string, value []byte) (*fabric.Proof, error) {
-	pr := &fabric.Proof{}
+func MakeProof(signer protoutil.Signer, key string, value []byte) (*fabric.CommitmentProof, error) {
+	pr := &fabric.CommitmentProof{}
 	result := &rwset.TxReadWriteSet{
 		DataModel: rwset.TxReadWriteSet_KV,
 		NsRwset: []*rwset.NsReadWriteSet{

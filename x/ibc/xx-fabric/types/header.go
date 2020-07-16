@@ -5,6 +5,7 @@ import (
 
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/peer"
 )
 
@@ -22,7 +23,7 @@ func (h Header) ClientType() clientexported.ClientType {
 	return Fabric
 }
 
-func NewChaincodeHeader(seq uint64, timestamp int64, proof Proof) ChaincodeHeader {
+func NewChaincodeHeader(seq uint64, timestamp int64, proof CommitmentProof) ChaincodeHeader {
 	return ChaincodeHeader{
 		Sequence: commitment.NewSequence(seq, timestamp),
 		Proof:    proof,
@@ -56,4 +57,13 @@ func (ci ChaincodeInfo) GetFabricChaincodeID() peer.ChaincodeID {
 		Name:    ci.ChaincodeId.Name,
 		Version: ci.ChaincodeId.Version,
 	}
+}
+
+func (ci ChaincodeInfo) GetSignBytes() []byte {
+	ci.Signatures = nil
+	bz, err := proto.Marshal(&ci)
+	if err != nil {
+		panic(err)
+	}
+	return bz
 }

@@ -12,15 +12,16 @@ message Header {
 }
 
 message ChaincodeHeader {
-  Sequence sequence = 1 [(gogoproto.nullable) = false];
-  Proof  proof      = 2 [(gogoproto.nullable) = false];
+  Sequence         sequence   = 1 [(gogoproto.nullable) = false];
+  CommitmentProof  proof      = 2 [(gogoproto.nullable) = false];
 }
 
 message ChaincodeInfo {
   string         channel_id         = 1;
   ChaincodeID    chaincode_id       = 2 [(gogoproto.nullable) = false];
   bytes          endorsement_policy = 3;
-  repeated bytes signatures         = 4; // signatures are created by last endorsers
+  bytes          ibc_policy         = 4;
+  repeated bytes signatures         = 5; // signatures satisfy last ibc_policy
 }
 
 // ref. https://github.com/hyperledger/fabric-chaincode-java/blob/392cf9cb740c42e0376ecdbbb015285b5a74ba97/fabric-chaincode-protos/src/main/protos/peer/chaincode.proto#L21
@@ -40,7 +41,7 @@ message Prefix {
   bytes value = 1 [(gogoproto.moretags) = "yaml:\"value\""];
 }
 
-message Proof {
+message CommitmentProof {
   option (gogoproto.equal) = true;
   
   bytes proposal = 1;

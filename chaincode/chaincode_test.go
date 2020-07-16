@@ -120,7 +120,7 @@ func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInt
 func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.TransactionContextInterface) *fabric.MsgCreateClient {
 	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, nil)
-	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.Proof{})
+	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.CommitmentProof{})
 	h := fabric.NewHeader(ch, ci)
 	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
@@ -389,7 +389,7 @@ func (ca TestChaincodeApp) getEndorsedCurrentSequence(ctx contractapi.Transactio
 	return &seq, nil
 }
 
-func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Entry) (*fabric.Proof, error) {
+func (ca TestChaincodeApp) makeMockEndorsedCommitmentProof(entry *commitment.Entry) (*fabric.CommitmentProof, error) {
 	return tests.MakeProof(ca.endorser, entry.Key, entry.Value)
 }
 

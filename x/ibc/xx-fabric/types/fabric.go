@@ -13,7 +13,6 @@ import (
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	"github.com/hyperledger/fabric/msp"
-	"github.com/hyperledger/fabric/protoutil"
 )
 
 // VerifyChaincodeHeader verifies ChaincodeHeader with last Endorsement Policy
@@ -31,22 +30,38 @@ func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
 // VerifyChaincodeInfo verifies ChaincodeInfo with last IBC Policy
 func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	// TODO implement
+	// return VerifyEndorsedValue(clientState.LastChaincodeInfo.IbcPolicy, info.GetSignBytes())
+	return nil
+}
+
+// VerifyEndorsedValue verifies a value with given policy
+func VerifyEndorsedValue(policyBytes []byte, value []byte) error {
+	// // TODO parameterize
+	// config, err := DefaultConfig()
+	// if err != nil {
+	// 	return err
+	// }
+	// policy, err := getPolicyEvaluator(policyBytes, config)
+	// if err != nil {
+	// 	return err
+	// }
+	// _ = policy
+
 	return nil
 }
 
 // VerifyEndorsedCommitment verifies a key-value entry with a policy
-func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof Proof, key string, value []byte) (bool, error) {
+func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof CommitmentProof, key string, value []byte) (bool, error) {
 	// TODO parameterize
 	config, err := DefaultConfig()
 	if err != nil {
 		return false, err
 	}
-	sigSet := makeSignedDataList(&proof)
 	policy, err := getPolicyEvaluator(policyBytes, config)
 	if err != nil {
 		return false, err
 	}
-	if err := policy.EvaluateSignedData(sigSet); err != nil {
+	if err := policy.EvaluateSignedData(proof.ToSignedData()); err != nil {
 		return false, err
 	}
 
@@ -72,25 +87,6 @@ func getPolicyEvaluator(policyBytes []byte, config Config) (policies.Policy, err
 	}
 	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: mgr}
 	return pp.NewPolicy(sigp.SignaturePolicy)
-}
-
-func makeSignedDataList(pr *Proof) []*protoutil.SignedData {
-	var sigSet []*protoutil.SignedData
-	for i := 0; i < len(pr.Signatures); i++ {
-		msg := make([]byte, len(pr.Proposal)+len(pr.Identities[i]))
-		copy(msg[:len(pr.Proposal)], pr.Proposal)
-		copy(msg[len(pr.Proposal):], pr.Identities[i])
-
-		sigSet = append(
-			sigSet,
-			&protoutil.SignedData{
-				Data:      msg,
-				Identity:  pr.Identities[i],
-				Signature: pr.Signatures[i],
-			},
-		)
-	}
-	return sigSet
 }
 
 func ensureWriteSetIncludesCommitment(set []*rwsetutil.NsRwSet, nsIdx, rwsIdx uint32, targetKey string, expectValue []byte) (bool, error) {

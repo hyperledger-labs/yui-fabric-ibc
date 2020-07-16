@@ -46,8 +46,7 @@ func TestGetPolicyEvaluator(t *testing.T) {
 	proof, err := makeProof(si, "key1", []byte("val1"))
 	require.NoError(t, err)
 
-	sigs := makeSignedDataList(proof)
-	assert.NoError(t, plc.EvaluateSignedData(sigs))
+	assert.NoError(t, plc.EvaluateSignedData(proof.ToSignedData()))
 }
 
 func configForTest() Config {

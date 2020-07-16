@@ -13,7 +13,7 @@ type (
 	ChaincodeInfo        = types.ChaincodeInfo
 	MsgCreateClient      = types.MsgCreateClient
 	MsgUpdateClient      = types.MsgUpdateClient
-	Proof                = types.Proof
+	CommitmentProof      = types.CommitmentProof
 	ChaincodeID          = types.ChaincodeID
 	ConsensusStateKeeper = keeper.ConsensusStateKeeper
 )

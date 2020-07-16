@@ -21,7 +21,7 @@ func RegisterCodec(cdc *codec.Codec) {
 	cdc.RegisterConcrete(ConsensusState{}, "ibc/fabric/types/ConsensusState", nil)
 	cdc.RegisterConcrete(ChaincodeHeader{}, "ibc/fabric/types/ChaincodeHeader", nil)
 	cdc.RegisterConcrete(ChaincodeInfo{}, "ibc/fabric/types/ChaincodeInfo", nil)
-	cdc.RegisterConcrete(Proof{}, "ibc/fabric/types/Proof", nil)
+	cdc.RegisterConcrete(CommitmentProof{}, "ibc/fabric/types/CommitmentProof", nil)
 	cdc.RegisterConcrete(peer.ChaincodeID{}, "ibc/fabric/types/ChaincodeID", nil)
 }
 
