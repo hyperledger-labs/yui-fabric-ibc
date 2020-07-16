@@ -14,4 +14,5 @@ type ChannelKeeper interface {
 	SendPacket(ctx sdk.Context, channelCap *capabilitytypes.Capability, packet channelexported.PacketI) error
 	PacketExecuted(ctx sdk.Context, chanCap *capabilitytypes.Capability, packet channelexported.PacketI, acknowledgement []byte) error
 	RecvPacket(ctx sdk.Context, packet channelexported.PacketI, proof []byte, proofHeight uint64) (channelexported.PacketI, error)
+	AcknowledgePacket(ctx sdk.Context, packet channelexported.PacketI, acknowledgement []byte, proof []byte, proofHeight uint64) (channelexported.PacketI, error)
 }

@@ -86,6 +86,18 @@ func (k Keeper) RecvPacket(ctx sdk.Context, packet channelexported.PacketI, proo
 	return k.ChannelKeeper.RecvPacket(ctx, p, proof, proofHeight)
 }
 
+// AcknowledgePacket wraps ChannelKeeper.AcknowledgePacket
+// TODO add shield support
+func (k Keeper) AcknowledgePacket(
+	ctx sdk.Context,
+	packet channelexported.PacketI,
+	acknowledgement []byte,
+	proof []byte,
+	proofHeight uint64,
+) (channelexported.PacketI, error) {
+	return k.ChannelKeeper.AcknowledgePacket(ctx, packet, acknowledgement, proof, proofHeight)
+}
+
 // KeyPrivateData returns a private collection key that original data is stored at
 func KeyPrivateData(packet channelexported.PacketI) string {
 	return fmt.Sprintf("/private/%v/%v/%v", packet.GetSourceChannel(), packet.GetSourcePort(), packet.GetSequence())
