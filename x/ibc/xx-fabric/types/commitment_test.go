@@ -30,7 +30,10 @@ func TestCommitment(t *testing.T) {
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
 
-	pr, err := makeProof(signer)
+	targetKey := "commitment/{channel}/{port}/{seq}"
+	targetValue := []byte("true")
+
+	pr, err := makeProof(signer, targetKey, targetValue)
 	require.NoError(err)
 
 	var mspids []string
@@ -62,7 +65,7 @@ func TestCommitment(t *testing.T) {
 		)
 	}
 
-	deserializer, err := LoadVerifyingMsps(config)
+	deserializer, err := loadVerifyingMsps(config)
 	require.NoError(err)
 
 	pp := cauthdsl.EnvelopeBasedPolicyProvider{Deserializer: deserializer}
@@ -80,8 +83,7 @@ func TestCommitment(t *testing.T) {
 	result := &rwsetutil.TxRwSet{}
 	require.NoError(result.FromProtoBytes(cact.Results))
 
-	targetKey := "commitment/{channel}/{port}/{seq}"
-	ok, err := EnsureWriteSetIncludesCommitment(result.NsRwSets, pr.NsIndex, pr.WriteSetIndex, targetKey, []byte("true"))
+	ok, err := ensureWriteSetIncludesCommitment(result.NsRwSets, pr.NsIndex, pr.WriteSetIndex, targetKey, targetValue)
 	require.NoError(err)
 	require.True(ok)
 }
@@ -148,7 +150,7 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 	return res, err
 }
 
-func makeProof(signer protoutil.Signer) (*Proof, error) {
+func makeProof(signer protoutil.Signer, key string, value []byte) (*Proof, error) {
 	pr := &Proof{}
 	result := &rwset.TxReadWriteSet{
 		DataModel: rwset.TxReadWriteSet_KV,
@@ -158,8 +160,8 @@ func makeProof(signer protoutil.Signer) (*Proof, error) {
 				Rwset: MarshalOrPanic(&kvrwset.KVRWSet{
 					Writes: []*kvrwset.KVWrite{
 						{
-							Key:   "commitment/{channel}/{port}/{seq}",
-							Value: []byte("true"),
+							Key:   key,
+							Value: value,
 						},
 					},
 				}),

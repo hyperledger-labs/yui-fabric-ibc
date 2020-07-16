@@ -92,31 +92,6 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 	return res, err
 }
 
-// func MakeClientState(mspids []string) fabric.ClientState {
-// 	policy := protoutil.MarshalOrPanic(&common.ApplicationPolicy{
-// 		Type: &common.ApplicationPolicy_SignaturePolicy{
-// 			SignaturePolicy: policydsl.SignedByNOutOfGivenRole(int32(len(mspids)/2+1), msppb.MSPRole_MEMBER, mspids),
-// 		},
-// 	})
-// 	cs := fabric.ClientState{
-// 		LastChaincodeHeader: fabric.ChaincodeHeader{
-// 			Sequence:  1,
-// 			Timestamp: tmtime.Now(),
-// 			Proof:     fabric.Proof{}, // TODO fix
-// 		},
-// 		LastChaincodeInfo: fabric.ChaincodeInfo{
-// 			ChannelID: "dummyChannel",
-// 			ChaincodeID: pb.ChaincodeID{
-// 				Name:    "dummyCC",
-// 				Version: "dummyVer",
-// 			},
-// 			PolicyBytes: policy,
-// 			Signatures:  nil, // TODO fix
-// 		},
-// 	}
-// 	return cs
-// }
-
 func MarshalOrPanic(msg proto.Message) []byte {
 	b, err := proto.Marshal(msg)
 	if err != nil {

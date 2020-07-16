@@ -1,13 +1,11 @@
-package typestest
+package types
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/datachainlab/fabric-ibc/tests"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
-	"github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/common/policydsl"
@@ -19,7 +17,7 @@ import (
 func TestLoadVerifyingMSPs(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
-	msps, err := types.LoadVerifyingMsps(configForTest())
+	msps, err := loadVerifyingMsps(configForTest())
 	require.NoError(err)
 
 	dict, err := msps.GetMSPs()
@@ -38,24 +36,24 @@ func TestGetPolicyEvaluator(t *testing.T) {
 	mspID := "Org2MSP"
 	plcBytes := makePolicy([]string{mspID})
 	// load verifying msp configs inside it
-	plc, err := types.GetPolicyEvaluator(plcBytes, config)
+	plc, err := getPolicyEvaluator(plcBytes, config)
 
 	msp, err := fabrictests.GetLocalMsp(config.MSPsDir, mspID)
 	require.NoError(t, err)
 	si, err := msp.GetDefaultSigningIdentity()
 	require.NoError(t, err)
 
-	proof, err := tests.MakeProof(si, "key1", []byte("val1"))
+	proof, err := makeProof(si, "key1", []byte("val1"))
 	require.NoError(t, err)
 
-	sigs := types.MakeSignedDataList(proof)
+	sigs := makeSignedDataList(proof)
 	assert.NoError(t, plc.EvaluateSignedData(sigs))
 }
 
-func configForTest() types.Config {
+func configForTest() Config {
 	wd, _ := os.Getwd()
-	return types.Config{
-		MSPsDir: filepath.Join(wd, "..", "..", "..", "..", "..", "tests", "fixtures", "organizations", "peerOrganizations"),
+	return Config{
+		MSPsDir: filepath.Join(wd, "..", "..", "..", "..", "tests", "fixtures", "organizations", "peerOrganizations"),
 		MSPIDs:  []string{"Org1MSP", "Org2MSP"},
 	}
 }
