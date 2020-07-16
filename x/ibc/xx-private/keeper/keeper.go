@@ -44,7 +44,7 @@ func (k Keeper) SendPacket(ctx sdk.Context, channelCap *capabilitytypes.Capabili
 	if err := authtypes.StubFromContext(ctx).PutPrivateData(collection, key, data); err != nil {
 		return err
 	}
-	p.Data = MakePrivatePacketData(key, data)
+	p.Data = MakeShieldedData(key, data)
 	return k.ChannelKeeper.SendPacket(ctx, channelCap, p)
 }
 
@@ -103,9 +103,9 @@ func KeyPrivateData(packet channelexported.PacketI) string {
 	return fmt.Sprintf("/private/%v/%v/%v", packet.GetSourceChannel(), packet.GetSourcePort(), packet.GetSequence())
 }
 
-// MakePrivatePacketData returns bytes concat a collection key and shielded data
+// MakeShieldedData returns bytes concat a collection key and shielded data
 // TODO add salt support?
-func MakePrivatePacketData(key string, data []byte) []byte {
+func MakeShieldedData(key string, data []byte) []byte {
 	h := hash(data)
 	return []byte(fmt.Sprintf("%v/%X", key, h))
 }
@@ -119,7 +119,7 @@ func ParseShieldedData(shieldedData []byte) (key string, hash []byte, err error)
 	if err != nil {
 		return "", nil, err
 	}
-	return strings.Join(parts[0:len(parts)-1-1], "/"), hash, nil
+	return strings.Join(parts[0:len(parts)-1], "/"), hash, nil
 }
 
 // hash returns a hash of given value
