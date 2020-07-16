@@ -166,7 +166,7 @@ func TestCreateClient(t *testing.T) {
 		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, nil)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
-		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		proof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
@@ -187,7 +187,7 @@ func TestCreateClient(t *testing.T) {
 		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, nil)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
-		proof, err := tests.MakeProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		proof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
