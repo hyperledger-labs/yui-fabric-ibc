@@ -34,12 +34,12 @@ func (h ChaincodeHeader) ValidateBasic() error {
 	return nil
 }
 
-func NewChaincodeInfo(chanID string, ccID ChaincodeID, policyBytes []byte, sigs [][]byte) ChaincodeInfo {
+func NewChaincodeInfo(chanID string, ccID ChaincodeID, policyBytes []byte, proof *MessageProof) ChaincodeInfo {
 	return ChaincodeInfo{
 		ChannelId:         chanID,
 		ChaincodeId:       ccID,
 		EndorsementPolicy: policyBytes,
-		Signatures:        sigs,
+		Proof:             proof,
 	}
 }
 
@@ -60,7 +60,7 @@ func (ci ChaincodeInfo) GetFabricChaincodeID() peer.ChaincodeID {
 }
 
 func (ci ChaincodeInfo) GetSignBytes() []byte {
-	ci.Signatures = nil
+	ci.Proof = nil
 	bz, err := proto.Marshal(&ci)
 	if err != nil {
 		panic(err)

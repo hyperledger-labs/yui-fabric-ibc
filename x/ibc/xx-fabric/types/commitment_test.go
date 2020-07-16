@@ -106,7 +106,7 @@ func makeClientState(mspids []string) ClientState {
 				Version: "dummyVer",
 			},
 			EndorsementPolicy: policy,
-			Signatures:        nil, // TODO fix
+			Proof:             nil, // TODO fix
 		},
 	}
 	return cs
