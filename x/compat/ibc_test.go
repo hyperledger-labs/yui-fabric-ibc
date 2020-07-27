@@ -137,7 +137,7 @@ func TestCodec(t *testing.T) {
 func TestCreateClient(t *testing.T) {
 	require := require.New(t)
 
-	conf, err := fabrictypes.DefaultConfig()
+	conf, err := fabrictypes.DefaultSignerConfig()
 	require.NoError(err)
 	// setup the MSP manager so that we can sign/verify
 	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")

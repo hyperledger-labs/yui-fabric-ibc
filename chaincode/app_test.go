@@ -54,7 +54,7 @@ func TestApp(t *testing.T) {
 
 	require := require.New(t)
 
-	conf, err := fabrictypes.DefaultConfig()
+	conf, err := fabrictypes.DefaultPeerConfig()
 	require.NoError(err)
 	// setup the MSP manager so that we can sign/verify
 	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")

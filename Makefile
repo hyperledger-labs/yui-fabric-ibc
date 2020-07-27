@@ -2,7 +2,9 @@ build:
 	@go build ./cmd/fabibc
 
 test:
-	FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./...
+	FABRIC_IBC_PEER_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations \
+	FABRIC_IBC_SIGNER_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations \
+	go test ./...
 
 ###############################################################################
 ###                                Protobuf                                 ###

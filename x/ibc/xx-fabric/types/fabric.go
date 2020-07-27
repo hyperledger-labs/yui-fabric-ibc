@@ -39,7 +39,7 @@ func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 // VerifyEndorsedMessage verifies a value with given policy
 func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte) error {
 	// TODO parameterize
-	config, err := DefaultConfig()
+	config, err := DefaultSignerConfig()
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte)
 // VerifyEndorsedCommitment verifies a key-value entry with a policy
 func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof CommitmentProof, key string, value []byte) (bool, error) {
 	// TODO parameterize
-	config, err := DefaultConfig()
+	config, err := DefaultPeerConfig()
 	if err != nil {
 		return false, err
 	}

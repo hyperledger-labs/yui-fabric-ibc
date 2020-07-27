@@ -23,7 +23,7 @@ func TestCommitment(t *testing.T) {
 	require := require.New(t)
 
 	// setup the MSP manager so that we can sign/verify
-	config, err := DefaultConfig()
+	config, err := DefaultPeerConfig()
 	require.NoError(err)
 	lcMSP, err := fabrictests.GetLocalMsp(config.MSPsDir, "SampleOrgMSP")
 	require.NoError(err)
