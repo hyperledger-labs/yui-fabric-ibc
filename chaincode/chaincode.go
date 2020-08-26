@@ -108,10 +108,10 @@ func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionCont
 
 func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
 
-		connection, found := app.IBCKeeper.ConnectionKeeper.GetConnection(c, connectionID)
+		connection, found := app.GetIBCKeeper().ConnectionKeeper.GetConnection(c, connectionID)
 		if !found {
 			return sdkerrors.Wrap(types.ErrConnectionNotFound, "cannot relay ACK of open attempt")
 		}
@@ -138,10 +138,10 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 
 func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
 
-		channel, found := app.IBCKeeper.ChannelKeeper.GetChannel(c, portID, channelID)
+		channel, found := app.GetIBCKeeper().ChannelKeeper.GetChannel(c, portID, channelID)
 		if !found {
 			return sdkerrors.Wrap(channeltypes.ErrChannelNotFound, channelID)
 		}
@@ -169,9 +169,9 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 
 func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
-		cmbz := app.IBCKeeper.ChannelKeeper.GetPacketCommitment(c, portID, channelID, sequence)
+		cmbz := app.GetIBCKeeper().ChannelKeeper.GetPacketCommitment(c, portID, channelID, sequence)
 		if cmbz == nil {
 			return errors.New("commitment not found")
 		}
@@ -197,9 +197,9 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 
 func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
-		ackBytes, ok := app.IBCKeeper.ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
+		ackBytes, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
 		if !ok {
 			return errors.New("acknowledgement packet not found")
 		}
@@ -224,9 +224,9 @@ func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionC
 
 func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
-		_, ok := app.IBCKeeper.ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
+		_, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
 		if ok {
 			return errors.New("acknowledgement packet found")
 		}
@@ -250,9 +250,9 @@ func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.Trans
 
 func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
-		cs, ok := app.IBCKeeper.ClientKeeper.GetClientConsensusState(c, clientID, height)
+		cs, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(c, clientID, height)
 		if !ok {
 			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
 		}
@@ -280,9 +280,9 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 
 func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app *app.IBCApp) error {
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		c, writer := app.MakeContext(abci.Header{})
-		seq, found := app.IBCKeeper.ChannelKeeper.GetNextSequenceRecv(c, portID, channelID)
+		seq, found := app.GetIBCKeeper().ChannelKeeper.GetNextSequenceRecv(c, portID, channelID)
 		if !found {
 			return sdkerrors.Wrapf(
 				channel.ErrSequenceReceiveNotFound,

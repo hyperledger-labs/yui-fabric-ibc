@@ -66,6 +66,8 @@ var (
 	}
 )
 
+var _ Application = (*IBCApp)(nil)
+
 type IBCApp struct {
 	*BaseApp
 	cdc      *codec.Codec
@@ -234,6 +236,10 @@ func (app *IBCApp) InitChainer(ctx sdk.Context, appStateBytes []byte) error {
 
 func (app *IBCApp) Codec() *codec.Codec {
 	return app.cdc
+}
+
+func (app *IBCApp) GetIBCKeeper() *ibc.Keeper {
+	return app.IBCKeeper
 }
 
 // MakeCodecs constructs the *std.Codec and *codec.Codec instances used by

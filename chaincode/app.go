@@ -30,12 +30,12 @@ func NewAppRunner(logger log.Logger, dbProvider DBProvider, seqMgr *commitment.S
 }
 
 func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) error {
-	return r.RunFunc(stub, func(app *app.IBCApp) error {
+	return r.RunFunc(stub, func(app app.Application) error {
 		return app.InitChain(appStateBytes)
 	})
 }
 
-func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(*app.IBCApp) error) error {
+func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Application) error) error {
 	db := r.dbProvider(stub)
 	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
 	if err != nil {

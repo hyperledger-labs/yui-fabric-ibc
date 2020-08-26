@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/datachainlab/fabric-ibc/store"
+	"github.com/datachainlab/fabric-ibc/x/ibc"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -15,6 +17,15 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 )
+
+type Application interface {
+	InitChain(appStateBytes []byte) error
+	RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (result *sdk.Result, err error)
+
+	Codec() *codec.Codec
+	MakeContext(header abci.Header) (ctx sdk.Context, writer func())
+	GetIBCKeeper() *ibc.Keeper
+}
 
 type BaseApp struct {
 	logger      log.Logger
@@ -143,6 +154,14 @@ func (app *BaseApp) InitChain(appStateBytes []byte) error {
 		return err
 	}
 	ms.Write()
+	return nil
+}
+
+func (app *BaseApp) Codec() *codec.Codec {
+	return nil
+}
+
+func (app *BaseApp) GetIBCKeeper() *ibc.Keeper {
 	return nil
 }
 
