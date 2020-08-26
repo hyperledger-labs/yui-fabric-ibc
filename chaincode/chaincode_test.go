@@ -1,4 +1,4 @@
-package chaincode
+package chaincode_test
 
 import (
 	"fmt"
@@ -12,8 +12,9 @@ import (
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
-	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/chaincode"
 	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/datachainlab/fabric-ibc/tests"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
@@ -28,7 +29,7 @@ import (
 )
 
 type TestChaincodeApp struct {
-	cc *IBCChaincode
+	cc *chaincode.IBCChaincode
 
 	signer sdk.AccAddress
 	prvKey crypto.PrivKey
@@ -61,8 +62,8 @@ func MakeTestChaincodeApp(
 	channelID string,
 	channelOrder channel.Order,
 ) TestChaincodeApp {
-	cdc, _ := app.MakeCodecs()
-	cc := NewIBCChaincode(app.NewIBCApp, DefaultDBProvider)
+	cdc, _ := example.MakeCodecs()
+	cc := chaincode.NewIBCChaincode(example.AppProvider, chaincode.DefaultDBProvider)
 	return TestChaincodeApp{
 		cc: cc,
 
@@ -96,7 +97,7 @@ func (ca *TestChaincodeApp) init(ctx contractapi.TransactionContextInterface) er
 }
 
 func (ca TestChaincodeApp) runMsg(stub shim.ChaincodeStubInterface, msgs ...sdk.Msg) error {
-	events, err := ca.cc.runner.RunMsg(stub, makeStdTxBytes(ca.cdc, ca.prvKey, msgs...))
+	events, err := ca.cc.RunMsg(stub, makeStdTxBytes(ca.cdc, ca.prvKey, msgs...))
 	if err != nil {
 		return err
 	}
@@ -515,7 +516,7 @@ func (ca TestChaincodeApp) makeProofNextSequenceRecv(ctx contractapi.Transaction
 func TestResponseSerializer(t *testing.T) {
 	require := require.New(t)
 
-	cc := NewIBCChaincode(app.NewIBCApp, DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(example.AppProvider, chaincode.DefaultDBProvider)
 	chaincode, err := contractapi.NewChaincode(cc)
 	require.NoError(err)
 
