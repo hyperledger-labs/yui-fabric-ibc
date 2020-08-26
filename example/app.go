@@ -187,7 +187,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider a
 	// Initialize and seal the capability keeper so all persistent capabilities
 	// are loaded in-memory and prevent any further modules from creating scoped
 	// sub-keepers.
-	ctx, writer := app.MakeContext(abci.Header{})
+	ctx, writer := app.MakeCacheContext(abci.Header{})
 	app.CapabilityKeeper.InitializeAndSeal(ctx)
 	writer()
 

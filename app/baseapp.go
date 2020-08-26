@@ -23,7 +23,7 @@ type Application interface {
 	RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (result *sdk.Result, err error)
 
 	Codec() *codec.Codec
-	MakeContext(header abci.Header) (ctx sdk.Context, writer func())
+	MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func())
 	GetIBCKeeper() ibc.Keeper
 }
 
@@ -362,7 +362,7 @@ func (app *BaseApp) SetBlockProvider(blockProvider BlockProvider) {
 //----------------------------------------
 // +Helpers
 
-func (app *BaseApp) MakeContext(header abci.Header) (ctx sdk.Context, writer func()) {
+func (app *BaseApp) MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func()) {
 	ms := app.cms.CacheMultiStore()
 	return sdk.NewContext(ms, header, false, app.logger), ms.Write
 }
