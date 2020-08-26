@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 
+	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
 func main() {
-	cc := chaincode.NewIBCChaincode()
+	cc := chaincode.NewIBCChaincode(app.NewIBCApp, chaincode.DefaultDBProvider)
 	chaincode, err := contractapi.NewChaincode(cc)
 
 	if err != nil {

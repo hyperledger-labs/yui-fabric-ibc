@@ -14,18 +14,27 @@ import (
 	dbm "github.com/tendermint/tm-db"
 )
 
+type AppProvider func(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider app.SelfConsensusStateKeeperProvider, blockProvider app.BlockProvider) (app.Application, error)
+
 type AppRunner struct {
-	logger     log.Logger
-	traceStore io.Writer
-	dbProvider DBProvider
-	seqMgr     *commitment.SequenceManager
+	logger      log.Logger
+	traceStore  io.Writer
+	appProvider AppProvider
+	dbProvider  DBProvider
+	seqMgr      *commitment.SequenceManager
 }
 
-func NewAppRunner(logger log.Logger, dbProvider DBProvider, seqMgr *commitment.SequenceManager) AppRunner {
+func NewAppRunner(
+	logger log.Logger,
+	appProvider AppProvider,
+	dbProvider DBProvider,
+	seqMgr *commitment.SequenceManager,
+) AppRunner {
 	return AppRunner{
-		logger:     logger,
-		dbProvider: dbProvider,
-		seqMgr:     seqMgr,
+		logger:      logger,
+		appProvider: appProvider,
+		dbProvider:  dbProvider,
+		seqMgr:      seqMgr,
 	}
 }
 
@@ -37,7 +46,7 @@ func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) 
 
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Application) error) error {
 	db := r.dbProvider(stub)
-	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
+	app, err := r.appProvider(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
 	if err != nil {
 		return err
 	}
@@ -49,7 +58,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Applicat
 
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]abci.Event, error) {
 	db := r.dbProvider(stub)
-	app, err := app.NewIBCApp(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
+	app, err := r.appProvider(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}

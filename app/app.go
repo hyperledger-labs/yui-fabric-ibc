@@ -97,7 +97,7 @@ type IBCApp struct {
 	mm *module.Manager
 }
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider SelfConsensusStateKeeperProvider, blockProvider BlockProvider) (*IBCApp, error) {
+func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider SelfConsensusStateKeeperProvider, blockProvider BlockProvider) (Application, error) {
 	appCodec, cdc := MakeCodecs()
 	bApp := NewBaseApp(appName, logger, db, JSONTxDecoder(cdc))
 	keys := sdk.NewKVStoreKeys(

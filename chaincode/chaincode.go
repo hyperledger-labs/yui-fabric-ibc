@@ -32,10 +32,10 @@ type IBCChaincode struct {
 	runner      AppRunner
 }
 
-func NewIBCChaincode() *IBCChaincode {
+func NewIBCChaincode(appProvider AppProvider, dbProvider DBProvider) *IBCChaincode {
 	logger := log.NewTMLogger(os.Stdout)
 	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
-	runner := NewAppRunner(logger, DefaultDBProvider, &sequenceMgr)
+	runner := NewAppRunner(logger, appProvider, dbProvider, &sequenceMgr)
 	c := &IBCChaincode{
 		logger:      logger,
 		sequenceMgr: sequenceMgr,

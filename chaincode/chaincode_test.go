@@ -62,7 +62,7 @@ func MakeTestChaincodeApp(
 	channelOrder channel.Order,
 ) TestChaincodeApp {
 	cdc, _ := app.MakeCodecs()
-	cc := NewIBCChaincode()
+	cc := NewIBCChaincode(app.NewIBCApp, DefaultDBProvider)
 	return TestChaincodeApp{
 		cc: cc,
 
@@ -515,7 +515,7 @@ func (ca TestChaincodeApp) makeProofNextSequenceRecv(ctx contractapi.Transaction
 func TestResponseSerializer(t *testing.T) {
 	require := require.New(t)
 
-	cc := NewIBCChaincode()
+	cc := NewIBCChaincode(app.NewIBCApp, DefaultDBProvider)
 	chaincode, err := contractapi.NewChaincode(cc)
 	require.NoError(err)
 
