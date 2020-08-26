@@ -157,14 +157,6 @@ func (app *BaseApp) InitChain(appStateBytes []byte) error {
 	return nil
 }
 
-func (app *BaseApp) Codec() *codec.Codec {
-	return nil
-}
-
-func (app *BaseApp) GetIBCKeeper() *ibc.Keeper {
-	return nil
-}
-
 func (app *BaseApp) getBlockHeader() abci.Header {
 	block := app.blockProvider()
 	return abci.Header{
