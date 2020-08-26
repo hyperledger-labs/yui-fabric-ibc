@@ -240,8 +240,8 @@ func (app *IBCApp) Codec() *codec.Codec {
 	return app.cdc
 }
 
-func (app *IBCApp) GetIBCKeeper() *ibc.Keeper {
-	return app.IBCKeeper
+func (app *IBCApp) GetIBCKeeper() ibc.Keeper {
+	return *app.IBCKeeper
 }
 
 // NewAnteHandler returns an AnteHandler that checks and increments sequence

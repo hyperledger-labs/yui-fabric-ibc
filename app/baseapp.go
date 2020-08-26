@@ -24,7 +24,7 @@ type Application interface {
 
 	Codec() *codec.Codec
 	MakeContext(header abci.Header) (ctx sdk.Context, writer func())
-	GetIBCKeeper() *ibc.Keeper
+	GetIBCKeeper() ibc.Keeper
 }
 
 type BaseApp struct {
