@@ -21,6 +21,7 @@ import (
 type Application interface {
 	InitChain(appStateBytes []byte) error
 	RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (result *sdk.Result, err error)
+	Query(req abci.RequestQuery) abci.ResponseQuery
 
 	Codec() *codec.Codec
 	MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func())

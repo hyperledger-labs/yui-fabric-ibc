@@ -69,6 +69,14 @@ func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, 
 	return ctx.GetStub().SetEvent(EventIBC, bz)
 }
 
+func (c *IBCChaincode) Query(ctx contractapi.TransactionContextInterface, reqJSON string) (*app.ResponseQuery, error) {
+	var req app.RequestQuery
+	if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
+		return nil, err
+	}
+	return c.runner.Query(ctx.GetStub(), req)
+}
+
 // GetSequence returns current Sequence
 func (c *IBCChaincode) GetSequence(ctx contractapi.TransactionContextInterface) (*commitment.Sequence, error) {
 	return c.sequenceMgr.GetCurrentSequence(ctx.GetStub())
