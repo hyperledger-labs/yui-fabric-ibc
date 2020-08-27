@@ -1,4 +1,4 @@
-package chaincode
+package chaincode_test
 
 import (
 	"fmt"
@@ -10,7 +10,9 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
+	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
 	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
@@ -110,6 +112,25 @@ func TestApp(t *testing.T) {
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenAck(t, ctx1, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenConfirm(t, ctx0, app0)))
 
+	{
+		bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
+		res, err := app0.query(ctx0, app.RequestQuery{Data: bz, Path: "/custom/ibc/channel/channels"})
+		require.NoError(err)
+		var channels []channeltypes.IdentifiedChannel
+		channeltypes.SubModuleCdc.MustUnmarshalJSON([]byte(res.Value), &channels)
+		require.Equal(1, len(channels))
+		require.Equal(channels[0].ID, channelID0)
+	}
+	{
+		bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
+		res, err := app1.query(ctx1, app.RequestQuery{Data: bz, Path: "/custom/ibc/channel/channels"})
+		require.NoError(err)
+		var channels []channeltypes.IdentifiedChannel
+		channeltypes.SubModuleCdc.MustUnmarshalJSON([]byte(res.Value), &channels)
+		require.Equal(1, len(channels))
+		require.Equal(channels[0].ID, channelID1)
+	}
+
 	var createPacket = func(src, dst TestChaincodeApp, coins sdk.Coins, seq, timeoutHeight, timeoutTimestamp uint64) channel.Packet {
 		data := ibctransfertypes.NewFungibleTokenPacketData(coins, src.signer.String(), src.signer.String())
 		return channel.NewPacket(data.GetBytes(), seq, src.portID, src.channelID, dst.portID, dst.channelID, timeoutHeight, timeoutTimestamp)
@@ -117,7 +138,7 @@ func TestApp(t *testing.T) {
 
 	// Setup transfer
 	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/x/ibc-transfer/keeper/relay_test.go#L21
-	addr := sdk.AccAddress(app.MasterAccount.PubKey().Address())
+	addr := sdk.AccAddress(example.MasterAccount.PubKey().Address())
 	denom := fmt.Sprintf("%v/%v/ftk", app1.portID, app1.channelID)
 	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
 	app0.signer = addr
