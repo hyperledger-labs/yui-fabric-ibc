@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/datachainlab/fabric-ibc/store"
+	"github.com/datachainlab/fabric-ibc/x/ibc"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -15,6 +17,16 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 )
+
+type Application interface {
+	InitChain(appStateBytes []byte) error
+	RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (result *sdk.Result, err error)
+	Query(req abci.RequestQuery) abci.ResponseQuery
+
+	Codec() *codec.Codec
+	MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func())
+	GetIBCKeeper() ibc.Keeper
+}
 
 type BaseApp struct {
 	logger      log.Logger
@@ -351,7 +363,7 @@ func (app *BaseApp) SetBlockProvider(blockProvider BlockProvider) {
 //----------------------------------------
 // +Helpers
 
-func (app *BaseApp) MakeContext(header abci.Header) (ctx sdk.Context, writer func()) {
+func (app *BaseApp) MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func()) {
 	ms := app.cms.CacheMultiStore()
 	return sdk.NewContext(ms, header, false, app.logger), ms.Write
 }
