@@ -1,6 +1,7 @@
 package chaincode_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
@@ -511,6 +513,14 @@ func (ca TestChaincodeApp) makeProofNextSequenceRecv(ctx contractapi.Transaction
 		return 0, nil, err
 	}
 	return ca.seq.Value, bz, nil
+}
+
+func (ca TestChaincodeApp) query(ctx contractapi.TransactionContextInterface, req app.RequestQuery) (*app.ResponseQuery, error) {
+	bz, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	return ca.cc.Query(ctx, string(bz))
 }
 
 func TestResponseSerializer(t *testing.T) {

@@ -10,6 +10,8 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
+	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
+	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
@@ -109,6 +111,25 @@ func TestApp(t *testing.T) {
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenTry(t, ctx0, app0)))
 	require.NoError(app0.runMsg(stub0, app0.createMsgChannelOpenAck(t, ctx1, app1)))
 	require.NoError(app1.runMsg(stub1, app1.createMsgChannelOpenConfirm(t, ctx0, app0)))
+
+	{
+		bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
+		res, err := app0.query(ctx0, app.RequestQuery{Data: bz, Path: "/custom/ibc/channel/channels"})
+		require.NoError(err)
+		var channels []channeltypes.IdentifiedChannel
+		channeltypes.SubModuleCdc.MustUnmarshalJSON([]byte(res.Value), &channels)
+		require.Equal(1, len(channels))
+		require.Equal(channels[0].ID, channelID0)
+	}
+	{
+		bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
+		res, err := app1.query(ctx1, app.RequestQuery{Data: bz, Path: "/custom/ibc/channel/channels"})
+		require.NoError(err)
+		var channels []channeltypes.IdentifiedChannel
+		channeltypes.SubModuleCdc.MustUnmarshalJSON([]byte(res.Value), &channels)
+		require.Equal(1, len(channels))
+		require.Equal(channels[0].ID, channelID1)
+	}
 
 	var createPacket = func(src, dst TestChaincodeApp, coins sdk.Coins, seq, timeoutHeight, timeoutTimestamp uint64) channel.Packet {
 		data := ibctransfertypes.NewFungibleTokenPacketData(coins, src.signer.String(), src.signer.String())
