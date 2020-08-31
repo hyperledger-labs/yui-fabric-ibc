@@ -12,6 +12,7 @@ import (
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	connection "github.com/cosmos/cosmos-sdk/x/ibc/03-connection"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
+	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
@@ -553,6 +554,17 @@ func TestResponseSerializer(t *testing.T) {
 	now = now.Add(10 * time.Second)
 	stub0.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: now.Unix()}, nil)
 	stub0.GetFunctionAndParametersReturns("EndorseSequenceCommitment", []string{"2"})
+	res = chaincode.Invoke(stub0)
+	require.EqualValues(200, res.Status, res.String())
+
+	// Query
+	bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
+	req := app.RequestQuery{Data: string(bz), Path: "/custom/ibc/channel/channels"}
+	jbz, err := json.Marshal(req)
+	require.NoError(err)
+	now = now.Add(10 * time.Second)
+	stub0.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: now.Unix()}, nil)
+	stub0.GetFunctionAndParametersReturns("Query", []string{string(jbz)})
 	res = chaincode.Invoke(stub0)
 	require.EqualValues(200, res.Status, res.String())
 }

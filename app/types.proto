@@ -6,7 +6,7 @@ option go_package = "github.com/datachainlab/fabric-ibc/app";
 import "third_party/proto/gogoproto/gogo.proto";
 
 message RequestQuery {
-    bytes  data = 1 [(gogoproto.jsontag) = "data"];
+    string data = 1 [(gogoproto.jsontag) = "data"];
     string path = 2 [(gogoproto.jsontag) = "path"];
 }
 
