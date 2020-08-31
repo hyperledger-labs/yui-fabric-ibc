@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/cosmos/cosmos-sdk/store/cachemulti"
 	"github.com/cosmos/cosmos-sdk/store/dbadapter"
@@ -10,6 +11,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/tracekv"
 	"github.com/cosmos/cosmos-sdk/store/transient"
 	"github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	abci "github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -22,6 +25,16 @@ type Store struct {
 	traceWriter  io.Writer
 	traceContext types.TraceContext
 }
+
+// Queryable allows a Store to expose internal state to the abci.Query
+// interface. Multistore can route requests to the proper Store.
+//
+// This is an optional, but useful extension to any CommitStore
+type Queryable interface {
+	Query(abci.RequestQuery) abci.ResponseQuery
+}
+
+var _ Queryable = (*Store)(nil)
 
 func NewStore(db dbm.DB) *Store {
 	return &Store{
@@ -206,6 +219,53 @@ func (rs *Store) getStoreByName(name string) types.Store {
 	}
 
 	return rs.GetCommitKVStore(key)
+}
+
+//----------------------------------------
+// +Queryable
+
+// Query calls substore.Query with the same `req` where `req.Path` is
+// modified to remove the substore prefix.
+// Ie. `req.Path` here is `/<substore>/<path>`, and trimmed to `/<path>` for the substore.
+// TODO: add proof for `multistore -> substore`.
+func (rs *Store) Query(req abci.RequestQuery) abci.ResponseQuery {
+	path := req.Path
+	storeName, subpath, err := parsePath(path)
+	if err != nil {
+		return sdkerrors.QueryResult(err)
+	}
+
+	store := rs.getStoreByName(storeName)
+	if store == nil {
+		return sdkerrors.QueryResult(sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "no such store: %s", storeName))
+	}
+
+	queryable, ok := store.(types.Queryable)
+	if !ok {
+		return sdkerrors.QueryResult(sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "store %s (type %T) doesn't support queries", storeName, store))
+	}
+
+	// trim the path and make the query
+	req.Path = subpath
+	return queryable.Query(req)
+}
+
+// parsePath expects a format like /<storeName>[/<subpath>]
+// Must start with /, subpath may be empty
+// Returns error if it doesn't start with /
+func parsePath(path string) (storeName string, subpath string, err error) {
+	if !strings.HasPrefix(path, "/") {
+		return storeName, subpath, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "invalid path: %s", path)
+	}
+
+	paths := strings.SplitN(path[1:], "/", 2)
+	storeName = paths[0]
+
+	if len(paths) == 2 {
+		subpath = "/" + paths[1]
+	}
+
+	return storeName, subpath, nil
 }
 
 //----------------------------------------

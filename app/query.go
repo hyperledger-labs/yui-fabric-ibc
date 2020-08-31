@@ -18,14 +18,19 @@ func (app *BaseApp) Query(req abci.RequestQuery) abci.ResponseQuery {
 	}
 
 	switch path[0] {
-	// TODO add "store" support
-	// case "store":
-	// 	return handleQueryStore(app, path, req)
+	case "store":
+		return handleQueryStore(app, path, req)
 	case "custom":
 		return handleQueryCustom(app, path, req)
 	}
 
 	return sdkerrors.QueryResult(sdkerrors.Wrap(sdkerrors.ErrUnknownRequest, "unknown query path"))
+}
+
+func handleQueryStore(app *BaseApp, path []string, req abci.RequestQuery) abci.ResponseQuery {
+	// "/store" prefix for store queries
+	req.Path = "/" + strings.Join(path[1:], "/")
+	return app.cms.Query(req)
 }
 
 func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) abci.ResponseQuery {
