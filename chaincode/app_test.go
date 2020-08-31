@@ -116,7 +116,7 @@ func TestApp(t *testing.T) {
 
 	{
 		bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
-		res, err := app0.query(ctx0, app.RequestQuery{Data: bz, Path: "/custom/ibc/channel/channels"})
+		res, err := app0.query(ctx0, app.RequestQuery{Data: string(bz), Path: "/custom/ibc/channel/channels"})
 		require.NoError(err)
 		var channels []channeltypes.IdentifiedChannel
 		channeltypes.SubModuleCdc.MustUnmarshalJSON([]byte(res.Value), &channels)
@@ -125,7 +125,7 @@ func TestApp(t *testing.T) {
 	}
 	{
 		bz := channeltypes.SubModuleCdc.MustMarshalJSON(channeltypes.QueryAllChannelsParams{Limit: 100, Page: 1})
-		res, err := app1.query(ctx1, app.RequestQuery{Data: bz, Path: "/custom/ibc/channel/channels"})
+		res, err := app1.query(ctx1, app.RequestQuery{Data: string(bz), Path: "/custom/ibc/channel/channels"})
 		require.NoError(err)
 		var channels []channeltypes.IdentifiedChannel
 		channeltypes.SubModuleCdc.MustUnmarshalJSON([]byte(res.Value), &channels)
@@ -147,7 +147,7 @@ func TestApp(t *testing.T) {
 
 	// check if nextSequence equals an expected value
 	// app0
-	res, err := app0.query(ctx0, app.RequestQuery{Data: host.KeyNextSequenceSend(app0.portID, app0.channelID), Path: "/store/ibc/key"})
+	res, err := app0.query(ctx0, app.RequestQuery{Data: string(host.KeyNextSequenceSend(app0.portID, app0.channelID)), Path: "/store/ibc/key"})
 	require.NoError(err)
 	require.Equal(uint64(1), binary.BigEndian.Uint64([]byte(res.Value)))
 
@@ -159,11 +159,11 @@ func TestApp(t *testing.T) {
 
 	// check if nextSequence equals an expected value
 	// app0
-	res, err = app0.query(ctx0, app.RequestQuery{Data: host.KeyNextSequenceSend(app0.portID, app0.channelID), Path: "/store/ibc/key"})
+	res, err = app0.query(ctx0, app.RequestQuery{Data: string(host.KeyNextSequenceSend(app0.portID, app0.channelID)), Path: "/store/ibc/key"})
 	require.NoError(err)
 	require.Equal(uint64(2), binary.BigEndian.Uint64([]byte(res.Value)))
 	// app1
-	res, err = app1.query(ctx1, app.RequestQuery{Data: host.KeyNextSequenceRecv(app1.portID, app1.channelID), Path: "/store/ibc/key"})
+	res, err = app1.query(ctx1, app.RequestQuery{Data: string(host.KeyNextSequenceRecv(app1.portID, app1.channelID)), Path: "/store/ibc/key"})
 	require.NoError(err)
 	require.Equal(uint64(2), binary.BigEndian.Uint64([]byte(res.Value)))
 

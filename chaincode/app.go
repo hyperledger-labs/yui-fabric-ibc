@@ -76,7 +76,7 @@ func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery)
 	if err != nil {
 		return nil, err
 	}
-	res := a.Query(abci.RequestQuery{Data: req.Data, Path: req.Path})
+	res := a.Query(abci.RequestQuery{Data: []byte(req.Data), Path: req.Path})
 	if res.IsErr() {
 		return nil, fmt.Errorf("failed to query '%v': %v", req.Path, res.Log)
 	}
