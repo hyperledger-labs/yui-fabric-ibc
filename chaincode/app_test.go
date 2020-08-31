@@ -1,6 +1,7 @@
 package chaincode_test
 
 import (
+	"encoding/binary"
 	"fmt"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
 	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
 	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
+	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/datachainlab/fabric-ibc/x/compat"
@@ -143,11 +145,27 @@ func TestApp(t *testing.T) {
 	coins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewInt(100)))
 	app0.signer = addr
 
+	// check if nextSequence equals an expected value
+	// app0
+	res, err := app0.query(ctx0, app.RequestQuery{Data: host.KeyNextSequenceSend(app0.portID, app0.channelID), Path: "/store/ibc/key"})
+	require.NoError(err)
+	require.Equal(uint64(1), binary.BigEndian.Uint64([]byte(res.Value)))
+
 	// Success
 	require.NoError(app0.runMsg(stub0, app0.createMsgTransfer(t, app1, coins, addr, 1000, 0)))
 	packet0 := createPacket(app0, app1, coins, 1, 1000, 0)
 	require.NoError(app1.runMsg(stub1, app1.createMsgPacketForTransfer(t, ctx0, app0, packet0)))
 	require.NoError(app0.runMsg(stub0, app0.createMsgAcknowledgement(t, ctx1, app1, packet0)))
+
+	// check if nextSequence equals an expected value
+	// app0
+	res, err = app0.query(ctx0, app.RequestQuery{Data: host.KeyNextSequenceSend(app0.portID, app0.channelID), Path: "/store/ibc/key"})
+	require.NoError(err)
+	require.Equal(uint64(2), binary.BigEndian.Uint64([]byte(res.Value)))
+	// app1
+	res, err = app1.query(ctx1, app.RequestQuery{Data: host.KeyNextSequenceRecv(app1.portID, app1.channelID), Path: "/store/ibc/key"})
+	require.NoError(err)
+	require.Equal(uint64(2), binary.BigEndian.Uint64([]byte(res.Value)))
 
 	// Timeout
 	var timeoutHeight uint64 = 3
