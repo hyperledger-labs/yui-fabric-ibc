@@ -50,18 +50,6 @@ func HandleMsgCreateClient(ctx sdk.Context, k Keeper, msg exported.MsgCreateClie
 		return nil, err
 	}
 
-	ctx.EventManager().EmitEvents(sdk.Events{
-		sdk.NewEvent(
-			EventTypeCreateClient,
-			sdk.NewAttribute(AttributeKeyClientID, msg.GetClientID()),
-			sdk.NewAttribute(AttrbuteKeyClientType, msg.GetClientType()),
-		),
-		sdk.NewEvent(
-			sdk.EventTypeMessage,
-			sdk.NewAttribute(sdk.AttributeKeyModule, AttributeValueCategory),
-		),
-	})
-
 	return &sdk.Result{
 		Events: ctx.EventManager().Events().ToABCIEvents(),
 	}, nil

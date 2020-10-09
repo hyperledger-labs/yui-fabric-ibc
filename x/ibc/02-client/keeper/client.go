@@ -45,6 +45,7 @@ func (k Keeper) CreateClient(
 		sdk.NewEvent(
 			types.EventTypeCreateClient,
 			sdk.NewAttribute(types.AttributeKeyClientID, clientID),
+			sdk.NewAttribute(types.AttributeKeyClientType, clientState.ClientType().String()),
 		),
 		sdk.NewEvent(
 			sdk.EventTypeMessage,
