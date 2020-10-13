@@ -4,6 +4,10 @@
 
 Fabric-IBC includes the Chaincode and Cosmos modules that enable IBC between Fabric and Cosmos/Tendermint, or between Fabric and Fabric. Of course, it'll be able to communicate with other Blockchains and DLTs that support IBC!
 
+## Documents
+
+Please see [here](https://github.com/datachainlab/public-docs/tree/master/fabric-ibc).
+
 ## Development
 
 Currently, x/ibc/client module in cosmos-sdk cannot use a fabric client implemented in external modules without forking the source code. Therefore, we have copied and modified the following modules from cosmos-sdk.
