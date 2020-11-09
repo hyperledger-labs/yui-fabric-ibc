@@ -1,7 +1,6 @@
 package fabric
 
 import (
-	"errors"
 	"time"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -53,8 +52,11 @@ func CheckValidityAndUpdateState(
 func checkValidity(
 	clientState types.ClientState, header types.Header, currentTimestamp time.Time,
 ) error {
-	if header.ChaincodeHeader == nil && header.ChaincodeInfo == nil {
-		return errors.New("either ChaincodeHeader or ChaincodeInfo must be non-nil value")
+	if err := header.ValidateBasic(); err != nil {
+		return sdkerrors.Wrapf(
+			clienttypes.ErrInvalidHeader,
+			err.Error(),
+		)
 	}
 
 	if header.ChaincodeHeader != nil {
@@ -98,14 +100,32 @@ func checkValidity(
 		}
 	}
 
+	if header.MSPPolicies != nil {
+		if err := types.VerifyMSPPolicies(clientState, *header.MSPPolicies); err != nil {
+			return sdkerrors.Wrap(
+				clienttypes.ErrInvalidHeader,
+				err.Error(),
+			)
+		}
+	}
+
+	if header.MSPConfigs != nil {
+		if err := types.VerifyMSPConfigs(clientState, *header.MSPConfigs); err != nil {
+			return sdkerrors.Wrap(
+				clienttypes.ErrInvalidHeader,
+				err.Error(),
+			)
+		}
+	}
+
 	return nil
 }
 
 func update(clientState ClientState, header Header) (ClientState, *ConsensusState) {
 	var consensusState *ConsensusState
 
-	if header.ChaincodeInfo == nil && header.ChaincodeHeader == nil {
-		panic("either ChaincodeHeader or ChaincodeInfo must be non-nil value")
+	if err := header.ValidateBasic(); err != nil {
+		panic(err.Error())
 	}
 
 	if header.ChaincodeInfo != nil {
@@ -121,5 +141,62 @@ func update(clientState ClientState, header Header) (ClientState, *ConsensusStat
 		consensusState = &cs
 	}
 
+	if header.MSPPolicies != nil {
+		clientState = updateMSPPolicies(clientState, *header.MSPPolicies)
+	}
+
+	if header.MSPConfigs != nil {
+		clientState = updateMSPConfigs(clientState, *header.MSPConfigs)
+	}
+
 	return clientState, consensusState
+}
+
+func updateMSPPolicies(clientState ClientState, mspPolicies types.MSPPolicies) ClientState {
+	var newInfos types.MSPInfos
+	cursor := 0
+	for _, policy := range mspPolicies.Policies {
+		for _, info := range clientState.LastMSPInfos.Infos[cursor:] {
+			cursor++
+			if policy.ID < info.ID {
+				newInfos.Infos = append(newInfos.Infos, types.MSPInfo{
+					ID:     policy.ID,
+					Config: nil,
+					Policy: policy.Policy,
+				}, info)
+				break
+			} else if policy.ID == info.ID {
+				info.Policy = policy.Policy
+				newInfos.Infos = append(newInfos.Infos, info)
+				break
+			} else {
+				newInfos.Infos = append(newInfos.Infos, info)
+			}
+		}
+	}
+	clientState.LastMSPInfos = newInfos
+	return clientState
+}
+
+// this should be called after updateMSPPolicies for the same ClientState
+func updateMSPConfigs(clientState ClientState, mspConfigs types.MSPConfigs) ClientState {
+	var newInfos types.MSPInfos
+	cursor := 0
+	for _, config := range mspConfigs.Configs {
+		for _, info := range clientState.LastMSPInfos.Infos[cursor:] {
+			cursor++
+			// config.ID < info.ID must never happen after VerifyMSPConfigs()
+			if config.ID < info.ID {
+				panic("MSPConfig must be verified correctly")
+			} else if config.ID == info.ID {
+				info.Config = config.Config
+				newInfos.Infos = append(newInfos.Infos, info)
+				break
+			} else {
+				newInfos.Infos = append(newInfos.Infos, info)
+			}
+		}
+	}
+	clientState.LastMSPInfos = newInfos
+	return clientState
 }

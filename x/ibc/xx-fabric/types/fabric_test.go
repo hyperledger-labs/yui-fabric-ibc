@@ -36,7 +36,9 @@ func TestGetPolicyEvaluator(t *testing.T) {
 	mspID := "Org2MSP"
 	plcBytes := makePolicy([]string{mspID})
 	// load verifying msp configs inside it
-	plc, err := getPolicyEvaluator(plcBytes, config)
+	mconf, err := fabrictests.GetLocalVerifyingMspConfig(config.MSPsDir, mspID)
+	require.NoError(t, err)
+	plc, err := getPolicyEvaluator(plcBytes, []msppb.MSPConfig{*mconf})
 	require.NoError(t, err)
 	msp, err := fabrictests.GetLocalMsp(config.MSPsDir, mspID)
 	require.NoError(t, err)

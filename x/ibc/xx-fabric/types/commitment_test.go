@@ -1,6 +1,7 @@
 package types
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/datachainlab/fabric-ibc/commitment"
@@ -11,9 +12,11 @@ import (
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset/kvrwset"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/policydsl"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
+	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -200,4 +203,36 @@ func MarshalOrPanic(msg proto.Message) []byte {
 		panic(err)
 	}
 	return b
+}
+
+func loadVerifyingMsps(conf Config) (msp.MSPManager, error) {
+	msps := []msp.MSP{}
+	// if in local, this would depend `peer.localMspType` config
+	for _, id := range conf.MSPIDs {
+		dir := filepath.Join(conf.MSPsDir, id)
+		bccspConfig := factory.GetDefaultOpts()
+		mspConf, err := msp.GetVerifyingMspConfig(dir, id, msp.ProviderTypeToString(msp.FABRIC))
+		if err != nil {
+			return nil, err
+		}
+		opts := msp.Options[msp.ProviderTypeToString(msp.FABRIC)]
+		cryptoProvider, err := (&factory.SWFactory{}).Get(bccspConfig)
+		if err != nil {
+			return nil, err
+		}
+		m, err := msp.New(opts, cryptoProvider)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.Setup(mspConf); err != nil {
+			return nil, err
+		}
+		msps = append(msps, m)
+	}
+	mgr := msp.NewMSPManager()
+	err := mgr.Setup(msps)
+	if err != nil {
+		return nil, err
+	}
+	return mgr, nil
 }

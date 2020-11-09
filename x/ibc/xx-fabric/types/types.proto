@@ -7,8 +7,10 @@ import "third_party/proto/gogoproto/gogo.proto";
 import "commitment/types.proto";
 
 message Header {
-  ChaincodeHeader ChaincodeHeader = 1 [(gogoproto.nullable) = true];
-  ChaincodeInfo   ChaincodeInfo   = 2 [(gogoproto.nullable) = true];
+  ChaincodeHeader  ChaincodeHeader = 1 [(gogoproto.nullable) = true];
+  ChaincodeInfo    ChaincodeInfo   = 2 [(gogoproto.nullable) = true];
+  MSPConfigs       MSPConfigs      = 3 [(gogoproto.nullable) = true];
+  MSPPolicies      MSPPolicies     = 4 [(gogoproto.nullable) = true];
 }
 
 message ChaincodeHeader {
@@ -22,6 +24,39 @@ message ChaincodeInfo {
   bytes          endorsement_policy = 3;
   bytes          ibc_policy         = 4;
   MessageProof   proof              = 5;
+}
+
+message MSPInfos {
+  repeated MSPInfo infos = 1 [(gogoproto.nullable) = false];
+}
+
+message MSPConfigs {
+  repeated MSPConfig configs = 1 [(gogoproto.nullable) = false];
+}
+
+message MSPPolicies {
+  repeated MSPPolicy policies = 1 [(gogoproto.nullable) = false];
+}
+
+message MSPInfo {
+  // MSP ID
+  string        ID     = 1 [(gogoproto.jsontag) = "id,omitempty"];
+  bytes         config = 2;
+  bytes         policy = 3;
+}
+
+message MSPConfig {
+  // MSP ID
+  string        ID     = 1 [(gogoproto.jsontag) = "id,omitempty"];
+  bytes         config = 2;
+  MessageProof  proof  = 3;
+}
+
+message MSPPolicy {
+  // MSP ID
+  string        ID     = 1 [(gogoproto.jsontag) = "id,omitempty"];
+  bytes         policy = 2;
+  MessageProof  proof  = 3;
 }
 
 // ref. https://github.com/hyperledger/fabric-chaincode-java/blob/392cf9cb740c42e0376ecdbbb015285b5a74ba97/fabric-chaincode-protos/src/main/protos/peer/chaincode.proto#L21

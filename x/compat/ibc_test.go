@@ -19,6 +19,7 @@ import (
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
@@ -139,8 +140,11 @@ func TestCreateClient(t *testing.T) {
 
 	conf, err := fabrictypes.DefaultConfig()
 	require.NoError(err)
+	mspID := "SampleOrgMSP"
 	// setup the MSP manager so that we can sign/verify
-	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")
+	mconf, bconf, err := fabrictests.GetLocalMspConfig(conf.MSPsDir, mspID)
+	require.NoError(err)
+	lcMSP, err := fabrictests.SetupLocalMsp(mconf, bconf)
 	require.NoError(err)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
@@ -163,14 +167,20 @@ func TestCreateClient(t *testing.T) {
 	// CreateClient
 	{
 		/// Build Msg
-		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
+		var pcBytes []byte = makePolicy([]string{mspID})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
 		proof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
-		h := fabric.NewHeader(ch, ci)
+		err = fabrictests.ToVerifyingConfig(mconf)
+		require.NoError(err)
+		conf, err := proto.Marshal(mconf)
+		require.NoError(err)
+		mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{fabric.NewMSPPolicy(mspID, pcBytes, &fabric.MessageProof{})})
+		mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{fabric.NewMSPConfig(mspID, conf, &fabric.MessageProof{})})
+		h := fabric.NewHeader(ch, ci, mps, mcs)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgCreateClient(clientID, h, signer)
 		require.NoError(msg.ValidateBasic())
@@ -184,17 +194,33 @@ func TestCreateClient(t *testing.T) {
 	// UpdateClient
 	{
 		/// Build Msg
-		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
+		var pcBytes []byte = makePolicy([]string{mspID})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
-		mproof, err := tests.MakeMessageProof(signer, ci.GetSignBytes())
+		mProof, err := tests.MakeMessageProof(signer, ci.GetSignBytes())
 		require.NoError(err)
-		ci.Proof = mproof
+		ci.Proof = mProof
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
 		cproof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *cproof
 
-		h := fabric.NewHeader(ch, ci)
+		err = fabrictests.ToVerifyingConfig(mconf)
+		require.NoError(err)
+		conf, err := proto.Marshal(mconf)
+		require.NoError(err)
+
+		policy := fabric.NewMSPPolicy(mspID, pcBytes, nil)
+		policyProof, err := tests.MakeMessageProof(signer, policy.GetSignBytes())
+		require.NoError(err)
+		policy.Proof = policyProof
+		mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{policy})
+
+		mconf := fabric.NewMSPConfig(mspID, conf, nil)
+		mconfProof, err := tests.MakeMessageProof(signer, mconf.GetSignBytes())
+		require.NoError(err)
+		mconf.Proof = mconfProof
+		mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{mconf})
+		h := fabric.NewHeader(ch, ci, mps, mcs)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgUpdateClient(clientID, h, signer)
 		require.NoError(msg.ValidateBasic())

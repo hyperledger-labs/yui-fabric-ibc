@@ -60,8 +60,11 @@ func TestApp(t *testing.T) {
 
 	conf, err := fabrictypes.DefaultConfig()
 	require.NoError(err)
+	mspID := "SampleOrgMSP"
 	// setup the MSP manager so that we can sign/verify
-	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")
+	mconf, bconf, err := fabrictests.GetLocalMspConfig(conf.MSPsDir, mspID)
+	require.NoError(err)
+	lcMSP, err := fabrictests.SetupLocalMsp(mconf, bconf)
 	require.NoError(err)
 	endorser, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
@@ -81,10 +84,12 @@ func TestApp(t *testing.T) {
 
 	prv0 := secp256k1.GenPrivKey()
 	prv1 := secp256k1.GenPrivKey()
+	err = fabrictests.ToVerifyingConfig(mconf)
+	require.NoError(err)
 
-	app0 := MakeTestChaincodeApp(prv0, fabchannelID, ccid, endorser, clientID0, connectionID0, portID0, channelID0, channelOrder0)
+	app0 := MakeTestChaincodeApp(prv0, fabchannelID, ccid, endorser, clientID0, connectionID0, portID0, channelID0, channelOrder0, *mconf)
 	require.NoError(app0.init(ctx0))
-	app1 := MakeTestChaincodeApp(prv1, fabchannelID, ccid, endorser, clientID1, connectionID1, portID1, channelID1, channelOrder1)
+	app1 := MakeTestChaincodeApp(prv1, fabchannelID, ccid, endorser, clientID1, connectionID1, portID1, channelID1, channelOrder1, *mconf)
 	require.NoError(app1.init(ctx1))
 
 	// Create Clients

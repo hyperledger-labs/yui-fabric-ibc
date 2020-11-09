@@ -25,7 +25,6 @@ func HandleMsgCreateClient(ctx sdk.Context, k Keeper, msg exported.MsgCreateClie
 			return nil, sdkerrors.Wrap(ErrInvalidClientType, "Msg is not a Tendermint CreateClient msg")
 		}
 		var err error
-
 		clientState, err = ibctmtypes.InitializeFromMsg(tmMsg)
 		if err != nil {
 			return nil, err
@@ -38,7 +37,12 @@ func HandleMsgCreateClient(ctx sdk.Context, k Keeper, msg exported.MsgCreateClie
 		if !ok {
 			return nil, sdkerrors.Wrap(ErrInvalidClientType, "Msg is not a Fabric CreateClient msg")
 		}
-		clientState = fabric.NewClientState(fabMsg.GetClientID(), fabMsg.Header)
+		var err error
+		clientState, err = fabric.InitializeFromMsg(fabMsg)
+		if err != nil {
+			return nil, err
+		}
+
 	default:
 		return nil, sdkerrors.Wrap(ErrInvalidClientType, msg.GetClientType())
 	}
