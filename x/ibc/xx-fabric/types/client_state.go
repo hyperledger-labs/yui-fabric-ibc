@@ -41,6 +41,9 @@ type ClientState struct {
 	LastMSPInfos        MSPInfos        `json:"last_msp_infos" yaml:"last_msp_infos"`
 }
 
+// XXX we need better alias name
+type MSPPBConfig = msppb.MSPConfig
+
 func InitializeFromMsg(msg MsgCreateClient) (ClientState, error) {
 	return Initialize(msg.ClientID, msg.Header)
 }
@@ -145,8 +148,13 @@ func (cs ClientState) VerifyClientConsensusState(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakeConsensusStateCommitmentEntryKey(prefix, counterpartyClientIdentifier, consensusHeight)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, cs.LastMSPInfos); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -182,7 +190,13 @@ func (cs ClientState) VerifyConnectionState(
 	if err != nil {
 		return err
 	}
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, cs.LastMSPInfos); err != nil {
+
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -219,7 +233,12 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, cs.LastMSPInfos); err != nil {
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -246,8 +265,13 @@ func (cs ClientState) VerifyPacketCommitment(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakePacketCommitmentEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes, cs.LastMSPInfos); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -274,9 +298,14 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
 	bz := channeltypes.CommitAcknowledgement(acknowledgement)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, cs.LastMSPInfos); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -303,8 +332,13 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}, cs.LastMSPInfos); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -330,9 +364,14 @@ func (cs ClientState) VerifyNextSequenceRecv(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakeNextSequenceRecvEntryKey(prefix, portID, channelID)
 	bz := sdk.Uint64ToBigEndian(nextSequenceRecv)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, cs.LastMSPInfos); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -396,10 +435,10 @@ func sanitizeVerificationArgs(
 	return proof, nil
 }
 
-func (mi MSPInfos) GetMSPConfigs() ([]msppb.MSPConfig, error) {
-	configs := make([]msppb.MSPConfig, len(mi.Infos))
+func (mi MSPInfos) GetMSPConfigs() ([]MSPPBConfig, error) {
+	configs := make([]MSPPBConfig, len(mi.Infos))
 	for i, mi := range mi.Infos {
-		var mspConfig msppb.MSPConfig
+		var mspConfig MSPPBConfig
 		if err := proto.Unmarshal(mi.Config, &mspConfig); err != nil {
 			return nil, err
 		}

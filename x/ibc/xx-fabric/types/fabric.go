@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
-	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/common/cauthdsl"
@@ -18,8 +17,13 @@ import (
 
 // VerifyChaincodeHeader verifies ChaincodeHeader with last Endorsement Policy
 func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
+	configs, err := clientState.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+
 	lastci := clientState.LastChaincodeInfo
-	ok, err := VerifyEndorsedCommitment(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentEntryKey(h.Sequence.Value), h.Sequence.Bytes(), clientState.LastMSPInfos)
+	ok, err := VerifyEndorsedCommitment(clientState.LastChaincodeInfo.GetFabricChaincodeID(), lastci.EndorsementPolicy, h.Proof, MakeSequenceCommitmentEntryKey(h.Sequence.Value), h.Sequence.Bytes(), configs)
 	if err != nil {
 		return err
 	} else if !ok {
@@ -33,7 +37,11 @@ func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	if info.Proof == nil {
 		return errors.New("a proof is empty")
 	}
-	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *info.Proof, info.GetSignBytes(), clientState.LastMSPInfos)
+	configs, err := clientState.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *info.Proof, info.GetSignBytes(), configs)
 }
 
 func VerifyMSPConfigs(clientState ClientState, configs MSPConfigs) error {
@@ -54,7 +62,11 @@ func VerifyMSPConfig(clientState ClientState, config MSPConfig) error {
 	if err != nil {
 		return err
 	}
-	return VerifyEndorsedMessage(policy, *config.Proof, config.GetSignBytes(), clientState.LastMSPInfos)
+	lastConfigs, err := clientState.LastMSPInfos.GetMSPConfigs()
+	if err != nil {
+		return err
+	}
+	return VerifyEndorsedMessage(policy, *config.Proof, config.GetSignBytes(), lastConfigs)
 }
 
 func VerifyMSPPolicies(clientState ClientState, policies MSPPolicies) error {
@@ -71,15 +83,15 @@ func VerifyMSPPolicy(clientState ClientState, policy MSPPolicy) error {
 	if policy.Proof == nil {
 		return errors.New("a proof is empty")
 	}
-	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *policy.Proof, policy.GetSignBytes(), clientState.LastMSPInfos)
-}
-
-// VerifyEndorsedMessage verifies a value with given policy
-func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte, mspInfos MSPInfos) error {
-	configs, err := mspInfos.GetMSPConfigs()
+	configs, err := clientState.LastMSPInfos.GetMSPConfigs()
 	if err != nil {
 		return err
 	}
+	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *policy.Proof, policy.GetSignBytes(), configs)
+}
+
+// VerifyEndorsedMessage verifies a value with given policy
+func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte, configs []MSPPBConfig) error {
 	policy, err := getPolicyEvaluator(policyBytes, configs)
 	if err != nil {
 		return err
@@ -92,11 +104,7 @@ func VerifyEndorsedMessage(policyBytes []byte, proof MessageProof, value []byte,
 }
 
 // VerifyEndorsedCommitment verifies a key-value entry with a policy
-func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof CommitmentProof, key string, value []byte, mspInfos MSPInfos) (bool, error) {
-	configs, err := mspInfos.GetMSPConfigs()
-	if err != nil {
-		return false, err
-	}
+func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof CommitmentProof, key string, value []byte, configs []MSPPBConfig) (bool, error) {
 	policy, err := getPolicyEvaluator(policyBytes, configs)
 	if err != nil {
 		return false, err
@@ -115,7 +123,7 @@ func VerifyEndorsedCommitment(ccID peer.ChaincodeID, policyBytes []byte, proof C
 	return ensureWriteSetIncludesCommitment(rwset.NsRwSets, proof.NsIndex, proof.WriteSetIndex, key, value)
 }
 
-func getPolicyEvaluator(policyBytes []byte, configs []msppb.MSPConfig) (policies.Policy, error) {
+func getPolicyEvaluator(policyBytes []byte, configs []MSPPBConfig) (policies.Policy, error) {
 	var ap peer.ApplicationPolicy
 	if err := proto.Unmarshal(policyBytes, &ap); err != nil {
 		return nil, err
@@ -171,7 +179,7 @@ func getTxReadWriteSetFromProposalResponsePayload(proposal []byte) (*peer.Chainc
 	return cact.GetChaincodeId(), txRWSet, nil
 }
 
-func setupVerifyingMSPManager(mspConfigs []msppb.MSPConfig) (msp.MSPManager, error) {
+func setupVerifyingMSPManager(mspConfigs []MSPPBConfig) (msp.MSPManager, error) {
 	msps := []msp.MSP{}
 	// if in local, this would depend `peer.localMspType` config
 	for _, conf := range mspConfigs {
@@ -189,7 +197,7 @@ func setupVerifyingMSPManager(mspConfigs []msppb.MSPConfig) (msp.MSPManager, err
 	return mgr, nil
 }
 
-func setupVerifyingMSP(mspConf msppb.MSPConfig) (msp.MSP, error) {
+func setupVerifyingMSP(mspConf MSPPBConfig) (msp.MSP, error) {
 	bccspConfig := factory.GetDefaultOpts()
 	cryptoProvider, err := (&factory.SWFactory{}).Get(bccspConfig)
 	if err != nil {
