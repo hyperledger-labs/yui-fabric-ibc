@@ -178,8 +178,8 @@ func TestCreateClient(t *testing.T) {
 		require.NoError(err)
 		conf, err := proto.Marshal(mconf)
 		require.NoError(err)
-		mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{fabric.NewMSPPolicy(mspID, pcBytes, &fabric.MessageProof{})})
-		mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{fabric.NewMSPConfig(mspID, conf, &fabric.MessageProof{})})
+		mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{fabric.NewMSPPolicy(fabrictypes.TypeCreate, mspID, pcBytes, &fabric.MessageProof{})})
+		mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{fabric.NewMSPConfig(fabrictypes.TypeCreate, mspID, conf, &fabric.MessageProof{})})
 		h := fabric.NewHeader(ch, ci, mps, mcs)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgCreateClient(clientID, h, signer)
@@ -209,13 +209,13 @@ func TestCreateClient(t *testing.T) {
 		conf, err := proto.Marshal(mconf)
 		require.NoError(err)
 
-		policy := fabric.NewMSPPolicy(mspID, pcBytes, nil)
+		policy := fabric.NewMSPPolicy(fabrictypes.TypeUpdate, mspID, pcBytes, nil)
 		policyProof, err := tests.MakeMessageProof(signer, policy.GetSignBytes())
 		require.NoError(err)
 		policy.Proof = policyProof
 		mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{policy})
 
-		mconf := fabric.NewMSPConfig(mspID, conf, nil)
+		mconf := fabric.NewMSPConfig(fabrictypes.TypeUpdate, mspID, conf, nil)
 		mconfProof, err := tests.MakeMessageProof(signer, mconf.GetSignBytes())
 		require.NoError(err)
 		mconf.Proof = mconfProof

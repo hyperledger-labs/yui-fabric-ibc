@@ -17,7 +17,7 @@ import (
 
 // VerifyChaincodeHeader verifies ChaincodeHeader with last Endorsement Policy
 func VerifyChaincodeHeader(clientState ClientState, h ChaincodeHeader) error {
-	configs, err := clientState.LastMSPInfos.GetMSPConfigs()
+	configs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	if info.Proof == nil {
 		return errors.New("a proof is empty")
 	}
-	configs, err := clientState.LastMSPInfos.GetMSPConfigs()
+	configs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -53,16 +53,42 @@ func VerifyMSPConfigs(clientState ClientState, configs MSPConfigs) error {
 	return nil
 }
 
-// verifies whether MSPConfig suits the last MSPPolicy
+// verify whether MSPConfig suits the last MSPPolicy
+// MSPPolicy must be created in advance
 func VerifyMSPConfig(clientState ClientState, config MSPConfig) error {
 	if config.Proof == nil {
 		return errors.New("a proof is empty")
 	}
-	policy, err := clientState.LastMSPInfos.GetPolicy(config.MSPID)
+	policy, err := clientState.LastMSPInfos.FindMSPPolicy(config.MSPID)
 	if err != nil {
 		return err
 	}
-	lastConfigs, err := clientState.LastMSPInfos.GetMSPConfigs()
+	switch config.Type {
+	case TypeCreate:
+		return verifyMSPConfigCreate(clientState, policy, config)
+	case TypeUpdate:
+		return verifyMSPConfigUpdate(clientState, policy, config)
+	default:
+		return errors.New("invalid type")
+	}
+}
+
+func verifyMSPConfigCreate(clientState ClientState, policy []byte, config MSPConfig) error {
+	if _, err := clientState.LastMSPInfos.FindMSPConfig(config.MSPID); err == nil {
+		return errors.New("MSPConfig has already been created")
+	}
+	lastConfigs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+	return VerifyEndorsedMessage(policy, *config.Proof, config.GetSignBytes(), lastConfigs)
+}
+
+func verifyMSPConfigUpdate(clientState ClientState, policy []byte, config MSPConfig) error {
+	if _, err := clientState.LastMSPInfos.FindMSPConfig(config.MSPID); err != nil {
+		return errors.New("MSPConfig has not been created")
+	}
+	lastConfigs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -83,7 +109,33 @@ func VerifyMSPPolicy(clientState ClientState, policy MSPPolicy) error {
 	if policy.Proof == nil {
 		return errors.New("a proof is empty")
 	}
-	configs, err := clientState.LastMSPInfos.GetMSPConfigs()
+
+	switch policy.Type {
+	case TypeCreate:
+		return verifyMSPPolicyCreate(clientState, policy)
+	case TypeUpdate:
+		return verifyMSPPolicyUpdate(clientState, policy)
+	default:
+		return errors.New("invalid type")
+	}
+}
+
+func verifyMSPPolicyCreate(clientState ClientState, policy MSPPolicy) error {
+	if _, err := clientState.LastMSPInfos.FindMSPPolicy(policy.MSPID); err == nil {
+		return errors.New("MSPPolicy has already been created")
+	}
+	configs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *policy.Proof, policy.GetSignBytes(), configs)
+}
+
+func verifyMSPPolicyUpdate(clientState ClientState, policy MSPPolicy) error {
+	if _, err := clientState.LastMSPInfos.FindMSPPolicy(policy.MSPID); err != nil {
+		return errors.New("MSPPolicy has not been created")
+	}
+	configs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}

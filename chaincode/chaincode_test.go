@@ -134,8 +134,8 @@ func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.T
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, pcBytes, nil)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.CommitmentProof{})
 	conf, _ := proto.Marshal(&ca.mspConfig)
-	mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{fabric.NewMSPPolicy(mspID, pcBytes, &fabric.MessageProof{})})
-	mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{fabric.NewMSPConfig(mspID, conf, &fabric.MessageProof{})})
+	mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{fabric.NewMSPPolicy(fabrictypes.TypeCreate, mspID, pcBytes, &fabric.MessageProof{})})
+	mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{fabric.NewMSPConfig(fabrictypes.TypeCreate, mspID, conf, &fabric.MessageProof{})})
 	h := fabric.NewHeader(ch, ci, mps, mcs)
 	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
@@ -153,13 +153,13 @@ func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdate
 	require.NoError(t, err)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, *cproof)
 	conf, _ := proto.Marshal(&ca.mspConfig)
-	policy := fabric.NewMSPPolicy(mspID, pcBytes, nil)
+	policy := fabric.NewMSPPolicy(fabrictypes.TypeUpdate, mspID, pcBytes, nil)
 	policyProof, err := tests.MakeMessageProof(ca.endorser, policy.GetSignBytes())
 	require.NoError(t, err)
 	policy.Proof = policyProof
 	mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{policy})
 
-	mconf := fabric.NewMSPConfig(mspID, conf, nil)
+	mconf := fabric.NewMSPConfig(fabrictypes.TypeUpdate, mspID, conf, nil)
 	mconfProof, err := tests.MakeMessageProof(ca.endorser, mconf.GetSignBytes())
 	require.NoError(t, err)
 	mconf.Proof = mconfProof

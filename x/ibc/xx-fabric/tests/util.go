@@ -9,6 +9,35 @@ import (
 	"github.com/hyperledger/fabric/msp"
 )
 
+type MSPTestFixture struct {
+	MSPID   string
+	MSPConf *msppb.MSPConfig
+	MSP     msp.MSP
+	Signer  msp.SigningIdentity
+}
+
+func GetMSPFixture(mspsDir string, mspID string) (*MSPTestFixture, error) {
+	mspConf, err := GetLocalVerifyingMspConfig(mspsDir, mspID)
+	if err != nil {
+		return nil, err
+	}
+	msp, err := GetLocalMsp(mspsDir, mspID)
+	if err != nil {
+		return nil, err
+	}
+	signer, err := msp.GetDefaultSigningIdentity()
+	if err != nil {
+		return nil, err
+	}
+
+	return &MSPTestFixture{
+		MSPID:   mspID,
+		MSPConf: mspConf,
+		MSP:     msp,
+		Signer:  signer,
+	}, nil
+}
+
 func GetLocalMspConfig(mspsDir string, mspID string) (*msppb.MSPConfig, *factory.FactoryOpts, error) {
 	bccspConf := getDefaultBccspConfig()
 	mconf, err := getLocalMspConfig(mspsDir, mspID, bccspConf)

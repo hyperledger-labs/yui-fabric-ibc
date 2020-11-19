@@ -43,7 +43,8 @@ func (h Header) ValidateBasic() error {
 	return nil
 }
 
-// check whether MSPPolicies and MSPConfigs have IDs in same order
+// check whether MSPPolicies and MSPConfigs have IDs in same order.
+// each pair must have the same ActionType
 func (h Header) TargetsSameMSPs() bool {
 	if h.MSPPolicies == nil || h.MSPPolicies.Policies == nil || h.MSPConfigs == nil || h.MSPConfigs.Configs == nil {
 		return false
@@ -52,7 +53,11 @@ func (h Header) TargetsSameMSPs() bool {
 		return false
 	}
 	for pi, policy := range h.MSPPolicies.Policies {
-		if policy.MSPID != h.MSPConfigs.Configs[pi].MSPID {
+		config := h.MSPConfigs.Configs[pi]
+		if policy.MSPID != config.MSPID {
+			return false
+		}
+		if policy.Type != config.Type {
 			return false
 		}
 	}
@@ -105,8 +110,9 @@ func (ci ChaincodeInfo) GetSignBytes() []byte {
 	return bz
 }
 
-func NewMSPConfig(mspID string, config []byte, proof *MessageProof) MSPConfig {
+func NewMSPConfig(actionType ActionType, mspID string, config []byte, proof *MessageProof) MSPConfig {
 	return MSPConfig{
+		Type:   actionType,
 		MSPID:  mspID,
 		Config: config,
 		Proof:  proof,
@@ -162,8 +168,9 @@ func (mcs MSPConfigs) ValidateBasic() error {
 	return nil
 }
 
-func NewMSPPolicy(mspID string, policy []byte, proof *MessageProof) MSPPolicy {
+func NewMSPPolicy(actionType ActionType, mspID string, policy []byte, proof *MessageProof) MSPPolicy {
 	return MSPPolicy{
+		Type:   actionType,
 		MSPID:  mspID,
 		Policy: policy,
 		Proof:  proof,

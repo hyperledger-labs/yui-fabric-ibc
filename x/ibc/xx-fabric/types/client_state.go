@@ -25,9 +25,7 @@ import (
 
 const (
 	Fabric clientexported.ClientType = 100
-)
 
-const (
 	ClientTypeFabric string = "fabric"
 )
 
@@ -148,7 +146,7 @@ func (cs ClientState) VerifyClientConsensusState(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -191,7 +189,7 @@ func (cs ClientState) VerifyConnectionState(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -233,7 +231,7 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -265,7 +263,7 @@ func (cs ClientState) VerifyPacketCommitment(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -298,7 +296,7 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -332,7 +330,7 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -364,7 +362,7 @@ func (cs ClientState) VerifyNextSequenceRecv(
 		return err
 	}
 
-	configs, err := cs.LastMSPInfos.GetMSPConfigs()
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
@@ -435,25 +433,48 @@ func sanitizeVerificationArgs(
 	return proof, nil
 }
 
-func (mi MSPInfos) GetMSPConfigs() ([]MSPPBConfig, error) {
-	configs := make([]MSPPBConfig, len(mi.Infos))
-	for i, mi := range mi.Infos {
+func NewMSPInfo(mspID string, config, policy []byte) MSPInfo {
+	return MSPInfo{
+		MSPID:  mspID,
+		Config: config,
+		Policy: policy,
+	}
+}
+
+func (mi MSPInfos) GetMSPPBConfigs() ([]MSPPBConfig, error) {
+	configs := []MSPPBConfig{}
+	for _, mi := range mi.Infos {
+		// if MSPConfig is not set, just skip
+		if mi.Config == nil {
+			continue
+		}
 		var mspConfig MSPPBConfig
 		if err := proto.Unmarshal(mi.Config, &mspConfig); err != nil {
 			return nil, err
 		}
-		configs[i] = mspConfig
+		configs = append(configs, mspConfig)
 	}
 	return configs, nil
 }
 
-func (mi MSPInfos) GetPolicy(mspID string) ([]byte, error) {
-	for _, info := range mi.Infos {
-		if info.MSPID == mspID {
-			return info.Policy, nil
-		}
+func (mi MSPInfos) HasMSPID(mspID string) bool {
+	return indexOfMSPID(mi, mspID) != -1
+}
+
+func (mi MSPInfos) FindMSPConfig(mspID string) ([]byte, error) {
+	idx := indexOfMSPID(mi, mspID)
+	if idx >= 0 && mi.Infos[idx].Config != nil {
+		return mi.Infos[idx].Config, nil
 	}
-	return nil, errors.New("mspID not found")
+	return nil, errors.New("MSPConfig not found")
+}
+
+func (mi MSPInfos) FindMSPPolicy(mspID string) ([]byte, error) {
+	idx := indexOfMSPID(mi, mspID)
+	if idx >= 0 && mi.Infos[idx].Policy != nil {
+		return mi.Infos[idx].Policy, nil
+	}
+	return nil, errors.New("MSPPolicy not found")
 }
 
 // assume header.ValidateBasic() == nil
@@ -463,12 +484,6 @@ func generateMSPInfos(header Header) (*MSPInfos, error) {
 	}
 	var infos MSPInfos
 	for pi, policy := range header.MSPPolicies.Policies {
-		config := header.MSPConfigs.Configs[pi]
-		// TODO if generateMSPInfos() is just for creating a ClientState, check these types
-		//if policy.Type != TypeCreate || config.Type != TypeCreate {
-		if policy.Type != config.Type {
-			return nil, errors.New("each MSPConfig and MSPPolicy pair must have the same type")
-		}
 		infos.Infos = append(infos.Infos, MSPInfo{
 			MSPID:  policy.MSPID,
 			Config: header.MSPConfigs.Configs[pi].Config,
@@ -476,4 +491,14 @@ func generateMSPInfos(header Header) (*MSPInfos, error) {
 		})
 	}
 	return &infos, nil
+}
+
+// return the index of the mspID or -1 if mspID is not present.
+func indexOfMSPID(mi MSPInfos, mspID string) int {
+	for i, info := range mi.Infos {
+		if info.MSPID == mspID {
+			return i
+		}
+	}
+	return -1
 }

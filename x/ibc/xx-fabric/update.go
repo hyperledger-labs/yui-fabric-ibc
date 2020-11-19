@@ -1,6 +1,7 @@
 package fabric
 
 import (
+	"strings"
 	"time"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -152,51 +153,79 @@ func update(clientState ClientState, header Header) (ClientState, *ConsensusStat
 	return clientState, consensusState
 }
 
+// this should be called before updateMSPPolicies for the same ClientState.
+// if clientState does not have MSPIDs which mspPolicies have, new MSPInfos are inserted in the sorted positions.
+// assume mspPolicies are sorted as validated by ValidateBasic()
 func updateMSPPolicies(clientState ClientState, mspPolicies types.MSPPolicies) ClientState {
-	var newInfos types.MSPInfos
-	cursor := 0
-	for _, policy := range mspPolicies.Policies {
-		for _, info := range clientState.LastMSPInfos.Infos[cursor:] {
-			cursor++
-			if policy.MSPID < info.MSPID {
-				newInfos.Infos = append(newInfos.Infos, types.MSPInfo{
-					MSPID:  policy.MSPID,
-					Config: nil,
-					Policy: policy.Policy,
-				}, info)
-				break
-			} else if policy.MSPID == info.MSPID {
-				info.Policy = policy.Policy
-				newInfos.Infos = append(newInfos.Infos, info)
-				break
-			} else {
-				newInfos.Infos = append(newInfos.Infos, info)
-			}
+	var newInfos []MSPInfo
+	lenP := len(mspPolicies.Policies)
+	lenI := len(clientState.LastMSPInfos.Infos)
+	pi := 0
+	ii := 0
+	for pi < lenP || ii < lenI {
+		if pi == lenP {
+			info := clientState.LastMSPInfos.Infos[ii]
+			newInfos = append(newInfos, info)
+			ii++
+			continue
+		}
+		if ii == lenI {
+			policy := mspPolicies.Policies[pi]
+			newInfos = append(newInfos, types.NewMSPInfo(policy.MSPID, nil, policy.Policy))
+			pi++
+			continue
+		}
+
+		policy := mspPolicies.Policies[pi]
+		info := clientState.LastMSPInfos.Infos[ii]
+		comp := strings.Compare(policy.MSPID, info.MSPID)
+		if comp == -1 {
+			newInfos = append(newInfos, types.NewMSPInfo(policy.MSPID, nil, policy.Policy))
+			pi++
+		} else if comp == 0 {
+			info.Policy = policy.Policy
+			newInfos = append(newInfos, info)
+			pi++
+			ii++
+		} else {
+			newInfos = append(newInfos, info)
+			ii++
 		}
 	}
-	clientState.LastMSPInfos = newInfos
+	clientState.LastMSPInfos = types.MSPInfos{Infos: newInfos}
 	return clientState
 }
 
-// this should be called after updateMSPPolicies for the same ClientState
+// this should be called after updateMSPPolicies for the same ClientState.
+// assume clientState has a MSPInfo for each MSPID of mspConfigs, as verified by VerifyMSPConfig in advance
 func updateMSPConfigs(clientState ClientState, mspConfigs types.MSPConfigs) ClientState {
-	var newInfos types.MSPInfos
-	cursor := 0
-	for _, config := range mspConfigs.Configs {
-		for _, info := range clientState.LastMSPInfos.Infos[cursor:] {
-			cursor++
-			// config.MSPID < info.MSPID must never happen after VerifyMSPConfigs()
-			if config.MSPID < info.MSPID {
-				panic("MSPConfig must be verified correctly")
-			} else if config.MSPID == info.MSPID {
-				info.Config = config.Config
-				newInfos.Infos = append(newInfos.Infos, info)
-				break
-			} else {
-				newInfos.Infos = append(newInfos.Infos, info)
-			}
+	var newInfos []MSPInfo
+	lenC := len(mspConfigs.Configs)
+	lenI := len(clientState.LastMSPInfos.Infos)
+	ci := 0
+	ii := 0
+	for ci < lenC && ii < lenI {
+		config := mspConfigs.Configs[ci]
+		info := clientState.LastMSPInfos.Infos[ii]
+		comp := strings.Compare(config.MSPID, info.MSPID)
+		if comp == 0 {
+			info.Config = config.Config
+			newInfos = append(newInfos, info)
+			ci++
+			ii++
+		} else if comp == 1 {
+			newInfos = append(newInfos, info)
+			ii++
+		} else {
+			// after verifying, this never happens
+			panic("mspConfigs must be verified")
 		}
 	}
-	clientState.LastMSPInfos = newInfos
+	for ii < lenI {
+		info := clientState.LastMSPInfos.Infos[ii]
+		newInfos = append(newInfos, info)
+		ii++
+	}
+	clientState.LastMSPInfos = types.MSPInfos{Infos: newInfos}
 	return clientState
 }
