@@ -84,7 +84,7 @@ func TestApp(t *testing.T) {
 
 	prv0 := secp256k1.GenPrivKey()
 	prv1 := secp256k1.GenPrivKey()
-	err = fabrictests.ToVerifyingConfig(mconf)
+	err = fabrictests.GetVerifyingConfig(mconf)
 	require.NoError(err)
 
 	app0 := MakeTestChaincodeApp(prv0, fabchannelID, ccid, endorser, clientID0, connectionID0, portID0, channelID0, channelOrder0, *mconf)

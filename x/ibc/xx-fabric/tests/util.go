@@ -15,12 +15,13 @@ func GetLocalMspConfig(mspsDir string, mspID string) (*msppb.MSPConfig, *factory
 	return mconf, bccspConf, err
 }
 
+// return MSPConfig with no signing identity
 func GetLocalVerifyingMspConfig(mspsDir string, mspID string) (*msppb.MSPConfig, error) {
 	mconf, _, err := GetLocalMspConfig(mspsDir, mspID)
 	if err != nil {
 		return nil, err
 	}
-	err = ToVerifyingConfig(mconf)
+	err = GetVerifyingConfig(mconf)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,8 @@ func SetupLocalMsp(mspConf *msppb.MSPConfig, bccspConf *factory.FactoryOpts) (ms
 	return m, nil
 }
 
-func ToVerifyingConfig(mconf *msppb.MSPConfig) error {
+// get MSPConfig for verifying
+func GetVerifyingConfig(mconf *msppb.MSPConfig) error {
 	var conf msppb.FabricMSPConfig
 	err := proto.Unmarshal(mconf.Config, &conf)
 	if err != nil {

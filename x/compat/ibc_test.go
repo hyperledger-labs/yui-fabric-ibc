@@ -174,7 +174,7 @@ func TestCreateClient(t *testing.T) {
 		require.NoError(err)
 		ch.Proof = *proof
 
-		err = fabrictests.ToVerifyingConfig(mconf)
+		err = fabrictests.GetVerifyingConfig(mconf)
 		require.NoError(err)
 		conf, err := proto.Marshal(mconf)
 		require.NoError(err)
@@ -204,7 +204,7 @@ func TestCreateClient(t *testing.T) {
 		require.NoError(err)
 		ch.Proof = *cproof
 
-		err = fabrictests.ToVerifyingConfig(mconf)
+		err = fabrictests.GetVerifyingConfig(mconf)
 		require.NoError(err)
 		conf, err := proto.Marshal(mconf)
 		require.NoError(err)
