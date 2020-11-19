@@ -11,20 +11,20 @@ func TestMSPPolicies_ValidateBasic(t *testing.T) {
 		fields  fields
 		wantErr bool
 	}{
-		{"invalid1", fields{Policies: []MSPPolicy{{ID: "MSP1", Policy: []byte("policy"), Proof: nil}}}, true},
-		{"invalid2", fields{Policies: []MSPPolicy{{ID: "MSP1", Policy: nil, Proof: &MessageProof{}}}}, true},
+		{"invalid1", fields{Policies: []MSPPolicy{{MSPID: "MSP1", Policy: []byte("policy"), Proof: nil}}}, true},
+		{"invalid2", fields{Policies: []MSPPolicy{{MSPID: "MSP1", Policy: nil, Proof: &MessageProof{}}}}, true},
 		{"ids are sorted", fields{Policies: []MSPPolicy{
-			{ID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
-			{ID: "MSP2", Policy: []byte("policy2"), Proof: &MessageProof{}},
+			{MSPID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
+			{MSPID: "MSP2", Policy: []byte("policy2"), Proof: &MessageProof{}},
 		}}, false},
 		{"ids are unsorted", fields{Policies: []MSPPolicy{
-			{ID: "MSP2", Policy: []byte("policy2"), Proof: &MessageProof{}},
-			{ID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
+			{MSPID: "MSP2", Policy: []byte("policy2"), Proof: &MessageProof{}},
+			{MSPID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
 		}}, true},
 		{"duplicated id", fields{Policies: []MSPPolicy{
-			{ID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
-			{ID: "MSP2", Policy: []byte("policy2a"), Proof: &MessageProof{}},
-			{ID: "MSP2", Policy: []byte("policy2b"), Proof: &MessageProof{}},
+			{MSPID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
+			{MSPID: "MSP2", Policy: []byte("policy2a"), Proof: &MessageProof{}},
+			{MSPID: "MSP2", Policy: []byte("policy2b"), Proof: &MessageProof{}},
 		}}, true},
 	}
 	for _, tt := range tests {

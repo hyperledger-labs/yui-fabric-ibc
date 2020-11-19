@@ -410,7 +410,7 @@ func (mi MSPInfos) GetMSPConfigs() ([]msppb.MSPConfig, error) {
 
 func (mi MSPInfos) GetPolicy(mspID string) ([]byte, error) {
 	for _, info := range mi.Infos {
-		if info.ID == mspID {
+		if info.MSPID == mspID {
 			return info.Policy, nil
 		}
 	}
@@ -424,8 +424,14 @@ func generateMSPInfos(header Header) (*MSPInfos, error) {
 	}
 	var infos MSPInfos
 	for pi, policy := range header.MSPPolicies.Policies {
+		config := header.MSPConfigs.Configs[pi]
+		// TODO if generateMSPInfos() is just for creating a ClientState, check these types
+		//if policy.Type != TypeCreate || config.Type != TypeCreate {
+		if policy.Type != config.Type {
+			return nil, errors.New("each MSPConfig and MSPPolicy pair must have the same type")
+		}
 		infos.Infos = append(infos.Infos, MSPInfo{
-			ID:     policy.ID,
+			MSPID:  policy.MSPID,
 			Config: header.MSPConfigs.Configs[pi].Config,
 			Policy: policy.Policy,
 		})

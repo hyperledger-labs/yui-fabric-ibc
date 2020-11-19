@@ -50,7 +50,7 @@ func VerifyMSPConfig(clientState ClientState, config MSPConfig) error {
 	if config.Proof == nil {
 		return errors.New("a proof is empty")
 	}
-	policy, err := clientState.LastMSPInfos.GetPolicy(config.ID)
+	policy, err := clientState.LastMSPInfos.GetPolicy(config.MSPID)
 	if err != nil {
 		return err
 	}

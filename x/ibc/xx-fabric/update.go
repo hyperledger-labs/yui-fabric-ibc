@@ -158,14 +158,14 @@ func updateMSPPolicies(clientState ClientState, mspPolicies types.MSPPolicies) C
 	for _, policy := range mspPolicies.Policies {
 		for _, info := range clientState.LastMSPInfos.Infos[cursor:] {
 			cursor++
-			if policy.ID < info.ID {
+			if policy.MSPID < info.MSPID {
 				newInfos.Infos = append(newInfos.Infos, types.MSPInfo{
-					ID:     policy.ID,
+					MSPID:  policy.MSPID,
 					Config: nil,
 					Policy: policy.Policy,
 				}, info)
 				break
-			} else if policy.ID == info.ID {
+			} else if policy.MSPID == info.MSPID {
 				info.Policy = policy.Policy
 				newInfos.Infos = append(newInfos.Infos, info)
 				break
@@ -185,10 +185,10 @@ func updateMSPConfigs(clientState ClientState, mspConfigs types.MSPConfigs) Clie
 	for _, config := range mspConfigs.Configs {
 		for _, info := range clientState.LastMSPInfos.Infos[cursor:] {
 			cursor++
-			// config.ID < info.ID must never happen after VerifyMSPConfigs()
-			if config.ID < info.ID {
+			// config.MSPID < info.MSPID must never happen after VerifyMSPConfigs()
+			if config.MSPID < info.MSPID {
 				panic("MSPConfig must be verified correctly")
-			} else if config.ID == info.ID {
+			} else if config.MSPID == info.MSPID {
 				info.Config = config.Config
 				newInfos.Infos = append(newInfos.Infos, info)
 				break

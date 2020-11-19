@@ -38,25 +38,32 @@ message MSPPolicies {
   repeated MSPPolicy policies = 1 [(gogoproto.nullable) = false];
 }
 
+enum ActionType {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  ACTION_TYPE_CREATE = 0 [(gogoproto.enumvalue_customname) = "TypeCreate"];
+  ACTION_TYPE_UPDATE = 1 [(gogoproto.enumvalue_customname) = "TypeUpdate"];
+  ACTION_TYPE_DELETE = 2 [(gogoproto.enumvalue_customname) = "TypeDelete"];
+}
+
 message MSPInfo {
-  // MSP ID
-  string        ID     = 1 [(gogoproto.jsontag) = "id,omitempty"];
+  string        MSPID  = 1;
   bytes         config = 2;
   bytes         policy = 3;
 }
 
 message MSPConfig {
-  // MSP ID
-  string        ID     = 1 [(gogoproto.jsontag) = "id,omitempty"];
-  bytes         config = 2;
-  MessageProof  proof  = 3;
+  ActionType    Type   = 1;
+  string        MSPID  = 2;
+  bytes         config = 3;
+  MessageProof  proof  = 4;
 }
 
 message MSPPolicy {
-  // MSP ID
-  string        ID     = 1 [(gogoproto.jsontag) = "id,omitempty"];
-  bytes         policy = 2;
-  MessageProof  proof  = 3;
+  ActionType    Type   = 1;
+  string        MSPID  = 2;
+  bytes         policy = 3;
+  MessageProof  proof  = 4;
 }
 
 // ref. https://github.com/hyperledger/fabric-chaincode-java/blob/392cf9cb740c42e0376ecdbbb015285b5a74ba97/fabric-chaincode-protos/src/main/protos/peer/chaincode.proto#L21

@@ -52,7 +52,7 @@ func (h Header) TargetsSameMSPs() bool {
 		return false
 	}
 	for pi, policy := range h.MSPPolicies.Policies {
-		if policy.ID != h.MSPConfigs.Configs[pi].ID {
+		if policy.MSPID != h.MSPConfigs.Configs[pi].MSPID {
 			return false
 		}
 	}
@@ -105,17 +105,17 @@ func (ci ChaincodeInfo) GetSignBytes() []byte {
 	return bz
 }
 
-func NewMSPConfig(id string, config []byte, proof *MessageProof) MSPConfig {
+func NewMSPConfig(mspID string, config []byte, proof *MessageProof) MSPConfig {
 	return MSPConfig{
-		ID:     id,
+		MSPID:  mspID,
 		Config: config,
 		Proof:  proof,
 	}
 }
 
 func (mc MSPConfig) ValidateBasic() error {
-	if mc.ID == "" {
-		return errors.New("an ID is empty")
+	if mc.MSPID == "" {
+		return errors.New("a MSPID is empty")
 	}
 	if mc.Config == nil {
 		return errors.New("a config is empty")
@@ -150,29 +150,29 @@ func (mcs MSPConfigs) ValidateBasic() error {
 		if err := mc.ValidateBasic(); err != nil {
 			return err
 		}
-		if m[mc.ID] {
+		if m[mc.MSPID] {
 			return errors.New("some configs are duplicated")
 		}
-		if prevID >= mc.ID {
-			return errors.New("ID must be sorted by ascending order")
+		if prevID >= mc.MSPID {
+			return errors.New("MSPID must be sorted by ascending order")
 		}
-		m[mc.ID] = true
-		prevID = mc.ID
+		m[mc.MSPID] = true
+		prevID = mc.MSPID
 	}
 	return nil
 }
 
-func NewMSPPolicy(id string, policy []byte, proof *MessageProof) MSPPolicy {
+func NewMSPPolicy(mspID string, policy []byte, proof *MessageProof) MSPPolicy {
 	return MSPPolicy{
-		ID:     id,
+		MSPID:  mspID,
 		Policy: policy,
 		Proof:  proof,
 	}
 }
 
 func (mp MSPPolicy) ValidateBasic() error {
-	if mp.ID == "" {
-		return errors.New("an ID is empty")
+	if mp.MSPID == "" {
+		return errors.New("an MSPID is empty")
 	}
 	if mp.Policy == nil {
 		return errors.New("a policy is empty")
@@ -205,14 +205,14 @@ func (mps MSPPolicies) ValidateBasic() error {
 		if err := mp.ValidateBasic(); err != nil {
 			return err
 		}
-		if m[mp.ID] {
+		if m[mp.MSPID] {
 			return errors.New("some configs are duplicated")
 		}
-		if prevID >= mp.ID {
-			return errors.New("ID must be sorted by ascending order")
+		if prevID >= mp.MSPID {
+			return errors.New("MSPID must be sorted by ascending order")
 		}
-		m[mp.ID] = true
-		prevID = mp.ID
+		m[mp.MSPID] = true
+		prevID = mp.MSPID
 	}
 	return nil
 
