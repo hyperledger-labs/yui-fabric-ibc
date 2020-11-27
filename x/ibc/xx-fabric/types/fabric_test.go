@@ -97,7 +97,7 @@ func TestVerifyEndorsedMessage(t *testing.T) {
 	}
 }
 
-func Test_verifyMSPCreate(t *testing.T) {
+func TestVerifyMSPHeader(t *testing.T) {
 	conf := configForTest()
 	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
 	require.NoError(t, err)
@@ -118,7 +118,8 @@ func Test_verifyMSPCreate(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"valid case", args{
+		/* create */
+		{"valid create", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
 				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
 			}},
@@ -158,56 +159,17 @@ func Test_verifyMSPCreate(t *testing.T) {
 			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy2")},
 			signer:    org2.Signer,
 		}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// generate proof for MSPHeader for each case
-			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
-			require.NoError(t, err)
-			signerIdentity, err := tt.args.signer.Serialize()
-			require.NoError(t, err)
-			proof := &MessageProof{
-				Identities: [][]byte{signerIdentity},
-				Signatures: [][]byte{sig},
-			}
-			tt.args.mh.Proof = proof
+		{"freezed", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeCreate, MSPID: org2.MSPID, Config: []byte("config"), Policy: []byte("policy")},
+			signer:    org1.Signer,
+		}, true},
 
-			cs := ClientState{
-				ID:                  "id",
-				LastChaincodeHeader: ChaincodeHeader{},
-				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
-				LastMSPInfos:        tt.args.lastMSPInfos,
-			}
-
-			if err := verifyMSPCreate(cs, tt.args.mh); (err != nil) != tt.wantErr {
-				t.Errorf("verifyMSPCreate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_verifyMSPUpdateConfig(t *testing.T) {
-	conf := configForTest()
-	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
-	require.NoError(t, err)
-	confOrg1, err := proto.Marshal(org1.MSPConf)
-	require.NoError(t, err)
-
-	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
-	require.NoError(t, err)
-
-	type args struct {
-		lastMSPInfos MSPInfos
-		ibcPolicy    []byte
-		mh           MSPHeader
-		signer       msp.SigningIdentity
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{"valid case", args{
+		/* update config */
+		{"valid update config", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
 				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
 			}},
@@ -245,56 +207,9 @@ func Test_verifyMSPUpdateConfig(t *testing.T) {
 			mh:        MSPHeader{Type: MSPHeaderTypeUpdateConfig, MSPID: org1.MSPID, Config: []byte("config"), Policy: nil},
 			signer:    org1.Signer,
 		}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// generate proof for MSPHeader for each case
-			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
-			require.NoError(t, err)
-			signerIdentity, err := tt.args.signer.Serialize()
-			require.NoError(t, err)
-			proof := &MessageProof{
-				Identities: [][]byte{signerIdentity},
-				Signatures: [][]byte{sig},
-			}
-			tt.args.mh.Proof = proof
 
-			cs := ClientState{
-				ID:                  "id",
-				LastChaincodeHeader: ChaincodeHeader{},
-				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
-				LastMSPInfos:        tt.args.lastMSPInfos,
-			}
-
-			if err := verifyMSPUpdateConfig(cs, tt.args.mh); (err != nil) != tt.wantErr {
-				t.Errorf("verifyMSPUpdateConfig() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_verifyMSPUpdatePolicy(t *testing.T) {
-	conf := configForTest()
-	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
-	require.NoError(t, err)
-	confOrg1, err := proto.Marshal(org1.MSPConf)
-	require.NoError(t, err)
-
-	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
-	require.NoError(t, err)
-
-	type args struct {
-		lastMSPInfos MSPInfos
-		ibcPolicy    []byte
-		mh           MSPHeader
-		signer       msp.SigningIdentity
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{"valid case", args{
+		/* update policy */
+		{"valid update policy", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
 				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
 			}},
@@ -332,55 +247,8 @@ func Test_verifyMSPUpdatePolicy(t *testing.T) {
 			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy")},
 			signer:    org1.Signer,
 		}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// generate proof for MSPHeader for each case
-			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
-			require.NoError(t, err)
-			signerIdentity, err := tt.args.signer.Serialize()
-			require.NoError(t, err)
-			proof := &MessageProof{
-				Identities: [][]byte{signerIdentity},
-				Signatures: [][]byte{sig},
-			}
-			tt.args.mh.Proof = proof
 
-			cs := ClientState{
-				ID:                  "id",
-				LastChaincodeHeader: ChaincodeHeader{},
-				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
-				LastMSPInfos:        tt.args.lastMSPInfos,
-			}
-
-			if err := verifyMSPUpdatePolicy(cs, tt.args.mh); (err != nil) != tt.wantErr {
-				t.Errorf("verifyMSPUpdatePolicy() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_verifyMSPFreeze(t *testing.T) {
-	conf := configForTest()
-	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
-	require.NoError(t, err)
-	confOrg1, err := proto.Marshal(org1.MSPConf)
-	require.NoError(t, err)
-
-	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
-	require.NoError(t, err)
-
-	type args struct {
-		lastMSPInfos MSPInfos
-		ibcPolicy    []byte
-		mh           MSPHeader
-		signer       msp.SigningIdentity
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
+		/* freeze */
 		{"valid case", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
 				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
@@ -440,8 +308,8 @@ func Test_verifyMSPFreeze(t *testing.T) {
 				LastMSPInfos:        tt.args.lastMSPInfos,
 			}
 
-			if err := verifyMSPFreeze(cs, tt.args.mh); (err != nil) != tt.wantErr {
-				t.Errorf("verifyMSPFreeze() error = %v, wantErr %v", err, tt.wantErr)
+			if err := VerifyMSPHeader(cs, tt.args.mh); (err != nil) != tt.wantErr {
+				t.Errorf("VerifyMSPHeader() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

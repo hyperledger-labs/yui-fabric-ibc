@@ -444,9 +444,13 @@ func NewMSPInfo(mspID string, config, policy []byte) MSPInfo {
 func (mi MSPInfos) GetMSPPBConfigs() ([]MSPPBConfig, error) {
 	configs := []MSPPBConfig{}
 	for _, mi := range mi.Infos {
-		// if MSPConfig is not set, just skip
-		if mi.Config == nil {
+		// freezed MSPInfo is skipped
+		if mi.Freezed {
 			continue
+		}
+		if mi.Config == nil {
+			// valid MSPInfo should have a config
+			return nil, errors.New("a MSPInfo has no config")
 		}
 		var mspConfig MSPPBConfig
 		if err := proto.Unmarshal(mi.Config, &mspConfig); err != nil {

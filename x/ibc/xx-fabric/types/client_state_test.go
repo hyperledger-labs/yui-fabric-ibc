@@ -33,17 +33,24 @@ func TestMSPInfos_GetMSPPBConfigs(t *testing.T) {
 			false},
 		{"valid case",
 			fields{Infos: []MSPInfo{
-				{MSPID: org1.MSPID, Config: org1MspConf, Policy: makePolicy([]string{org1.MSPID})},
+				{MSPID: org1.MSPID, Config: org1MspConf, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
 			}},
 			[]MSPPBConfig{*org1.MSPConf},
 			false},
-		{"skipping nil MSPConfig",
+		{"skipping freezed MSPInfo",
+			fields{Infos: []MSPInfo{
+				{MSPID: org1.MSPID, Config: org1MspConf, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
+				{MSPID: org2.MSPID, Config: []byte("config2"), Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			[]MSPPBConfig{*org1.MSPConf},
+			false},
+		{"error with nil config",
 			fields{Infos: []MSPInfo{
 				{MSPID: org1.MSPID, Config: org1MspConf, Policy: makePolicy([]string{org1.MSPID})},
 				{MSPID: org2.MSPID, Config: nil, Policy: makePolicy([]string{org1.MSPID})},
 			}},
-			[]MSPPBConfig{*org1.MSPConf},
-			false},
+			[]MSPPBConfig{},
+			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -69,12 +76,11 @@ func TestMSPInfos_GetMSPPBConfigs(t *testing.T) {
 }
 
 func TestMSPInfos_HasMSPID(t *testing.T) {
-	mi := MSPInfos{
-		Infos: []MSPInfo{
-			{MSPID: "MSPID1", Config: nil, Policy: nil},
-			{MSPID: "MSPID2", Config: nil, Policy: nil},
-		},
-	}
+	mi := MSPInfos{Infos: []MSPInfo{
+		{MSPID: "MSPID1", Config: nil, Policy: nil, Freezed: false},
+		{MSPID: "MSPID2", Config: nil, Policy: nil, Freezed: false},
+		{MSPID: "MSPID3", Config: nil, Policy: nil, Freezed: true},
+	}}
 	type args struct {
 		mspID string
 	}
@@ -83,9 +89,10 @@ func TestMSPInfos_HasMSPID(t *testing.T) {
 		args args
 		want bool
 	}{
-		{"case1", args{"MSPID1"}, true},
-		{"case3", args{"mspid2"}, false},
-		{"case4", args{"MSPID3"}, false},
+		{"true for valid case", args{"MSPID1"}, true},
+		{"true for freezed", args{"MSPID3"}, true},
+		{"false for case sensitive", args{"mspid2"}, false},
+		{"false for not found", args{"MSPID4"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
