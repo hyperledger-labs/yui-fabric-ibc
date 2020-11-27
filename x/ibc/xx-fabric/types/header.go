@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	clientexported "github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
 	"github.com/datachainlab/fabric-ibc/commitment"
@@ -153,11 +154,17 @@ func (mhs MSPHeaders) ValidateBasic() error {
 		if m[mh.MSPID] {
 			return errors.New("some MSPHeaders are duplicated")
 		}
-		if prevID >= mh.MSPID {
+		if CompareMSPID(prevID, mh.MSPID) > 0 {
 			return errors.New("MSPID must be sorted by ascending order")
 		}
 		m[mh.MSPID] = true
 		prevID = mh.MSPID
 	}
 	return nil
+}
+
+// returns an integer comparing two MSPIDs.
+// the result will be 0 if a==b, -1 if a < b, and +1 if a > b.
+func CompareMSPID(a, b string) int {
+	return strings.Compare(a, b)
 }

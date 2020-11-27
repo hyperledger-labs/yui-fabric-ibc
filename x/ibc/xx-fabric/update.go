@@ -166,7 +166,7 @@ func createMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
 	var newInfos []MSPInfo
 	appended := false
 	for _, info := range clientState.LastMSPInfos.Infos {
-		if !appended && mh.MSPID < info.MSPID {
+		if !appended && types.CompareMSPID(mh.MSPID, info.MSPID) < 0 {
 			newInfos = append(newInfos, types.NewMSPInfo(mh.MSPID, mh.Config, mh.Policy), info)
 			appended = true
 			continue
