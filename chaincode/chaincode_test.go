@@ -134,9 +134,8 @@ func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.T
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, pcBytes, nil)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.CommitmentProof{})
 	conf, _ := proto.Marshal(&ca.mspConfig)
-	mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{fabric.NewMSPPolicy(fabrictypes.TypeCreate, mspID, pcBytes, &fabric.MessageProof{})})
-	mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{fabric.NewMSPConfig(fabrictypes.TypeCreate, mspID, conf, &fabric.MessageProof{})})
-	h := fabric.NewHeader(ch, ci, mps, mcs)
+	mhs := fabric.NewMSPHeaders([]fabrictypes.MSPHeader{fabric.NewMSPHeader(fabrictypes.MSPHeaderTypeCreate, mspID, conf, pcBytes, &fabric.MessageProof{})})
+	h := fabric.NewHeader(&ch, &ci, &mhs)
 	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
 	return &msg
@@ -152,20 +151,8 @@ func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdate
 	cproof, err := tests.MakeCommitmentProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ca.seq.Bytes())
 	require.NoError(t, err)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, *cproof)
-	conf, _ := proto.Marshal(&ca.mspConfig)
-	policy := fabric.NewMSPPolicy(fabrictypes.TypeUpdate, mspID, pcBytes, nil)
-	policyProof, err := tests.MakeMessageProof(ca.endorser, policy.GetSignBytes())
-	require.NoError(t, err)
-	policy.Proof = policyProof
-	mps := fabric.NewMSPPolicies([]fabrictypes.MSPPolicy{policy})
 
-	mconf := fabric.NewMSPConfig(fabrictypes.TypeUpdate, mspID, conf, nil)
-	mconfProof, err := tests.MakeMessageProof(ca.endorser, mconf.GetSignBytes())
-	require.NoError(t, err)
-	mconf.Proof = mconfProof
-	mcs := fabric.NewMSPConfigs([]fabrictypes.MSPConfig{mconf})
-
-	h := fabric.NewHeader(ch, ci, mps, mcs)
+	h := fabric.NewHeader(&ch, &ci, nil)
 	msg := fabric.NewMsgUpdateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
 	return &msg

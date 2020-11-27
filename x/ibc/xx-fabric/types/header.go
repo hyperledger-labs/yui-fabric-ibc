@@ -12,8 +12,8 @@ import (
 
 var _ clientexported.Header = (*Header)(nil)
 
-func NewHeader(cheader ChaincodeHeader, cinfo ChaincodeInfo, mPolicies MSPPolicies, mConfigs MSPConfigs) Header {
-	return Header{ChaincodeHeader: &cheader, ChaincodeInfo: &cinfo, MSPPolicies: &mPolicies, MSPConfigs: &mConfigs}
+func NewHeader(cheader *ChaincodeHeader, cinfo *ChaincodeInfo, mheaders *MSPHeaders) Header {
+	return Header{ChaincodeHeader: cheader, ChaincodeInfo: cinfo, MSPHeaders: mheaders}
 }
 
 func (h Header) GetHeight() uint64 {
@@ -25,43 +25,25 @@ func (h Header) ClientType() clientexported.ClientType {
 }
 
 func (h Header) ValidateBasic() error {
-	if h.ChaincodeHeader == nil && h.ChaincodeInfo == nil && h.MSPConfigs == nil && h.MSPPolicies == nil {
-		return errors.New("either ChaincodeHeader, ChaincodeInfo, MSPConfigs or MSPPolicies must be non-nil value")
+	if h.ChaincodeHeader == nil && h.ChaincodeInfo == nil && h.MSPHeaders == nil {
+		return errors.New("either ChaincodeHeader, ChaincodeInfo or MSPHeaders must be non-nil value")
 	}
-	if err := h.ChaincodeHeader.ValidateBasic(); err != nil {
-		return err
+	if h.ChaincodeHeader != nil {
+		if err := h.ChaincodeHeader.ValidateBasic(); err != nil {
+			return err
+		}
 	}
-	if err := h.ChaincodeInfo.ValidateBasic(); err != nil {
-		return err
+	if h.ChaincodeInfo != nil {
+		if err := h.ChaincodeInfo.ValidateBasic(); err != nil {
+			return err
+		}
 	}
-	if err := h.MSPPolicies.ValidateBasic(); err != nil {
-		return err
-	}
-	if err := h.MSPConfigs.ValidateBasic(); err != nil {
-		return err
+	if h.MSPHeaders != nil {
+		if err := h.MSPHeaders.ValidateBasic(); err != nil {
+			return err
+		}
 	}
 	return nil
-}
-
-// check whether MSPPolicies and MSPConfigs have IDs in same order.
-// each pair must have the same ActionType
-func (h Header) TargetsSameMSPs() bool {
-	if h.MSPPolicies == nil || h.MSPPolicies.Policies == nil || h.MSPConfigs == nil || h.MSPConfigs.Configs == nil {
-		return false
-	}
-	if len(h.MSPPolicies.Policies) != len(h.MSPConfigs.Configs) {
-		return false
-	}
-	for pi, policy := range h.MSPPolicies.Policies {
-		config := h.MSPConfigs.Configs[pi]
-		if policy.MSPID != config.MSPID {
-			return false
-		}
-		if policy.Type != config.Type {
-			return false
-		}
-	}
-	return true
 }
 
 func NewChaincodeHeader(seq uint64, timestamp int64, proof CommitmentProof) ChaincodeHeader {
@@ -110,117 +92,72 @@ func (ci ChaincodeInfo) GetSignBytes() []byte {
 	return bz
 }
 
-func NewMSPConfig(actionType ActionType, mspID string, config []byte, proof *MessageProof) MSPConfig {
-	return MSPConfig{
-		Type:   actionType,
+func NewMSPHeader(mhType MSPHeaderType, mspID string, config []byte, policy []byte, proof *MessageProof) MSPHeader {
+	return MSPHeader{
+		Type:   mhType,
 		MSPID:  mspID,
 		Config: config,
-		Proof:  proof,
-	}
-}
-
-func (mc MSPConfig) ValidateBasic() error {
-	if mc.MSPID == "" {
-		return errors.New("a MSPID is empty")
-	}
-	if mc.Config == nil {
-		return errors.New("a config is empty")
-	}
-	if mc.Proof == nil {
-		return errors.New("a proof is empty")
-	}
-	return nil
-}
-
-func (mc MSPConfig) GetSignBytes() []byte {
-	mc.Proof = nil
-	bz, err := proto.Marshal(&mc)
-	if err != nil {
-		panic(err)
-	}
-	return bz
-}
-
-func NewMSPConfigs(configs []MSPConfig) MSPConfigs {
-	return MSPConfigs{
-		Configs: configs,
-	}
-}
-
-func (mcs MSPConfigs) ValidateBasic() error {
-	// check duplication and sorting
-	m := map[string]bool{}
-	prevID := ""
-
-	for _, mc := range mcs.Configs {
-		if err := mc.ValidateBasic(); err != nil {
-			return err
-		}
-		if m[mc.MSPID] {
-			return errors.New("some configs are duplicated")
-		}
-		if prevID >= mc.MSPID {
-			return errors.New("MSPID must be sorted by ascending order")
-		}
-		m[mc.MSPID] = true
-		prevID = mc.MSPID
-	}
-	return nil
-}
-
-func NewMSPPolicy(actionType ActionType, mspID string, policy []byte, proof *MessageProof) MSPPolicy {
-	return MSPPolicy{
-		Type:   actionType,
-		MSPID:  mspID,
 		Policy: policy,
 		Proof:  proof,
 	}
 }
 
-func (mp MSPPolicy) ValidateBasic() error {
-	if mp.MSPID == "" {
-		return errors.New("an MSPID is empty")
+func (mh MSPHeader) ValidateBasic() error {
+	if mh.MSPID == "" {
+		return errors.New("MSPID is empty")
 	}
-	if mp.Policy == nil {
-		return errors.New("a policy is empty")
+
+	var validConfigPolicy bool
+	switch mh.Type {
+	case MSPHeaderTypeCreate:
+		validConfigPolicy = (mh.Config != nil && mh.Policy != nil)
+	case MSPHeaderTypeUpdatePolicy:
+		validConfigPolicy = (mh.Config == nil && mh.Policy != nil)
+	case MSPHeaderTypeUpdateConfig:
+		validConfigPolicy = (mh.Config != nil && mh.Policy == nil)
+	case MSPHeaderTypeFreeze:
+		validConfigPolicy = (mh.Config == nil && mh.Policy == nil)
 	}
-	if mp.Proof == nil {
-		return errors.New("a proof is empty")
+	if !validConfigPolicy {
+		return errors.New("config or policy is invalid")
+	}
+	if mh.Proof == nil {
+		return errors.New("proof is empty")
 	}
 	return nil
 }
 
-func (mp MSPPolicy) GetSignBytes() []byte {
-	mp.Proof = nil
-	bz, err := proto.Marshal(&mp)
+func (mh MSPHeader) GetSignBytes() []byte {
+	mh.Proof = nil
+	bz, err := proto.Marshal(&mh)
 	if err != nil {
 		panic(err)
 	}
 	return bz
 }
 
-func NewMSPPolicies(policies []MSPPolicy) MSPPolicies {
-	return MSPPolicies{
-		Policies: policies,
+func NewMSPHeaders(headers []MSPHeader) MSPHeaders {
+	return MSPHeaders{
+		Headers: headers,
 	}
 }
 
-func (mps MSPPolicies) ValidateBasic() error {
+func (mhs MSPHeaders) ValidateBasic() error {
 	m := map[string]bool{}
 	prevID := ""
-	for _, mp := range mps.Policies {
-		if err := mp.ValidateBasic(); err != nil {
+
+	for _, mh := range mhs.Headers {
+		if err := mh.ValidateBasic(); err != nil {
 			return err
 		}
-		if m[mp.MSPID] {
-			return errors.New("some configs are duplicated")
+		if m[mh.MSPID] {
+			return errors.New("some MSPHeaders are duplicated")
 		}
-		if prevID >= mp.MSPID {
+		if prevID >= mh.MSPID {
 			return errors.New("MSPID must be sorted by ascending order")
 		}
-		m[mp.MSPID] = true
-		prevID = mp.MSPID
+		m[mh.MSPID] = true
+		prevID = mh.MSPID
 	}
 	return nil
-
 }

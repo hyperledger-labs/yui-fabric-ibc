@@ -44,102 +44,108 @@ func VerifyChaincodeInfo(clientState ClientState, info ChaincodeInfo) error {
 	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *info.Proof, info.GetSignBytes(), configs)
 }
 
-func VerifyMSPConfigs(clientState ClientState, configs MSPConfigs) error {
-	for _, config := range configs.Configs {
-		if err := VerifyMSPConfig(clientState, config); err != nil {
+func VerifyMSPHeaders(clientState ClientState, mhs MSPHeaders) error {
+	for _, mh := range mhs.Headers {
+		if err := VerifyMSPHeader(clientState, mh); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// verify whether MSPConfig suits the last MSPPolicy
-// MSPPolicy must be created in advance
-func VerifyMSPConfig(clientState ClientState, config MSPConfig) error {
-	if config.Proof == nil {
-		return errors.New("a proof is empty")
-	}
-	policy, err := clientState.LastMSPInfos.FindMSPPolicy(config.MSPID)
-	if err != nil {
-		return err
-	}
-	switch config.Type {
-	case TypeCreate:
-		return verifyMSPConfigCreate(clientState, policy, config)
-	case TypeUpdate:
-		return verifyMSPConfigUpdate(clientState, policy, config)
+// verify whether MSPHeader suits the last MSPInfos.
+// assume MSPHeader.ValidateBasic() is nil
+func VerifyMSPHeader(clientState ClientState, mh MSPHeader) error {
+	switch mh.Type {
+	case MSPHeaderTypeCreate:
+		return verifyMSPCreate(clientState, mh)
+	case MSPHeaderTypeUpdatePolicy:
+		return verifyMSPUpdatePolicy(clientState, mh)
+	case MSPHeaderTypeUpdateConfig:
+		return verifyMSPUpdateConfig(clientState, mh)
+	case MSPHeaderTypeFreeze:
+		return verifyMSPFreeze(clientState, mh)
 	default:
 		return errors.New("invalid type")
 	}
 }
 
-func verifyMSPConfigCreate(clientState ClientState, policy []byte, config MSPConfig) error {
-	if _, err := clientState.LastMSPInfos.FindMSPConfig(config.MSPID); err == nil {
-		return errors.New("MSPConfig has already been created")
+func verifyMSPCreate(clientState ClientState, mh MSPHeader) error {
+	if mh.Proof == nil {
+		return errors.New("proof is nil")
 	}
+
+	if clientState.LastMSPInfos.HasMSPID(mh.MSPID) {
+		return errors.New("MSPInfo has already been created")
+	}
+
+	policy := clientState.LastChaincodeInfo.IbcPolicy
 	lastConfigs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
-	return VerifyEndorsedMessage(policy, *config.Proof, config.GetSignBytes(), lastConfigs)
+	return VerifyEndorsedMessage(policy, *mh.Proof, mh.GetSignBytes(), lastConfigs)
 }
 
-func verifyMSPConfigUpdate(clientState ClientState, policy []byte, config MSPConfig) error {
-	if _, err := clientState.LastMSPInfos.FindMSPConfig(config.MSPID); err != nil {
-		return errors.New("MSPConfig has not been created")
+func verifyMSPUpdatePolicy(clientState ClientState, mh MSPHeader) error {
+	if mh.Proof == nil {
+		return errors.New("proof is nil")
 	}
+
+	mi, err := clientState.LastMSPInfos.FindMSPInfo(mh.MSPID)
+	if err != nil {
+		return err
+	}
+	if mi.Freezed {
+		return errors.New("MSPInfo is freezed")
+	}
+
+	policy := clientState.LastChaincodeInfo.IbcPolicy
 	lastConfigs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
-	return VerifyEndorsedMessage(policy, *config.Proof, config.GetSignBytes(), lastConfigs)
+	return VerifyEndorsedMessage(policy, *mh.Proof, mh.GetSignBytes(), lastConfigs)
 }
 
-func VerifyMSPPolicies(clientState ClientState, policies MSPPolicies) error {
-	for _, policy := range policies.Policies {
-		if err := VerifyMSPPolicy(clientState, policy); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// verifies whether MSPPolicy suits the last IBCPolicy
-func VerifyMSPPolicy(clientState ClientState, policy MSPPolicy) error {
-	if policy.Proof == nil {
-		return errors.New("a proof is empty")
+func verifyMSPUpdateConfig(clientState ClientState, mh MSPHeader) error {
+	if mh.Proof == nil {
+		return errors.New("proof is nil")
 	}
 
-	switch policy.Type {
-	case TypeCreate:
-		return verifyMSPPolicyCreate(clientState, policy)
-	case TypeUpdate:
-		return verifyMSPPolicyUpdate(clientState, policy)
-	default:
-		return errors.New("invalid type")
-	}
-}
-
-func verifyMSPPolicyCreate(clientState ClientState, policy MSPPolicy) error {
-	if _, err := clientState.LastMSPInfos.FindMSPPolicy(policy.MSPID); err == nil {
-		return errors.New("MSPPolicy has already been created")
-	}
-	configs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
+	mi, err := clientState.LastMSPInfos.FindMSPInfo(mh.MSPID)
 	if err != nil {
 		return err
 	}
-	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *policy.Proof, policy.GetSignBytes(), configs)
-}
-
-func verifyMSPPolicyUpdate(clientState ClientState, policy MSPPolicy) error {
-	if _, err := clientState.LastMSPInfos.FindMSPPolicy(policy.MSPID); err != nil {
-		return errors.New("MSPPolicy has not been created")
+	if mi.Freezed {
+		return errors.New("MSPInfo is freezed")
 	}
-	configs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
+
+	lastConfigs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
 	if err != nil {
 		return err
 	}
-	return VerifyEndorsedMessage(clientState.LastChaincodeInfo.IbcPolicy, *policy.Proof, policy.GetSignBytes(), configs)
+	return VerifyEndorsedMessage(mi.Policy, *mh.Proof, mh.GetSignBytes(), lastConfigs)
+}
+
+func verifyMSPFreeze(clientState ClientState, mh MSPHeader) error {
+	if mh.Proof == nil {
+		return errors.New("proof is nil")
+	}
+
+	mi, err := clientState.LastMSPInfos.FindMSPInfo(mh.MSPID)
+	if err != nil {
+		return err
+	}
+	if mi.Freezed {
+		return errors.New("MSPInfo is freezed")
+	}
+	policy := clientState.LastChaincodeInfo.IbcPolicy
+	lastConfigs, err := clientState.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+	return VerifyEndorsedMessage(policy, *mh.Proof, mh.GetSignBytes(), lastConfigs)
 }
 
 // VerifyEndorsedMessage verifies a value with given policy

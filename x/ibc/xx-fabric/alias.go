@@ -29,10 +29,8 @@ var (
 	NewConsensusState       = types.NewConsensusState
 	NewChaincodeInfo        = types.NewChaincodeInfo
 	NewChaincodeHeader      = types.NewChaincodeHeader
-	NewMSPPolicies          = types.NewMSPPolicies
-	NewMSPConfigs           = types.NewMSPConfigs
-	NewMSPPolicy            = types.NewMSPPolicy
-	NewMSPConfig            = types.NewMSPConfig
+	NewMSPHeaders           = types.NewMSPHeaders
+	NewMSPHeader            = types.NewMSPHeader
 	NewClientState          = types.NewClientState
 	InitializeFromMsg       = types.InitializeFromMsg
 	RegisterCodec           = types.RegisterCodec

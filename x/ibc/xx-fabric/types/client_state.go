@@ -47,7 +47,7 @@ func InitializeFromMsg(msg MsgCreateClient) (ClientState, error) {
 }
 
 func Initialize(id string, header Header) (ClientState, error) {
-	if header.ChaincodeHeader == nil || header.ChaincodeInfo == nil || header.MSPConfigs == nil || header.MSPPolicies == nil {
+	if header.ChaincodeHeader == nil || header.ChaincodeInfo == nil || header.MSPHeaders == nil {
 		return ClientState{}, errors.New("each property of Header must not be empty")
 	}
 	if err := header.ValidateBasic(); err != nil {
@@ -457,37 +457,37 @@ func (mi MSPInfos) GetMSPPBConfigs() ([]MSPPBConfig, error) {
 	return configs, nil
 }
 
+// return true whether the target MSPInfo is freezed or not
 func (mi MSPInfos) HasMSPID(mspID string) bool {
-	return indexOfMSPID(mi, mspID) != -1
+	idx := indexOfMSPID(mi, mspID)
+	return idx != -1
 }
 
-func (mi MSPInfos) FindMSPConfig(mspID string) ([]byte, error) {
+func (mi MSPInfos) IndexOf(mspID string) int {
 	idx := indexOfMSPID(mi, mspID)
-	if idx >= 0 && mi.Infos[idx].Config != nil {
-		return mi.Infos[idx].Config, nil
-	}
-	return nil, errors.New("MSPConfig not found")
+	return idx
 }
 
-func (mi MSPInfos) FindMSPPolicy(mspID string) ([]byte, error) {
+func (mi MSPInfos) FindMSPInfo(mspID string) (*MSPInfo, error) {
 	idx := indexOfMSPID(mi, mspID)
-	if idx >= 0 && mi.Infos[idx].Policy != nil {
-		return mi.Infos[idx].Policy, nil
+	if idx < 0 {
+		return nil, errors.New("MSPInfo not found")
 	}
-	return nil, errors.New("MSPPolicy not found")
+	return &mi.Infos[idx], nil
 }
 
 // assume header.ValidateBasic() == nil
 func generateMSPInfos(header Header) (*MSPInfos, error) {
-	if !header.TargetsSameMSPs() {
-		return nil, errors.New("MSPConfigs and MSPPolicies must be for the same MSPs")
-	}
 	var infos MSPInfos
-	for pi, policy := range header.MSPPolicies.Policies {
+	for _, mh := range header.MSPHeaders.Headers {
+		if mh.Type != MSPHeaderTypeCreate {
+			continue
+		}
 		infos.Infos = append(infos.Infos, MSPInfo{
-			MSPID:  policy.MSPID,
-			Config: header.MSPConfigs.Configs[pi].Config,
-			Policy: policy.Policy,
+			MSPID:   mh.MSPID,
+			Config:  mh.Config,
+			Policy:  mh.Policy,
+			Freezed: false,
 		})
 	}
 	return &infos, nil

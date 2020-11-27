@@ -97,107 +97,7 @@ func TestVerifyEndorsedMessage(t *testing.T) {
 	}
 }
 
-func TestVerifyMSPConfig(t *testing.T) {
-	conf := configForTest()
-	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
-	require.NoError(t, err)
-	confOrg1, err := proto.Marshal(org1.MSPConf)
-	require.NoError(t, err)
-
-	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
-	require.NoError(t, err)
-
-	type args struct {
-		lastMSPInfos MSPInfos
-		config       MSPConfig
-		signer       msp.SigningIdentity
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{"valid create case", args{
-			lastMSPInfos: MSPInfos{
-				Infos: []MSPInfo{
-					{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
-					{MSPID: org2.MSPID, Config: nil, Policy: makePolicy([]string{org1.MSPID})},
-				},
-			},
-			config: MSPConfig{
-				Type: TypeCreate, MSPID: org2.MSPID, Config: []byte("config"), Proof: nil,
-			},
-			signer: org1.Signer,
-		}, false},
-		{"valid update case", args{
-			lastMSPInfos: MSPInfos{
-				Infos: []MSPInfo{
-					{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
-				},
-			},
-			config: MSPConfig{
-				Type: TypeUpdate, MSPID: org1.MSPID, Config: []byte("config"), Proof: nil,
-			},
-			signer: org1.Signer,
-		}, false},
-		{"no msp policy", args{
-			lastMSPInfos: MSPInfos{
-				Infos: []MSPInfo{},
-			},
-			config: MSPConfig{
-				Type: TypeCreate, MSPID: org1.MSPID, Config: []byte("config"), Proof: nil,
-			},
-			signer: org1.Signer,
-		}, true},
-		{"invalid signer for the msp policy", args{
-			lastMSPInfos: MSPInfos{
-				Infos: []MSPInfo{
-					{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
-					{MSPID: org2.MSPID, Config: nil, Policy: makePolicy([]string{"OTHER_MSP"})},
-				},
-			},
-			config: MSPConfig{
-				Type: TypeCreate, MSPID: org2.MSPID, Config: []byte("config"), Proof: nil,
-			},
-			signer: org1.Signer,
-		}, true},
-		{"invalid ActionType", args{
-			lastMSPInfos: MSPInfos{
-				Infos: []MSPInfo{
-					{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
-					{MSPID: org2.MSPID, Config: nil, Policy: makePolicy([]string{org1.MSPID})},
-				},
-			},
-			config: MSPConfig{
-				Type: TypeUpdate, MSPID: org2.MSPID, Config: []byte("config"), Proof: nil,
-			},
-			signer: org1.Signer,
-		}, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// generate proof for MSPConfig for each case
-			sig, err := tt.args.signer.Sign(tt.args.config.GetSignBytes())
-			require.NoError(t, err)
-			signerIdentity, err := tt.args.signer.Serialize()
-			require.NoError(t, err)
-			proof := &MessageProof{
-				Identities: [][]byte{signerIdentity},
-				Signatures: [][]byte{sig},
-			}
-			tt.args.config.Proof = proof
-
-			cs := ClientState{ID: "id", LastChaincodeHeader: ChaincodeHeader{}, LastChaincodeInfo: ChaincodeInfo{},
-				LastMSPInfos: tt.args.lastMSPInfos}
-			if err := VerifyMSPConfig(cs, tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("VerifyMSPConfig() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestVerifyMSPPolicy(t *testing.T) {
+func Test_verifyMSPCreate(t *testing.T) {
 	conf := configForTest()
 	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
 	require.NoError(t, err)
@@ -210,7 +110,7 @@ func TestVerifyMSPPolicy(t *testing.T) {
 	type args struct {
 		lastMSPInfos MSPInfos
 		ibcPolicy    []byte
-		policy       MSPPolicy
+		mh           MSPHeader
 		signer       msp.SigningIdentity
 	}
 	tests := []struct {
@@ -218,60 +118,51 @@ func TestVerifyMSPPolicy(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"valid create case", args{
+		{"valid case", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
-				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
 			}},
 			ibcPolicy: makePolicy([]string{org1.MSPID}),
-			policy: MSPPolicy{
-				Type: TypeCreate, MSPID: org2.MSPID, Policy: []byte("policy"), Proof: nil,
-			},
-			signer: org1.Signer,
+			mh:        MSPHeader{Type: MSPHeaderTypeCreate, MSPID: org2.MSPID, Config: []byte("config"), Policy: []byte("policy")},
+			signer:    org1.Signer,
 		}, false},
-		{"valid update case", args{
+		{"already created", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
-				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
 			}},
 			ibcPolicy: makePolicy([]string{org1.MSPID}),
-			policy: MSPPolicy{
-				Type: TypeUpdate, MSPID: org1.MSPID, Policy: []byte("policy"), Proof: nil,
-			},
-			signer: org1.Signer,
-		}, false},
-		{"need at least one MSPInfo before verifying", args{
-			lastMSPInfos: MSPInfos{[]MSPInfo{}},
-			ibcPolicy:    makePolicy([]string{org1.MSPID}),
-			policy: MSPPolicy{
-				Type: TypeCreate, MSPID: org1.MSPID, Policy: []byte("policy"), Proof: nil,
-			},
-			signer: org1.Signer,
+			mh:        MSPHeader{Type: MSPHeaderTypeCreate, MSPID: org1.MSPID, Config: []byte("config"), Policy: []byte("policy")},
+			signer:    org1.Signer,
 		}, true},
-		{"re-create is invalid", args{
+		{"re-create is not allowed", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
-				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
 			}},
 			ibcPolicy: makePolicy([]string{org1.MSPID}),
-			policy: MSPPolicy{
-				Type: TypeCreate, MSPID: org1.MSPID, Policy: []byte("policy"), Proof: nil,
-			},
-			signer: org1.Signer,
+			mh:        MSPHeader{Type: MSPHeaderTypeCreate, MSPID: org1.MSPID, Config: []byte("config"), Policy: []byte("policy")},
+			signer:    org1.Signer,
+		}, true},
+		{"ibcpolicy does not suit", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{"OTHER_MSP"}),
+			mh:        MSPHeader{Type: MSPHeaderTypeCreate, MSPID: org1.MSPID, Config: []byte("config"), Policy: []byte("policy")},
+			signer:    org1.Signer,
 		}, true},
 		{"invalid signer", args{
 			lastMSPInfos: MSPInfos{[]MSPInfo{
-				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID})},
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
 			}},
 			ibcPolicy: makePolicy([]string{org1.MSPID}),
-			policy: MSPPolicy{
-				Type: TypeCreate, MSPID: org2.MSPID, Policy: []byte("policy"), Proof: nil,
-			},
-			signer: org2.Signer,
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy2")},
+			signer:    org2.Signer,
 		}, true},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// generate proof for MSPConfig for each case
-			sig, err := tt.args.signer.Sign(tt.args.policy.GetSignBytes())
+			// generate proof for MSPHeader for each case
+			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
 			require.NoError(t, err)
 			signerIdentity, err := tt.args.signer.Serialize()
 			require.NoError(t, err)
@@ -279,7 +170,7 @@ func TestVerifyMSPPolicy(t *testing.T) {
 				Identities: [][]byte{signerIdentity},
 				Signatures: [][]byte{sig},
 			}
-			tt.args.policy.Proof = proof
+			tt.args.mh.Proof = proof
 
 			cs := ClientState{
 				ID:                  "id",
@@ -287,8 +178,270 @@ func TestVerifyMSPPolicy(t *testing.T) {
 				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
 				LastMSPInfos:        tt.args.lastMSPInfos,
 			}
-			if err := VerifyMSPPolicy(cs, tt.args.policy); (err != nil) != tt.wantErr {
-				t.Errorf("VerifyMSPPolicy() error = %v, wantErr %v", err, tt.wantErr)
+
+			if err := verifyMSPCreate(cs, tt.args.mh); (err != nil) != tt.wantErr {
+				t.Errorf("verifyMSPCreate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_verifyMSPUpdateConfig(t *testing.T) {
+	conf := configForTest()
+	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
+	require.NoError(t, err)
+	confOrg1, err := proto.Marshal(org1.MSPConf)
+	require.NoError(t, err)
+
+	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
+	require.NoError(t, err)
+
+	type args struct {
+		lastMSPInfos MSPInfos
+		ibcPolicy    []byte
+		mh           MSPHeader
+		signer       msp.SigningIdentity
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"valid case", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdateConfig, MSPID: org1.MSPID, Config: []byte("config"), Policy: nil},
+			signer:    org1.Signer,
+		}, false},
+		{"not created yet", args{
+			lastMSPInfos: MSPInfos{},
+			ibcPolicy:    makePolicy([]string{org1.MSPID}),
+			mh:           MSPHeader{Type: MSPHeaderTypeUpdateConfig, MSPID: org1.MSPID, Config: []byte("config"), Policy: nil},
+			signer:       org1.Signer,
+		}, true},
+		{"ibcpolicy does not suit", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{"OTHER_MSP"}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdateConfig, MSPID: org1.MSPID, Config: []byte("config"), Policy: nil},
+			signer:    org1.Signer,
+		}, true},
+		{"invalid signer", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdateConfig, MSPID: org1.MSPID, Config: []byte("config"), Policy: nil},
+			signer:    org2.Signer,
+		}, true},
+		{"freezed", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdateConfig, MSPID: org1.MSPID, Config: []byte("config"), Policy: nil},
+			signer:    org1.Signer,
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// generate proof for MSPHeader for each case
+			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
+			require.NoError(t, err)
+			signerIdentity, err := tt.args.signer.Serialize()
+			require.NoError(t, err)
+			proof := &MessageProof{
+				Identities: [][]byte{signerIdentity},
+				Signatures: [][]byte{sig},
+			}
+			tt.args.mh.Proof = proof
+
+			cs := ClientState{
+				ID:                  "id",
+				LastChaincodeHeader: ChaincodeHeader{},
+				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
+				LastMSPInfos:        tt.args.lastMSPInfos,
+			}
+
+			if err := verifyMSPUpdateConfig(cs, tt.args.mh); (err != nil) != tt.wantErr {
+				t.Errorf("verifyMSPUpdateConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_verifyMSPUpdatePolicy(t *testing.T) {
+	conf := configForTest()
+	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
+	require.NoError(t, err)
+	confOrg1, err := proto.Marshal(org1.MSPConf)
+	require.NoError(t, err)
+
+	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
+	require.NoError(t, err)
+
+	type args struct {
+		lastMSPInfos MSPInfos
+		ibcPolicy    []byte
+		mh           MSPHeader
+		signer       msp.SigningIdentity
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"valid case", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy")},
+			signer:    org1.Signer,
+		}, false},
+		{"not created yet", args{
+			lastMSPInfos: MSPInfos{},
+			ibcPolicy:    makePolicy([]string{org1.MSPID}),
+			mh:           MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy")},
+			signer:       org1.Signer,
+		}, true},
+		{"ibcpolicy does not suit", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{"OTHER_MSP"}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy")},
+			signer:    org1.Signer,
+		}, true},
+		{"invalid signer", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy2")},
+			signer:    org2.Signer,
+		}, true},
+		{"freezed", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeUpdatePolicy, MSPID: org1.MSPID, Config: nil, Policy: []byte("policy")},
+			signer:    org1.Signer,
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// generate proof for MSPHeader for each case
+			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
+			require.NoError(t, err)
+			signerIdentity, err := tt.args.signer.Serialize()
+			require.NoError(t, err)
+			proof := &MessageProof{
+				Identities: [][]byte{signerIdentity},
+				Signatures: [][]byte{sig},
+			}
+			tt.args.mh.Proof = proof
+
+			cs := ClientState{
+				ID:                  "id",
+				LastChaincodeHeader: ChaincodeHeader{},
+				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
+				LastMSPInfos:        tt.args.lastMSPInfos,
+			}
+
+			if err := verifyMSPUpdatePolicy(cs, tt.args.mh); (err != nil) != tt.wantErr {
+				t.Errorf("verifyMSPUpdatePolicy() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_verifyMSPFreeze(t *testing.T) {
+	conf := configForTest()
+	org1, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org1MSP")
+	require.NoError(t, err)
+	confOrg1, err := proto.Marshal(org1.MSPConf)
+	require.NoError(t, err)
+
+	org2, err := fabrictests.GetMSPFixture(conf.MSPsDir, "Org2MSP")
+	require.NoError(t, err)
+
+	type args struct {
+		lastMSPInfos MSPInfos
+		ibcPolicy    []byte
+		mh           MSPHeader
+		signer       msp.SigningIdentity
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"valid case", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: false},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeFreeze, MSPID: org1.MSPID, Config: nil, Policy: nil},
+			signer:    org1.Signer,
+		}, false},
+		{"not created yet", args{
+			lastMSPInfos: MSPInfos{},
+			ibcPolicy:    makePolicy([]string{org1.MSPID}),
+			mh:           MSPHeader{Type: MSPHeaderTypeFreeze, MSPID: org1.MSPID, Config: nil, Policy: nil},
+			signer:       org1.Signer,
+		}, true},
+		{"ibcpolicy does not suit", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{"OTHER_MSP"}),
+			mh:        MSPHeader{Type: MSPHeaderTypeFreeze, MSPID: org1.MSPID, Config: nil, Policy: nil},
+			signer:    org1.Signer,
+		}, true},
+		{"invalid signer", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeFreeze, MSPID: org1.MSPID, Config: nil, Policy: nil},
+			signer:    org2.Signer,
+		}, true},
+		{"freezed", args{
+			lastMSPInfos: MSPInfos{[]MSPInfo{
+				{MSPID: org1.MSPID, Config: confOrg1, Policy: makePolicy([]string{org1.MSPID}), Freezed: true},
+			}},
+			ibcPolicy: makePolicy([]string{org1.MSPID}),
+			mh:        MSPHeader{Type: MSPHeaderTypeFreeze, MSPID: org1.MSPID, Config: nil, Policy: nil},
+			signer:    org1.Signer,
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// generate proof for MSPHeader for each case
+			sig, err := tt.args.signer.Sign(tt.args.mh.GetSignBytes())
+			require.NoError(t, err)
+			signerIdentity, err := tt.args.signer.Serialize()
+			require.NoError(t, err)
+			proof := &MessageProof{
+				Identities: [][]byte{signerIdentity},
+				Signatures: [][]byte{sig},
+			}
+			tt.args.mh.Proof = proof
+
+			cs := ClientState{
+				ID:                  "id",
+				LastChaincodeHeader: ChaincodeHeader{},
+				LastChaincodeInfo:   ChaincodeInfo{IbcPolicy: tt.args.ibcPolicy},
+				LastMSPInfos:        tt.args.lastMSPInfos,
+			}
+
+			if err := verifyMSPFreeze(cs, tt.args.mh); (err != nil) != tt.wantErr {
+				t.Errorf("verifyMSPFreeze() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

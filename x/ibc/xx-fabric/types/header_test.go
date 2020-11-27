@@ -4,157 +4,54 @@ import (
 	"testing"
 )
 
-func TestHeader_TargetsSameMSPs(t *testing.T) {
+func TestMSPHeaders_ValidateBasic(t *testing.T) {
 	type fields struct {
-		MSPConfigs  *MSPConfigs
-		MSPPolicies *MSPPolicies
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   bool
-	}{
-		{"msps and types are same", fields{
-			MSPConfigs: &MSPConfigs{
-				Configs: []MSPConfig{
-					{Type: TypeUpdate, MSPID: "MSPID1", Config: nil, Proof: nil},
-					{Type: TypeUpdate, MSPID: "MSPID2", Config: nil, Proof: nil},
-				},
-			},
-			MSPPolicies: &MSPPolicies{
-				Policies: []MSPPolicy{
-					{Type: TypeUpdate, MSPID: "MSPID1", Policy: nil, Proof: nil},
-					{Type: TypeUpdate, MSPID: "MSPID2", Policy: nil, Proof: nil},
-				},
-			},
-		}, true},
-		{"msps are not same", fields{
-			MSPConfigs: &MSPConfigs{
-				Configs: []MSPConfig{
-					{Type: TypeCreate, MSPID: "MSPID1", Config: nil, Proof: nil},
-					{Type: TypeCreate, MSPID: "MSPID2", Config: nil, Proof: nil},
-				},
-			},
-			MSPPolicies: &MSPPolicies{
-				Policies: []MSPPolicy{
-					{Type: TypeCreate, MSPID: "MSPID1", Policy: nil, Proof: nil},
-					{Type: TypeCreate, MSPID: "MSPID3", Policy: nil, Proof: nil},
-				},
-			},
-		}, false},
-		{"order are not same", fields{
-			MSPConfigs: &MSPConfigs{
-				Configs: []MSPConfig{
-					{Type: TypeCreate, MSPID: "MSPID1", Config: nil, Proof: nil},
-					{Type: TypeCreate, MSPID: "MSPID2", Config: nil, Proof: nil},
-				},
-			},
-			MSPPolicies: &MSPPolicies{
-				Policies: []MSPPolicy{
-					{Type: TypeCreate, MSPID: "MSPID2", Policy: nil, Proof: nil},
-					{Type: TypeCreate, MSPID: "MSPID1", Policy: nil, Proof: nil},
-				},
-			},
-		}, false},
-		{"types are not same", fields{
-			MSPConfigs: &MSPConfigs{
-				Configs: []MSPConfig{
-					{Type: TypeUpdate, MSPID: "MSPID1", Config: nil, Proof: nil},
-				},
-			},
-			MSPPolicies: &MSPPolicies{
-				Policies: []MSPPolicy{
-					{Type: TypeCreate, MSPID: "MSPID1", Policy: nil, Proof: nil},
-				},
-			},
-		}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := Header{
-				ChaincodeHeader: nil,
-				ChaincodeInfo:   nil,
-				MSPConfigs:      tt.fields.MSPConfigs,
-				MSPPolicies:     tt.fields.MSPPolicies,
-			}
-			if got := h.TargetsSameMSPs(); got != tt.want {
-				t.Errorf("Header.TargetsSameMSPs() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestMSPPolicies_ValidateBasic(t *testing.T) {
-	type fields struct {
-		Policies []MSPPolicy
+		Headers []MSPHeader
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		wantErr bool
 	}{
-		{"invalid1", fields{Policies: []MSPPolicy{{MSPID: "MSP1", Policy: []byte("policy"), Proof: nil}}}, true},
-		{"invalid2", fields{Policies: []MSPPolicy{{MSPID: "MSP1", Policy: nil, Proof: &MessageProof{}}}}, true},
-		{"MSPIDs are sorted", fields{Policies: []MSPPolicy{
-			{MSPID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
-			{MSPID: "MSP2", Policy: []byte("policy2"), Proof: &MessageProof{}},
-		}}, false},
-		{"MSPIDs are unsorted", fields{Policies: []MSPPolicy{
-			{MSPID: "MSP2", Policy: []byte("policy2"), Proof: &MessageProof{}},
-			{MSPID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
+		{"no proof", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP1", Config: []byte("config"), Policy: []byte("policy"), Proof: nil},
 		}}, true},
-		{"MSPIDs are duplicated", fields{Policies: []MSPPolicy{
-			{MSPID: "MSP1", Policy: []byte("policy1"), Proof: &MessageProof{}},
-			{MSPID: "MSP2", Policy: []byte("policy2a"), Proof: &MessageProof{}},
-			{MSPID: "MSP2", Policy: []byte("policy2b"), Proof: &MessageProof{}},
+		{"no config for create", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP1", Config: nil, Policy: []byte("policy"), Proof: &MessageProof{}},
+		}}, true},
+		{"no policy for create", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP1", Config: []byte("config"), Policy: nil, Proof: &MessageProof{}},
+		}}, true},
+		{"no config for config update", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeUpdateConfig, MSPID: "MSP1", Config: nil, Policy: nil, Proof: &MessageProof{}},
+		}}, true},
+		{"no policy for policy update", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeUpdatePolicy, MSPID: "MSP1", Config: nil, Policy: nil, Proof: &MessageProof{}},
+		}}, true},
+		{"valid for delete", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeFreeze, MSPID: "MSP1", Config: nil, Policy: nil, Proof: &MessageProof{}},
+		}}, false},
+		{"MSPIDs are sorted", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP1", Config: []byte("config1"), Policy: []byte("policy1"), Proof: &MessageProof{}},
+			{Type: MSPHeaderTypeUpdateConfig, MSPID: "MSP2", Config: []byte("config2_update"), Policy: nil, Proof: &MessageProof{}},
+		}}, false},
+		{"MSPIDs must be sorted", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeUpdateConfig, MSPID: "MSP2", Config: []byte("config2_update"), Policy: nil, Proof: &MessageProof{}},
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP1", Config: []byte("config1"), Policy: []byte("policy1"), Proof: &MessageProof{}},
+		}}, true},
+		{"invalid for duplicate MSPID", fields{[]MSPHeader{
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP1", Config: []byte("config1"), Policy: []byte("policy1"), Proof: &MessageProof{}},
+			{Type: MSPHeaderTypeCreate, MSPID: "MSP2", Config: []byte("config2"), Policy: []byte("policy2a"), Proof: &MessageProof{}},
+			{Type: MSPHeaderTypeUpdatePolicy, MSPID: "MSP2", Config: nil, Policy: []byte("policy2b"), Proof: &MessageProof{}},
 		}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mps := MSPPolicies{
-				Policies: tt.fields.Policies,
+			mps := MSPHeaders{
+				Headers: tt.fields.Headers,
 			}
 			if err := mps.ValidateBasic(); (err != nil) != tt.wantErr {
 				t.Errorf("MSPPolicies.ValidateBasic() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestMSPConfigs_ValidateBasic(t *testing.T) {
-	type fields struct {
-		Configs []MSPConfig
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		{"invalid1", fields{Configs: []MSPConfig{{Type: TypeCreate, MSPID: "MSP1", Config: []byte("policy"), Proof: nil}}}, true},
-		{"invalid2", fields{Configs: []MSPConfig{{Type: TypeCreate, MSPID: "MSP1", Config: nil, Proof: &MessageProof{}}}}, true},
-		{"MSPIDs are sorted", fields{Configs: []MSPConfig{
-			{Type: TypeCreate, MSPID: "MSPID1", Config: []byte("config"), Proof: &MessageProof{}},
-			{Type: TypeCreate, MSPID: "MSPID2", Config: []byte("config"), Proof: &MessageProof{}},
-			{Type: TypeCreate, MSPID: "MSPID3", Config: []byte("config"), Proof: &MessageProof{}},
-		}}, false},
-		{"MSPIDs are unsorted in ascending order", fields{Configs: []MSPConfig{
-			{Type: TypeCreate, MSPID: "MSPID3", Config: []byte("config"), Proof: &MessageProof{}},
-			{Type: TypeCreate, MSPID: "MSPID2", Config: []byte("config"), Proof: &MessageProof{}},
-			{Type: TypeCreate, MSPID: "MSPID1", Config: []byte("config"), Proof: &MessageProof{}},
-		}}, true},
-		{"MSPIDs are duplicated", fields{Configs: []MSPConfig{
-			{Type: TypeCreate, MSPID: "MSPID1", Config: []byte("config"), Proof: &MessageProof{}},
-			{Type: TypeCreate, MSPID: "MSPID2", Config: []byte("config1"), Proof: &MessageProof{}},
-			{Type: TypeCreate, MSPID: "MSPID2", Config: []byte("config2"), Proof: &MessageProof{}},
-		}}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mcs := MSPConfigs{
-				Configs: tt.fields.Configs,
-			}
-			if err := mcs.ValidateBasic(); (err != nil) != tt.wantErr {
-				t.Errorf("MSPConfigs.ValidateBasic() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

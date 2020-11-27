@@ -1,7 +1,6 @@
 package fabric
 
 import (
-	"strings"
 	"time"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -101,17 +100,8 @@ func checkValidity(
 		}
 	}
 
-	if header.MSPPolicies != nil {
-		if err := types.VerifyMSPPolicies(clientState, *header.MSPPolicies); err != nil {
-			return sdkerrors.Wrap(
-				clienttypes.ErrInvalidHeader,
-				err.Error(),
-			)
-		}
-	}
-
-	if header.MSPConfigs != nil {
-		if err := types.VerifyMSPConfigs(clientState, *header.MSPConfigs); err != nil {
+	if header.MSPHeaders != nil {
+		if err := types.VerifyMSPHeaders(clientState, *header.MSPHeaders); err != nil {
 			return sdkerrors.Wrap(
 				clienttypes.ErrInvalidHeader,
 				err.Error(),
@@ -142,90 +132,72 @@ func update(clientState ClientState, header Header) (ClientState, *ConsensusStat
 		consensusState = &cs
 	}
 
-	if header.MSPPolicies != nil {
-		clientState = updateMSPPolicies(clientState, *header.MSPPolicies)
-	}
-
-	if header.MSPConfigs != nil {
-		clientState = updateMSPConfigs(clientState, *header.MSPConfigs)
+	if header.MSPHeaders != nil {
+		clientState = updateMSPInfos(clientState, *header.MSPHeaders)
 	}
 
 	return clientState, consensusState
 }
 
-// this should be called before updateMSPPolicies for the same ClientState.
-// if clientState does not have MSPIDs which mspPolicies have, new MSPInfos are inserted in the sorted positions.
-// assume mspPolicies are sorted as validated by ValidateBasic()
-func updateMSPPolicies(clientState ClientState, mspPolicies types.MSPPolicies) ClientState {
-	var newInfos []MSPInfo
-	lenP := len(mspPolicies.Policies)
-	lenI := len(clientState.LastMSPInfos.Infos)
-	pi := 0
-	ii := 0
-	for pi < lenP || ii < lenI {
-		if pi == lenP {
-			info := clientState.LastMSPInfos.Infos[ii]
-			newInfos = append(newInfos, info)
-			ii++
-			continue
-		}
-		if ii == lenI {
-			policy := mspPolicies.Policies[pi]
-			newInfos = append(newInfos, types.NewMSPInfo(policy.MSPID, nil, policy.Policy))
-			pi++
-			continue
-		}
-
-		policy := mspPolicies.Policies[pi]
-		info := clientState.LastMSPInfos.Infos[ii]
-		comp := strings.Compare(policy.MSPID, info.MSPID)
-		if comp == -1 {
-			newInfos = append(newInfos, types.NewMSPInfo(policy.MSPID, nil, policy.Policy))
-			pi++
-		} else if comp == 0 {
-			info.Policy = policy.Policy
-			newInfos = append(newInfos, info)
-			pi++
-			ii++
-		} else {
-			newInfos = append(newInfos, info)
-			ii++
-		}
+// assume MSPHeaders are sorted as validated by ValidateBasic() in advance
+func updateMSPInfos(clientState ClientState, mhs types.MSPHeaders) ClientState {
+	for _, mh := range mhs.Headers {
+		clientState = updateMSPInfo(clientState, mh)
 	}
-	clientState.LastMSPInfos = types.MSPInfos{Infos: newInfos}
 	return clientState
 }
 
-// this should be called after updateMSPPolicies for the same ClientState.
-// assume clientState has a MSPInfo for each MSPID of mspConfigs, as verified by VerifyMSPConfig in advance
-func updateMSPConfigs(clientState ClientState, mspConfigs types.MSPConfigs) ClientState {
+func updateMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
+	switch mh.Type {
+	case types.MSPHeaderTypeCreate:
+		return createMSPInfo(clientState, mh)
+	case types.MSPHeaderTypeUpdatePolicy:
+		return updateMSPPolicy(clientState, mh)
+	case types.MSPHeaderTypeUpdateConfig:
+		return updateMSPConfig(clientState, mh)
+	case types.MSPHeaderTypeFreeze:
+		return freezeMSPInfo(clientState, mh)
+	default:
+		panic("invalid MSPHeaderType")
+	}
+}
+
+func createMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
 	var newInfos []MSPInfo
-	lenC := len(mspConfigs.Configs)
-	lenI := len(clientState.LastMSPInfos.Infos)
-	ci := 0
-	ii := 0
-	for ci < lenC && ii < lenI {
-		config := mspConfigs.Configs[ci]
-		info := clientState.LastMSPInfos.Infos[ii]
-		comp := strings.Compare(config.MSPID, info.MSPID)
-		if comp == 0 {
-			info.Config = config.Config
-			newInfos = append(newInfos, info)
-			ci++
-			ii++
-		} else if comp == 1 {
-			newInfos = append(newInfos, info)
-			ii++
-		} else {
-			// after verifying, this never happens
-			panic("mspConfigs must be verified")
+	appended := false
+	for _, info := range clientState.LastMSPInfos.Infos {
+		if !appended && mh.MSPID < info.MSPID {
+			newInfos = append(newInfos, types.NewMSPInfo(mh.MSPID, mh.Config, mh.Policy), info)
+			appended = true
+			continue
 		}
-	}
-	for ii < lenI {
-		info := clientState.LastMSPInfos.Infos[ii]
 		newInfos = append(newInfos, info)
-		ii++
 	}
-	clientState.LastMSPInfos = types.MSPInfos{Infos: newInfos}
+	if !appended {
+		newInfos = append(newInfos, types.NewMSPInfo(mh.MSPID, mh.Config, mh.Policy))
+	}
+
+	clientState.LastMSPInfos.Infos = newInfos
+	return clientState
+}
+
+func updateMSPConfig(clientState ClientState, mh types.MSPHeader) ClientState {
+	// assume idx != -1
+	idx := clientState.LastMSPInfos.IndexOf(mh.MSPID)
+	clientState.LastMSPInfos.Infos[idx].Config = mh.Config
+	return clientState
+}
+
+func updateMSPPolicy(clientState ClientState, mh types.MSPHeader) ClientState {
+	// assume idx != -1
+	idx := clientState.LastMSPInfos.IndexOf(mh.MSPID)
+	clientState.LastMSPInfos.Infos[idx].Policy = mh.Policy
+	return clientState
+}
+
+func freezeMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
+	// assume idx != -1
+	idx := clientState.LastMSPInfos.IndexOf(mh.MSPID)
+	clientState.LastMSPInfos.Infos[idx].Freezed = true
 	return clientState
 }
