@@ -25,6 +25,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/msp"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
@@ -52,6 +53,9 @@ type TestChaincodeApp struct {
 	portID       string
 	channelID    string
 	channelOrder channel.Order
+
+	// MSP
+	mspConfig msppb.MSPConfig
 }
 
 func MakeTestChaincodeApp(
@@ -64,6 +68,7 @@ func MakeTestChaincodeApp(
 	portID string,
 	channelID string,
 	channelOrder channel.Order,
+	mspConfig msppb.MSPConfig,
 ) TestChaincodeApp {
 	cdc, _ := example.MakeCodecs()
 	cc := chaincode.NewIBCChaincode(example.AppProvider, chaincode.DefaultDBProvider)
@@ -83,6 +88,8 @@ func MakeTestChaincodeApp(
 		portID:       portID,
 		channelID:    channelID,
 		channelOrder: channelOrder,
+
+		mspConfig: mspConfig,
 	}
 }
 
@@ -122,17 +129,21 @@ func (ca *TestChaincodeApp) updateSequence(ctx contractapi.TransactionContextInt
 }
 
 func (ca TestChaincodeApp) createMsgCreateClient(t *testing.T, ctx contractapi.TransactionContextInterface) *fabric.MsgCreateClient {
-	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
+	mspID := "SampleOrgMSP"
+	var pcBytes []byte = makePolicy([]string{mspID})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, pcBytes, nil)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, fabric.CommitmentProof{})
-	h := fabric.NewHeader(ch, ci)
+	conf, _ := proto.Marshal(&ca.mspConfig)
+	mhs := fabric.NewMSPHeaders([]fabrictypes.MSPHeader{fabric.NewMSPHeader(fabrictypes.MSPHeaderTypeCreate, mspID, conf, pcBytes, &fabric.MessageProof{})})
+	h := fabric.NewHeader(&ch, &ci, &mhs)
 	msg := fabric.NewMsgCreateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
 	return &msg
 }
 
 func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdateClient {
-	var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
+	mspID := "SampleOrgMSP"
+	var pcBytes []byte = makePolicy([]string{mspID})
 	ci := fabric.NewChaincodeInfo(ca.fabChannelID, ca.fabChaincodeID, pcBytes, pcBytes, nil)
 	mproof, err := tests.MakeMessageProof(ca.endorser, ci.GetSignBytes())
 	require.NoError(t, err)
@@ -140,7 +151,8 @@ func (ca TestChaincodeApp) createMsgUpdateClient(t *testing.T) *fabric.MsgUpdate
 	cproof, err := tests.MakeCommitmentProof(ca.endorser, commitment.MakeSequenceCommitmentEntryKey(ca.seq.Value), ca.seq.Bytes())
 	require.NoError(t, err)
 	ch := fabric.NewChaincodeHeader(ca.seq.Value, ca.seq.Timestamp, *cproof)
-	h := fabric.NewHeader(ch, ci)
+
+	h := fabric.NewHeader(&ch, &ci, nil)
 	msg := fabric.NewMsgUpdateClient(ca.clientID, h, ca.signer)
 	require.NoError(t, msg.ValidateBasic())
 	return &msg

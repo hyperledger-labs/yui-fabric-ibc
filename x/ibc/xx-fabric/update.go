@@ -1,7 +1,6 @@
 package fabric
 
 import (
-	"errors"
 	"time"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -53,8 +52,11 @@ func CheckValidityAndUpdateState(
 func checkValidity(
 	clientState types.ClientState, header types.Header, currentTimestamp time.Time,
 ) error {
-	if header.ChaincodeHeader == nil && header.ChaincodeInfo == nil {
-		return errors.New("either ChaincodeHeader or ChaincodeInfo must be non-nil value")
+	if err := header.ValidateBasic(); err != nil {
+		return sdkerrors.Wrapf(
+			clienttypes.ErrInvalidHeader,
+			err.Error(),
+		)
 	}
 
 	if header.ChaincodeHeader != nil {
@@ -98,14 +100,23 @@ func checkValidity(
 		}
 	}
 
+	if header.MSPHeaders != nil {
+		if err := types.VerifyMSPHeaders(clientState, *header.MSPHeaders); err != nil {
+			return sdkerrors.Wrap(
+				clienttypes.ErrInvalidHeader,
+				err.Error(),
+			)
+		}
+	}
+
 	return nil
 }
 
 func update(clientState ClientState, header Header) (ClientState, *ConsensusState) {
 	var consensusState *ConsensusState
 
-	if header.ChaincodeInfo == nil && header.ChaincodeHeader == nil {
-		panic("either ChaincodeHeader or ChaincodeInfo must be non-nil value")
+	if err := header.ValidateBasic(); err != nil {
+		panic(err.Error())
 	}
 
 	if header.ChaincodeInfo != nil {
@@ -121,5 +132,72 @@ func update(clientState ClientState, header Header) (ClientState, *ConsensusStat
 		consensusState = &cs
 	}
 
+	if header.MSPHeaders != nil {
+		clientState = updateMSPInfos(clientState, *header.MSPHeaders)
+	}
+
 	return clientState, consensusState
+}
+
+// assume MSPHeaders are sorted as validated by ValidateBasic() in advance
+func updateMSPInfos(clientState ClientState, mhs types.MSPHeaders) ClientState {
+	for _, mh := range mhs.Headers {
+		clientState = updateMSPInfo(clientState, mh)
+	}
+	return clientState
+}
+
+func updateMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
+	switch mh.Type {
+	case types.MSPHeaderTypeCreate:
+		return createMSPInfo(clientState, mh)
+	case types.MSPHeaderTypeUpdatePolicy:
+		return updateMSPPolicy(clientState, mh)
+	case types.MSPHeaderTypeUpdateConfig:
+		return updateMSPConfig(clientState, mh)
+	case types.MSPHeaderTypeFreeze:
+		return freezeMSPInfo(clientState, mh)
+	default:
+		panic("invalid MSPHeaderType")
+	}
+}
+
+func createMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
+	var newInfos []MSPInfo
+	appended := false
+	for _, info := range clientState.LastMSPInfos.Infos {
+		if !appended && types.CompareMSPID(mh.MSPID, info.MSPID) < 0 {
+			newInfos = append(newInfos, types.NewMSPInfo(mh.MSPID, mh.Config, mh.Policy), info)
+			appended = true
+			continue
+		}
+		newInfos = append(newInfos, info)
+	}
+	if !appended {
+		newInfos = append(newInfos, types.NewMSPInfo(mh.MSPID, mh.Config, mh.Policy))
+	}
+
+	clientState.LastMSPInfos.Infos = newInfos
+	return clientState
+}
+
+func updateMSPConfig(clientState ClientState, mh types.MSPHeader) ClientState {
+	// assume idx != -1
+	idx := clientState.LastMSPInfos.IndexOf(mh.MSPID)
+	clientState.LastMSPInfos.Infos[idx].Config = mh.Config
+	return clientState
+}
+
+func updateMSPPolicy(clientState ClientState, mh types.MSPHeader) ClientState {
+	// assume idx != -1
+	idx := clientState.LastMSPInfos.IndexOf(mh.MSPID)
+	clientState.LastMSPInfos.Infos[idx].Policy = mh.Policy
+	return clientState
+}
+
+func freezeMSPInfo(clientState ClientState, mh types.MSPHeader) ClientState {
+	// assume idx != -1
+	idx := clientState.LastMSPInfos.IndexOf(mh.MSPID)
+	clientState.LastMSPInfos.Infos[idx].Freezed = true
+	return clientState
 }

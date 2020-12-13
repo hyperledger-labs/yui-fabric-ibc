@@ -19,13 +19,13 @@ import (
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
 	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/golang/protobuf/proto"
+	msppb "github.com/hyperledger/fabric-protos-go/msp"
 )
 
 const (
 	Fabric clientexported.ClientType = 100
-)
 
-const (
 	ClientTypeFabric string = "fabric"
 )
 
@@ -36,17 +36,42 @@ type ClientState struct {
 	ID                  string          `json:"id" yaml:"id"`
 	LastChaincodeHeader ChaincodeHeader `json:"last_chaincode_header" yaml:"last_chaincode_header"`
 	LastChaincodeInfo   ChaincodeInfo   `json:"last_chaincode_info" yaml:"last_chaincode_info"`
+	LastMSPInfos        MSPInfos        `json:"last_msp_infos" yaml:"last_msp_infos"`
+}
+
+// XXX we need better alias name
+type MSPPBConfig = msppb.MSPConfig
+
+func InitializeFromMsg(msg MsgCreateClient) (ClientState, error) {
+	return Initialize(msg.ClientID, msg.Header)
+}
+
+func Initialize(id string, header Header) (ClientState, error) {
+	if header.ChaincodeHeader == nil || header.ChaincodeInfo == nil || header.MSPHeaders == nil {
+		return ClientState{}, errors.New("each property of Header must not be empty")
+	}
+	if err := header.ValidateBasic(); err != nil {
+		return ClientState{}, err
+	}
+	mspInfos, err := generateMSPInfos(header)
+	if err != nil {
+		return ClientState{}, err
+	}
+	return NewClientState(id, *header.ChaincodeHeader, *header.ChaincodeInfo, *mspInfos), nil
 }
 
 // NewClientState creates a new ClientState instance
 func NewClientState(
 	id string,
-	header Header,
+	chaincodeHeader ChaincodeHeader,
+	chaincodeInfo ChaincodeInfo,
+	mspInfos MSPInfos,
 ) ClientState {
 	return ClientState{
 		ID:                  id,
-		LastChaincodeHeader: *header.ChaincodeHeader,
-		LastChaincodeInfo:   *header.ChaincodeInfo,
+		LastChaincodeHeader: chaincodeHeader,
+		LastChaincodeInfo:   chaincodeInfo,
+		LastMSPInfos:        mspInfos,
 	}
 }
 
@@ -121,8 +146,13 @@ func (cs ClientState) VerifyClientConsensusState(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakeConsensusStateCommitmentEntryKey(prefix, counterpartyClientIdentifier, consensusHeight)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -159,7 +189,12 @@ func (cs ClientState) VerifyConnectionState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -196,7 +231,12 @@ func (cs ClientState) VerifyChannelState(
 		return err
 	}
 
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -223,8 +263,13 @@ func (cs ClientState) VerifyPacketCommitment(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakePacketCommitmentEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, commitmentBytes, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -251,9 +296,14 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
 	bz := channeltypes.CommitAcknowledgement(acknowledgement)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -280,8 +330,13 @@ func (cs ClientState) VerifyPacketAcknowledgementAbsence(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -307,9 +362,14 @@ func (cs ClientState) VerifyNextSequenceRecv(
 		return err
 	}
 
+	configs, err := cs.LastMSPInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
 	key := commitment.MakeNextSequenceRecvEntryKey(prefix, portID, channelID)
 	bz := sdk.Uint64ToBigEndian(nextSequenceRecv)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz); err != nil {
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")
@@ -371,4 +431,78 @@ func sanitizeVerificationArgs(
 	}
 
 	return proof, nil
+}
+
+func NewMSPInfo(mspID string, config, policy []byte) MSPInfo {
+	return MSPInfo{
+		MSPID:  mspID,
+		Config: config,
+		Policy: policy,
+	}
+}
+
+func (mi MSPInfos) GetMSPPBConfigs() ([]MSPPBConfig, error) {
+	configs := []MSPPBConfig{}
+	for _, mi := range mi.Infos {
+		// freezed MSPInfo is skipped
+		if mi.Freezed {
+			continue
+		}
+		if mi.Config == nil {
+			// valid MSPInfo should have a config
+			return nil, errors.New("a MSPInfo has no config")
+		}
+		var mspConfig MSPPBConfig
+		if err := proto.Unmarshal(mi.Config, &mspConfig); err != nil {
+			return nil, err
+		}
+		configs = append(configs, mspConfig)
+	}
+	return configs, nil
+}
+
+// return true whether the target MSPInfo is freezed or not
+func (mi MSPInfos) HasMSPID(mspID string) bool {
+	idx := indexOfMSPID(mi, mspID)
+	return idx != -1
+}
+
+func (mi MSPInfos) IndexOf(mspID string) int {
+	idx := indexOfMSPID(mi, mspID)
+	return idx
+}
+
+func (mi MSPInfos) FindMSPInfo(mspID string) (*MSPInfo, error) {
+	idx := indexOfMSPID(mi, mspID)
+	if idx < 0 {
+		return nil, errors.New("MSPInfo not found")
+	}
+	return &mi.Infos[idx], nil
+}
+
+// assume header.ValidateBasic() == nil
+func generateMSPInfos(header Header) (*MSPInfos, error) {
+	var infos MSPInfos
+	for _, mh := range header.MSPHeaders.Headers {
+		if mh.Type != MSPHeaderTypeCreate {
+			continue
+		}
+		infos.Infos = append(infos.Infos, MSPInfo{
+			MSPID:   mh.MSPID,
+			Config:  mh.Config,
+			Policy:  mh.Policy,
+			Freezed: false,
+		})
+	}
+	return &infos, nil
+}
+
+// return the index of the mspID or -1 if mspID is not present.
+func indexOfMSPID(mi MSPInfos, mspID string) int {
+	for i, info := range mi.Infos {
+		if info.MSPID == mspID {
+			return i
+		}
+	}
+	return -1
 }
