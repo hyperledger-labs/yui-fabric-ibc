@@ -19,6 +19,7 @@ import (
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
@@ -139,8 +140,11 @@ func TestCreateClient(t *testing.T) {
 
 	conf, err := fabrictypes.DefaultConfig()
 	require.NoError(err)
+	mspID := "SampleOrgMSP"
 	// setup the MSP manager so that we can sign/verify
-	lcMSP, err := fabrictests.GetLocalMsp(conf.MSPsDir, "SampleOrgMSP")
+	mconf, bconf, err := fabrictests.GetLocalMspConfig(conf.MSPsDir, mspID)
+	require.NoError(err)
+	lcMSP, err := fabrictests.SetupLocalMsp(mconf, bconf)
 	require.NoError(err)
 	signer, err := lcMSP.GetDefaultSigningIdentity()
 	require.NoError(err)
@@ -163,14 +167,20 @@ func TestCreateClient(t *testing.T) {
 	// CreateClient
 	{
 		/// Build Msg
-		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
+		var pcBytes []byte = makePolicy([]string{mspID})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
 		proof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *proof
 
-		h := fabric.NewHeader(ch, ci)
+		err = fabrictests.GetVerifyingConfig(mconf)
+		require.NoError(err)
+		conf, err := proto.Marshal(mconf)
+		require.NoError(err)
+
+		mhs := fabric.NewMSPHeaders([]fabrictypes.MSPHeader{fabric.NewMSPHeader(fabrictypes.MSPHeaderTypeCreate, mspID, conf, pcBytes, &fabric.MessageProof{})})
+		h := fabric.NewHeader(&ch, &ci, &mhs)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgCreateClient(clientID, h, signer)
 		require.NoError(msg.ValidateBasic())
@@ -184,17 +194,109 @@ func TestCreateClient(t *testing.T) {
 	// UpdateClient
 	{
 		/// Build Msg
-		var pcBytes []byte = makePolicy([]string{"SampleOrgMSP"})
+		var pcBytes []byte = makePolicy([]string{mspID})
 		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
-		mproof, err := tests.MakeMessageProof(signer, ci.GetSignBytes())
+		mProof, err := tests.MakeMessageProof(signer, ci.GetSignBytes())
 		require.NoError(err)
-		ci.Proof = mproof
+		ci.Proof = mProof
 		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
 		cproof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
 		require.NoError(err)
 		ch.Proof = *cproof
 
-		h := fabric.NewHeader(ch, ci)
+		err = fabrictests.GetVerifyingConfig(mconf)
+		require.NoError(err)
+
+		h := fabric.NewHeader(&ch, &ci, nil)
+		signer := sdk.AccAddress("signer0")
+		msg := fabric.NewMsgUpdateClient(clientID, h, signer)
+		require.NoError(msg.ValidateBasic())
+		/// END
+
+		_, err = client.HandleMsgUpdateClient(ctx, clientKeeper, msg)
+		require.NoError(err)
+		seq++
+	}
+}
+
+func TestClientWithMSPHeaders(t *testing.T) {
+	require := require.New(t)
+
+	conf, err := fabrictypes.DefaultConfig()
+	require.NoError(err)
+	mspID := "SampleOrgMSP"
+	// setup the MSP manager so that we can sign/verify
+	mconf, bconf, err := fabrictests.GetLocalMspConfig(conf.MSPsDir, mspID)
+	require.NoError(err)
+	lcMSP, err := fabrictests.SetupLocalMsp(mconf, bconf)
+	require.NoError(err)
+	signer, err := lcMSP.GetDefaultSigningIdentity()
+	require.NoError(err)
+
+	/// Setup context
+	keys := sdk.NewKVStoreKeys(
+		ibchost.StoreKey,
+		client.SubModuleName,
+	)
+	stub := NewMockStub()
+	ctx := MakeContext(stub, keys)
+
+	cdc := MakeCodec()
+	sk := NewStakingKeeper()
+	csk := fabric.NewConsensusStateKeeper(stub, nil)
+	clientKeeper := clientkeeper.NewKeeper(cdc, keys[ibchost.StoreKey], sk, csk)
+	/// END
+
+	var seq uint64 = 1
+	// CreateClient
+	{
+		/// Build Msg
+		var pcBytes []byte = makePolicy([]string{mspID})
+		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
+		proof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		require.NoError(err)
+		ch.Proof = *proof
+
+		err = fabrictests.GetVerifyingConfig(mconf)
+		require.NoError(err)
+		conf, err := proto.Marshal(mconf)
+		require.NoError(err)
+		mhs := fabric.NewMSPHeaders([]fabrictypes.MSPHeader{fabric.NewMSPHeader(fabrictypes.MSPHeaderTypeCreate, mspID, conf, pcBytes, &fabric.MessageProof{})})
+		h := fabric.NewHeader(&ch, &ci, &mhs)
+		signer := sdk.AccAddress("signer0")
+		msg := fabric.NewMsgCreateClient(clientID, h, signer)
+		require.NoError(msg.ValidateBasic())
+		/// END
+
+		_, err = client.HandleMsgCreateClient(ctx, clientKeeper, msg)
+		require.NoError(err)
+		seq++
+	}
+
+	// UpdateClient
+	{
+		/// Build Msg
+		var pcBytes []byte = makePolicy([]string{mspID})
+		ci := fabric.NewChaincodeInfo(channelID, ccid, pcBytes, pcBytes, nil)
+		mProof, err := tests.MakeMessageProof(signer, ci.GetSignBytes())
+		require.NoError(err)
+		ci.Proof = mProof
+		ch := fabric.NewChaincodeHeader(seq, tmtime.Now().UnixNano(), fabrictypes.CommitmentProof{})
+		cproof, err := tests.MakeCommitmentProof(signer, commitment.MakeSequenceCommitmentEntryKey(seq), ch.Sequence.Bytes())
+		require.NoError(err)
+		ch.Proof = *cproof
+
+		err = fabrictests.GetVerifyingConfig(mconf)
+		require.NoError(err)
+
+		pcBytes = makePolicy([]string{mspID, "OTHER_MSP"})
+		mh := fabric.NewMSPHeader(fabrictypes.MSPHeaderTypeUpdatePolicy, mspID, nil, pcBytes, &fabric.MessageProof{})
+		mhProof, err := tests.MakeMessageProof(signer, mh.GetSignBytes())
+		require.NoError(err)
+		mh.Proof = mhProof
+		mhs := fabric.NewMSPHeaders([]fabrictypes.MSPHeader{mh})
+		h := fabric.NewHeader(&ch, &ci, &mhs)
 		signer := sdk.AccAddress("signer0")
 		msg := fabric.NewMsgUpdateClient(clientID, h, signer)
 		require.NoError(msg.ValidateBasic())
