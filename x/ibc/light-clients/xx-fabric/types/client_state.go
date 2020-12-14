@@ -25,24 +25,6 @@ const (
 
 var _ exported.ClientState = ClientState{}
 
-// func InitializeFromMsg(msg MsgCreateClient) (ClientState, error) {
-// 	return Initialize(msg.ClientID, msg.Header)
-// }
-
-// func Initialize(id string, header Header) (ClientState, error) {
-// 	if header.ChaincodeHeader == nil || header.ChaincodeInfo == nil || header.MSPHeaders == nil {
-// 		return ClientState{}, errors.New("each property of Header must not be empty")
-// 	}
-// 	if err := header.ValidateBasic(); err != nil {
-// 		return ClientState{}, err
-// 	}
-// 	mspInfos, err := generateMSPInfos(header)
-// 	if err != nil {
-// 		return ClientState{}, err
-// 	}
-// 	return NewClientState(id, *header.ChaincodeHeader, *header.ChaincodeInfo, *mspInfos), nil
-// }
-
 // NewClientState creates a new ClientState instance
 func NewClientState(
 	id string,

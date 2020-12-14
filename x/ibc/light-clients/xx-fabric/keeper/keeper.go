@@ -2,9 +2,9 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/ibc/02-client/exported"
+	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
 	"github.com/datachainlab/fabric-ibc/commitment"
-	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
+	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 )
 
@@ -22,5 +22,5 @@ func (k ConsensusStateKeeper) Get(_ sdk.Context, height uint64) (exported.Consen
 	if err != nil {
 		return nil, false
 	}
-	return fabrictypes.NewConsensusState(seq.Timestamp, seq.Value), true
+	return fabrictypes.NewConsensusState(seq.Timestamp), true
 }

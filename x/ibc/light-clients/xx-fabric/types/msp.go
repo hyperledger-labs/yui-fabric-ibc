@@ -62,6 +62,7 @@ func generateMSPInfos(header Header) (*MSPInfos, error) {
 	var infos MSPInfos
 	for _, mh := range header.MSPHeaders.Headers {
 		if mh.Type != MSPHeaderTypeCreate {
+			// TODO we should return an error if got an unexpected header?
 			continue
 		}
 		infos.Infos = append(infos.Infos, MSPInfo{
