@@ -8,8 +8,10 @@ test:
 ###                                Protobuf                                 ###
 ###############################################################################
 
+.PHONY: proto-gen
 proto-gen:
-	@./scripts/protocgen.sh
+	@echo "Generating Protobuf files"
+	docker run -v $(CURDIR):/workspace --workdir /workspace tendermintdev/sdk-proto-gen sh ./scripts/protocgen.sh
 
 proto-update-deps:
 	# Copy from https://github.com/cosmos/cosmos-sdk/blob/65ea305336c0da689ecf5f8c864d0f2e0370c71e/Makefile#L291

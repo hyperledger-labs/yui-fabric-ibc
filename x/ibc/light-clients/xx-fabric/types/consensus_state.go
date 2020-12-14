@@ -1,0 +1,37 @@
+package types
+
+import (
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
+	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+)
+
+var _ exported.ConsensusState = (*ConsensusState)(nil)
+
+func NewConsensusState(
+	timestamp int64,
+) ConsensusState {
+	return ConsensusState{
+		Timestamp: timestamp,
+	}
+}
+
+func (cs ConsensusState) ClientType() string {
+	return ClientTypeFabric
+}
+
+func (cs ConsensusState) GetRoot() exported.Root {
+	return nil
+}
+
+func (cs ConsensusState) GetTimestamp() uint64 {
+	return uint64(cs.Timestamp)
+}
+
+// ValidateBasic defines a basic validation for the tendermint consensus state.
+func (cs ConsensusState) ValidateBasic() error {
+	if cs.Timestamp == 0 {
+		return sdkerrors.Wrap(clienttypes.ErrInvalidConsensus, "timestamp cannot be zero Unix time")
+	}
+	return nil
+}

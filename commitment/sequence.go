@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	commitmentexported "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
+	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -25,11 +25,11 @@ func (seq *Sequence) Bytes() []byte {
 
 type SequenceManager struct {
 	config CommitmentConfig
-	prefix commitmentexported.Prefix
+	prefix exported.Prefix
 	clock  func() time.Time
 }
 
-func NewSequenceManager(config CommitmentConfig, prefix commitmentexported.Prefix) SequenceManager {
+func NewSequenceManager(config CommitmentConfig, prefix exported.Prefix) SequenceManager {
 	return SequenceManager{config: config, prefix: prefix, clock: tmtime.Now}
 }
 
