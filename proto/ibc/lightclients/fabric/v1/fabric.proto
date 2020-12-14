@@ -28,7 +28,7 @@ message ChaincodeHeader {
   commitment.Sequence         sequence   = 1 [(gogoproto.nullable) = false];
   CommitmentProof  proof      = 2 [(gogoproto.nullable) = false];
 }
-  
+
 message ChaincodeInfo {
   string         channel_id         = 1;
   ChaincodeID    chaincode_id       = 2 [(gogoproto.nullable) = false];
