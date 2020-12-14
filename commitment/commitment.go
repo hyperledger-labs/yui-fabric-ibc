@@ -32,6 +32,27 @@ func EntryFromCommitment(ce *CommitmentEntry) (*Entry, error) {
 	}, nil
 }
 
+/// ClientStateCommitment
+
+func MakeClientStateCommitmentEntry(
+	prefix exported.Prefix,
+	clientID string,
+	clientStateBytes []byte,
+) (*Entry, error) {
+	key := MakeClientStateCommitmentEntryKey(prefix, clientID)
+	return &Entry{
+		Key:   key,
+		Value: clientStateBytes,
+	}, nil
+}
+
+func MakeClientStateCommitmentEntryKey(
+	prefix exported.Prefix,
+	clientID string,
+) string {
+	return fmt.Sprintf("h/k:%v/clients/%v/clientState", string(prefix.Bytes()), clientID)
+}
+
 /// ConsensusStateCommitment
 
 func MakeConsensusStateCommitmentEntry(

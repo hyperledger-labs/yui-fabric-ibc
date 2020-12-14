@@ -111,6 +111,38 @@ func (cs ClientState) GetProofSpecs() []*ics23.ProofSpec {
 	return nil
 }
 
+// ZeroCustomFields returns solomachine client state with client-specific fields FrozenSequence,
+// and AllowUpdateAfterProposal zeroed out
+func (cs ClientState) ZeroCustomFields() exported.ClientState {
+	return NewClientState(
+		cs.Id, cs.LastChaincodeHeader, cs.LastChaincodeInfo, cs.LastMspInfos,
+	)
+}
+
+// VerifyUpgrade returns an error since solomachine client does not support upgrades
+func (cs ClientState) VerifyUpgrade(
+	_ sdk.Context, _ codec.BinaryMarshaler, _ sdk.KVStore,
+	_ exported.ClientState, _ exported.Height, _ []byte,
+) error {
+	return sdkerrors.Wrap(clienttypes.ErrInvalidUpgradeClient, "cannot upgrade fabric client")
+}
+
+func (cs ClientState) CheckProposedHeaderAndUpdateState(
+	ctx sdk.Context, cdc codec.BinaryMarshaler, clientStore sdk.KVStore,
+	header exported.Header,
+) (exported.ClientState, exported.ConsensusState, error) {
+	panic("unsupported operation")
+}
+
+func (cs ClientState) CheckMisbehaviourAndUpdateState(
+	ctx sdk.Context,
+	cdc codec.BinaryMarshaler,
+	clientStore sdk.KVStore,
+	misbehaviour exported.Misbehaviour,
+) (exported.ClientState, error) {
+	panic("unsupported operation")
+}
+
 // VerifyClientState verifies a proof of the client state of the running chain
 // stored on the target machine
 func (cs ClientState) VerifyClientState(
@@ -122,11 +154,36 @@ func (cs ClientState) VerifyClientState(
 	proof []byte,
 	clientState exported.ClientState,
 ) error {
-	// fabProof, _, err := produceVerificationArgs(store, cdc, cs, height, prefix, proof)
-	// if err != nil {
-	// 	return err
-	// }
-	panic("not implemented error")
+	fabProof, _, err := produceVerificationArgs(store, cdc, cs, height, prefix, proof)
+	if err != nil {
+		return err
+	}
+
+	if clientState == nil {
+		return sdkerrors.Wrap(clienttypes.ErrInvalidClient, "client state cannot be empty")
+	}
+
+	_, ok := clientState.(*ClientState)
+	if !ok {
+		return sdkerrors.Wrapf(clienttypes.ErrInvalidClient, "invalid client type %T, expected %T", clientState, &ClientState{})
+	}
+
+	bz, err := codec.MarshalAny(cdc, clientState)
+	if err != nil {
+		return err
+	}
+
+	configs, err := cs.LastMspInfos.GetMSPPBConfigs()
+	if err != nil {
+		return err
+	}
+
+	key := commitment.MakeClientStateCommitmentEntryKey(prefix, counterpartyClientIdentifier)
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, bz, configs); err != nil {
+		return err
+	} else if !ok {
+		return fmt.Errorf("unexpected value")
+	}
 	return nil
 }
 
@@ -252,7 +309,7 @@ func (cs ClientState) VerifyChannelState(
 // the specified port, specified channel, and specified sequence.
 func (cs ClientState) VerifyPacketCommitment(
 	store sdk.KVStore,
-	cdc codec.Marshaler,
+	cdc codec.BinaryMarshaler,
 	height exported.Height,
 	prefix exported.Prefix,
 	proof []byte,
@@ -349,7 +406,7 @@ func (cs ClientState) VerifyPacketReceiptAbsence(
 // received of the specified channel at the specified port.
 func (cs ClientState) VerifyNextSequenceRecv(
 	store sdk.KVStore,
-	cdc codec.Marshaler,
+	cdc codec.BinaryMarshaler,
 	height exported.Height,
 	prefix exported.Prefix,
 	proof []byte,
