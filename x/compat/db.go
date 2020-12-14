@@ -2,6 +2,7 @@ package compat
 
 import (
 	"encoding/hex"
+	"errors"
 	"reflect"
 
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -103,10 +104,6 @@ type BatchDB struct { // FIXME fix this poor impl
 	closed   bool
 }
 
-func (db *BatchDB) Close() {
-	db.closed = true
-}
-
 func (db *BatchDB) Write() error {
 	if db.closed {
 		panic("closed")
@@ -135,20 +132,27 @@ func (db *BatchDB) WriteSync() error {
 	return nil
 }
 
-func (db *BatchDB) Set(key, value []byte) {
+func (db *BatchDB) Set(key, value []byte) error {
 	if db.closed {
-		panic("closed")
+		return errors.New("closed")
 	}
 
 	db.commands = append(db.commands, setCommand{key: key, value: value})
+	return nil
 }
 
-func (db *BatchDB) Delete(key []byte) {
+func (db *BatchDB) Delete(key []byte) error {
 	if db.closed {
-		panic("closed")
+		return errors.New("closed")
 	}
 
 	db.commands = append(db.commands, deleteCommand{key: key})
+	return nil
+}
+
+func (db *BatchDB) Close() error {
+	db.closed = true
+	return nil
 }
 
 type command interface {
@@ -236,10 +240,8 @@ func (iter *Iterator) Error() error {
 	return nil
 }
 
-func (iter *Iterator) Close() {
-	if err := iter.qi.Close(); err != nil {
-		panic(err)
-	}
+func (iter *Iterator) Close() error {
+	return iter.qi.Close()
 }
 
 func ReverseIterator(itr dbm.Iterator) dbm.Iterator {
@@ -302,4 +304,6 @@ func (iter *simpleIterator) Error() error {
 	return nil
 }
 
-func (iter *simpleIterator) Close() {}
+func (iter *simpleIterator) Close() error {
+	return nil
+}
