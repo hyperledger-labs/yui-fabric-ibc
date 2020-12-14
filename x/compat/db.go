@@ -12,6 +12,17 @@ import (
 
 var _ dbm.DB = (*DB)(nil)
 
+var (
+	// errBatchClosed is returned when a closed or written batch is used.
+	errBatchClosed = errors.New("batch has been written or closed")
+
+	// errKeyEmpty is returned when attempting to use an empty or nil key.
+	errKeyEmpty = errors.New("key cannot be empty")
+
+	// errValueNil is returned when attempting to set a nil value.
+	errValueNil = errors.New("value cannot be nil")
+)
+
 type DB struct {
 	stub shim.ChaincodeStubInterface
 }
@@ -20,21 +31,18 @@ func NewDB(stub shim.ChaincodeStubInterface) *DB {
 	return &DB{stub: stub}
 }
 
-// We defensively turn nil keys or values into []byte{} for
-// most operations.
-func nonNilBytes(bz []byte) []byte {
-	if bz == nil {
-		return []byte{}
-	}
-	return bz
-}
-
 func (db *DB) Get(key []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, errKeyEmpty
+	}
 	hexStr := hex.EncodeToString(key)
 	return db.stub.GetState(hexStr)
 }
 
 func (db *DB) Has(key []byte) (bool, error) {
+	if len(key) == 0 {
+		return false, errKeyEmpty
+	}
 	v, err := db.Get(key)
 	if v == nil && err == nil {
 		return false, nil
@@ -45,8 +53,12 @@ func (db *DB) Has(key []byte) (bool, error) {
 }
 
 func (db *DB) Set(key, value []byte) error {
+	if len(key) == 0 {
+		return errKeyEmpty
+	} else if value == nil {
+		return errValueNil
+	}
 	hexStr := hex.EncodeToString(key)
-	value = nonNilBytes(value)
 	return db.stub.PutState(hexStr, value)
 }
 
@@ -55,6 +67,9 @@ func (db *DB) SetSync(key, value []byte) error {
 }
 
 func (db *DB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return errKeyEmpty
+	}
 	hexStr := hex.EncodeToString(key)
 	return db.stub.DelState(hexStr)
 }
@@ -64,6 +79,10 @@ func (db *DB) DeleteSync(key []byte) error {
 }
 
 func (db *DB) Iterator(start, end []byte) (dbm.Iterator, error) {
+	if (start != nil && len(start) == 0) || (end != nil && len(end) == 0) {
+		return nil, errKeyEmpty
+	}
+
 	s := hex.EncodeToString(start)
 	e := hex.EncodeToString(end)
 	iter, err := db.stub.GetStateByRange(s, e)
@@ -106,7 +125,7 @@ type BatchDB struct { // FIXME fix this poor impl
 
 func (db *BatchDB) Write() error {
 	if db.closed {
-		panic("closed")
+		return errors.New("batchDB is already closed")
 	}
 
 	for _, cmd := range db.commands {
@@ -120,7 +139,7 @@ func (db *BatchDB) Write() error {
 
 func (db *BatchDB) WriteSync() error {
 	if db.closed {
-		panic("closed")
+		return errors.New("batchDB is already closed")
 	}
 
 	for _, cmd := range db.commands {
@@ -134,7 +153,11 @@ func (db *BatchDB) WriteSync() error {
 
 func (db *BatchDB) Set(key, value []byte) error {
 	if db.closed {
-		return errors.New("closed")
+		return errors.New("batchDB is already closed")
+	} else if len(key) == 0 {
+		return errKeyEmpty
+	} else if value == nil {
+		return errValueNil
 	}
 
 	db.commands = append(db.commands, setCommand{key: key, value: value})
@@ -143,7 +166,9 @@ func (db *BatchDB) Set(key, value []byte) error {
 
 func (db *BatchDB) Delete(key []byte) error {
 	if db.closed {
-		return errors.New("closed")
+		return errors.New("batchDB is already closed")
+	} else if len(key) == 0 {
+		return errKeyEmpty
 	}
 
 	db.commands = append(db.commands, deleteCommand{key: key})
