@@ -24,7 +24,7 @@ type ClientKeeper struct {
 }
 
 func NewClientKeeper(k clientkeeper.Keeper, stub shim.ChaincodeStubInterface, seqMgr *commitment.SequenceManager) ClientKeeper {
-	return ClientKeeper{Keeper: k}
+	return ClientKeeper{Keeper: k, stub: stub, seqMgr: seqMgr}
 }
 
 // GetSelfConsensusState introspects the (self) past historical info at a given height
