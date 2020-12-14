@@ -1,7 +1,7 @@
 package tests
 
 import (
-	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
+	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
@@ -11,8 +11,8 @@ import (
 )
 
 // MakeCommitmentProof returns a CommitmentProof
-func MakeCommitmentProof(signer protoutil.Signer, key string, value []byte) (*fabric.CommitmentProof, error) {
-	pr := &fabric.CommitmentProof{}
+func MakeCommitmentProof(signer protoutil.Signer, key string, value []byte) (*fabrictypes.CommitmentProof, error) {
+	pr := &fabrictypes.CommitmentProof{}
 	result := &rwset.TxReadWriteSet{
 		DataModel: rwset.TxReadWriteSet_KV,
 		NsRwset: []*rwset.NsReadWriteSet{
@@ -94,8 +94,8 @@ func makeProposalResponse(signer protoutil.Signer, results []byte) (*pb.Proposal
 }
 
 // MakeMessageProof returns a MessageProof
-func MakeMessageProof(signer protoutil.Signer, value []byte) (*fabric.MessageProof, error) {
-	pr := &fabric.MessageProof{}
+func MakeMessageProof(signer protoutil.Signer, value []byte) (*fabrictypes.MessageProof, error) {
+	pr := &fabrictypes.MessageProof{}
 	sig, err := signer.Sign(value)
 	if err != nil {
 		return nil, err
