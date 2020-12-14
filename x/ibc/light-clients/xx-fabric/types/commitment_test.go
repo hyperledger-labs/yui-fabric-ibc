@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/datachainlab/fabric-ibc/commitment"
-	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/tests"
+	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
