@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	ics23 "github.com/confio/ics23/go"
@@ -22,8 +23,7 @@ const (
 	ClientTypeFabric string = "fabric"
 )
 
-// TODO commentout this
-// var _ exported.ClientState = ClientState{}
+var _ exported.ClientState = ClientState{}
 
 // func InitializeFromMsg(msg MsgCreateClient) (ClientState, error) {
 // 	return Initialize(msg.ClientID, msg.Header)
@@ -99,14 +99,39 @@ func (cs ClientState) Validate() error {
 	return host.ClientIdentifierValidator(cs.Id)
 }
 
+// GetFrozenHeight returns the frozen sequence of the client.
+// Return exported.Height to satisfy interface
+func (cs ClientState) GetFrozenHeight() exported.Height {
+	return clienttypes.NewHeight(0, math.MaxUint64)
+}
+
 // GetProofSpecs returns the format the client expects for proof verification
 // as a string array specifying the proof type for each position in chained proof
 func (cs ClientState) GetProofSpecs() []*ics23.ProofSpec {
 	return nil
 }
 
+// VerifyClientState verifies a proof of the client state of the running chain
+// stored on the target machine
+func (cs ClientState) VerifyClientState(
+	store sdk.KVStore,
+	cdc codec.BinaryMarshaler,
+	height exported.Height,
+	prefix exported.Prefix,
+	counterpartyClientIdentifier string,
+	proof []byte,
+	clientState exported.ClientState,
+) error {
+	// fabProof, _, err := produceVerificationArgs(store, cdc, cs, height, prefix, proof)
+	// if err != nil {
+	// 	return err
+	// }
+	panic("not implemented error")
+	return nil
+}
+
 // VerifyClientConsensusState verifies a proof of the consensus state of the
-// Solo Machine client stored on the target machine.
+// fabric client stored on the target machine.
 func (cs ClientState) VerifyClientConsensusState(
 	store sdk.KVStore,
 	cdc codec.BinaryMarshaler,

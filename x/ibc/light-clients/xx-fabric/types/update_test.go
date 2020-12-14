@@ -1,16 +1,14 @@
-package fabric
+package types
 
 import (
 	"bytes"
 	"testing"
-
-	"github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric/types"
 )
 
 func Test_updateMSPInfos(t *testing.T) {
 	type args struct {
 		clientState ClientState
-		mspHeaders  types.MSPHeaders
+		mspHeaders  MSPHeaders
 	}
 	tests := []struct {
 		name string
@@ -20,14 +18,14 @@ func Test_updateMSPInfos(t *testing.T) {
 		// TODO: Add test cases.
 		{"new MSPInfos",
 			args{
-				clientState: ClientState{LastMSPInfos: types.MSPInfos{Infos: []types.MSPInfo{}}},
-				mspHeaders: types.MSPHeaders{Headers: []types.MSPHeader{
-					{Type: types.MSPHeaderTypeCreate, MSPID: "MSPID1", Config: []byte("config1"), Policy: []byte("policy1"), Proof: &types.MessageProof{}},
-					{Type: types.MSPHeaderTypeCreate, MSPID: "MSPID2", Config: []byte("config2"), Policy: []byte("policy2"), Proof: &types.MessageProof{}},
+				clientState: ClientState{LastMSPInfos: MSPInfos{Infos: []MSPInfo{}}},
+				mspHeaders: MSPHeaders{Headers: []MSPHeader{
+					{Type: MSPHeaderTypeCreate, MSPID: "MSPID1", Config: []byte("config1"), Policy: []byte("policy1"), Proof: &MessageProof{}},
+					{Type: MSPHeaderTypeCreate, MSPID: "MSPID2", Config: []byte("config2"), Policy: []byte("policy2"), Proof: &MessageProof{}},
 				}},
 			},
 			ClientState{
-				LastMSPInfos: types.MSPInfos{Infos: []types.MSPInfo{
+				LastMSPInfos: MSPInfos{Infos: []MSPInfo{
 					{MSPID: "MSPID1", Config: []byte("config1"), Policy: []byte("policy1"), Freezed: false},
 					{MSPID: "MSPID2", Config: []byte("config2"), Policy: []byte("policy2"), Freezed: false},
 				}},
@@ -35,20 +33,20 @@ func Test_updateMSPInfos(t *testing.T) {
 		},
 		{"all MSPHeaderType",
 			args{
-				clientState: ClientState{LastMSPInfos: types.MSPInfos{Infos: []types.MSPInfo{
+				clientState: ClientState{LastMSPInfos: MSPInfos{Infos: []MSPInfo{
 					{MSPID: "MSPID1", Config: []byte("config1"), Policy: []byte("policy1"), Freezed: false},
 					{MSPID: "MSPID3", Config: []byte("config3"), Policy: []byte("policy3"), Freezed: false},
 					{MSPID: "MSPID4", Config: []byte("config4"), Policy: []byte("policy4"), Freezed: false},
 				}}},
-				mspHeaders: types.MSPHeaders{Headers: []types.MSPHeader{
-					{Type: types.MSPHeaderTypeUpdatePolicy, MSPID: "MSPID1", Config: nil, Policy: []byte("policy1_update"), Proof: &types.MessageProof{}},
-					{Type: types.MSPHeaderTypeCreate, MSPID: "MSPID2", Config: []byte("config2"), Policy: []byte("policy2"), Proof: &types.MessageProof{}},
-					{Type: types.MSPHeaderTypeFreeze, MSPID: "MSPID3", Config: nil, Policy: nil, Proof: &types.MessageProof{}},
-					{Type: types.MSPHeaderTypeUpdateConfig, MSPID: "MSPID4", Config: []byte("config4_update"), Policy: nil, Proof: &types.MessageProof{}},
+				mspHeaders: MSPHeaders{Headers: []MSPHeader{
+					{Type: MSPHeaderTypeUpdatePolicy, MSPID: "MSPID1", Config: nil, Policy: []byte("policy1_update"), Proof: &MessageProof{}},
+					{Type: MSPHeaderTypeCreate, MSPID: "MSPID2", Config: []byte("config2"), Policy: []byte("policy2"), Proof: &MessageProof{}},
+					{Type: MSPHeaderTypeFreeze, MSPID: "MSPID3", Config: nil, Policy: nil, Proof: &MessageProof{}},
+					{Type: MSPHeaderTypeUpdateConfig, MSPID: "MSPID4", Config: []byte("config4_update"), Policy: nil, Proof: &MessageProof{}},
 				}},
 			},
 			ClientState{
-				LastMSPInfos: types.MSPInfos{Infos: []types.MSPInfo{
+				LastMSPInfos: MSPInfos{Infos: []MSPInfo{
 					{MSPID: "MSPID1", Config: []byte("config1"), Policy: []byte("policy1_update"), Freezed: false}, // updated
 					{MSPID: "MSPID2", Config: []byte("config2"), Policy: []byte("policy2"), Freezed: false},        // created
 					{MSPID: "MSPID3", Config: []byte("config3"), Policy: []byte("policy3"), Freezed: true},         // freezed
