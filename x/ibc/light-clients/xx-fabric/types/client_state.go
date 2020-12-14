@@ -22,7 +22,8 @@ const (
 	ClientTypeFabric string = "fabric"
 )
 
-var _ exported.ClientState = ClientState{}
+// TODO commentout this
+// var _ exported.ClientState = ClientState{}
 
 // func InitializeFromMsg(msg MsgCreateClient) (ClientState, error) {
 // 	return Initialize(msg.ClientID, msg.Header)
