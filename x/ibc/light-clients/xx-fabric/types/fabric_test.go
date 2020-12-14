@@ -318,7 +318,7 @@ func TestVerifyMSPHeader(t *testing.T) {
 func configForTest() Config {
 	wd, _ := os.Getwd()
 	return Config{
-		MSPsDir: filepath.Join(wd, "..", "..", "..", "..", "tests", "fixtures", "organizations", "peerOrganizations"),
+		MSPsDir: filepath.Join(wd, "..", "..", "..", "..", "..", "tests", "fixtures", "organizations", "peerOrganizations"),
 		MSPIDs:  []string{"Org1MSP", "Org2MSP"},
 	}
 }
