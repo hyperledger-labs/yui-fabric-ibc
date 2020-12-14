@@ -1,9 +1,9 @@
 syntax = "proto3";
-package fabric.ibc.app;
+package app;
 
 option go_package = "github.com/datachainlab/fabric-ibc/app";
 
-import "third_party/proto/gogoproto/gogo.proto";
+import "gogoproto/gogo.proto";
 
 message RequestQuery {
     string data = 1 [(gogoproto.jsontag) = "data"];
