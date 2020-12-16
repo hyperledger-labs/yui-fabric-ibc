@@ -23,6 +23,7 @@ func main() {
 
 	if err := chaincode.Start(); err != nil {
 		fmt.Printf("Error starting IBC chaincode: %s", err.Error())
+		return
 	}
 }
 

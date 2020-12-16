@@ -46,10 +46,6 @@ func NewIBCChaincode(appProvider AppProvider, dbProvider DBProvider) *IBCChainco
 	return c
 }
 
-func (c IBCChaincode) GetAppRunner() AppRunner {
-	return c.runner
-}
-
 // InitChaincode initialize the state of the chaincode
 // This must be called when the chaincode is initialized
 func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface, appStateJSON string) error {
@@ -324,4 +320,12 @@ func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContex
 
 func (c IBCChaincode) makeHeight(height uint64) clienttypes.Height {
 	return clienttypes.NewHeight(0, height)
+}
+
+func (c IBCChaincode) GetAppRunner() AppRunner {
+	return c.runner
+}
+
+func (c *IBCChaincode) GetIgnoredFunctions() []string {
+	return []string{"GetAppRunner"}
 }
