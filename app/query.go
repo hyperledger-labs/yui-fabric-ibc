@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	abci "github.com/tendermint/tendermint/abci/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -48,7 +49,7 @@ func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) abci.
 		return sdkerrors.QueryResult(sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "no custom querier found for route %s", path[1]))
 	}
 
-	ctx, err := app.createQueryContext(req)
+	ctx, err := app.createQueryContext(req.Height, req.Prove)
 	if err != nil {
 		return sdkerrors.QueryResult(err)
 	}
@@ -70,12 +71,12 @@ func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) abci.
 	}
 }
 
-func (app *BaseApp) createQueryContext(req abci.RequestQuery) (sdk.Context, error) {
+func (app *BaseApp) createQueryContext(height int64, prove bool) (sdk.Context, error) {
 	cacheMS := app.cms.CacheMultiStore()
 
 	// cache wrap the commit-multistore for safety
 	ctx := sdk.NewContext(
-		cacheMS, abci.Header{}, true, app.logger,
+		cacheMS, tmproto.Header{}, true, app.logger,
 	)
 
 	return ctx, nil
