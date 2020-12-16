@@ -6,19 +6,21 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/x/ibc/03-connection/types"
-	channel "github.com/cosmos/cosmos-sdk/x/ibc/04-channel"
-	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/04-channel/types"
-	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
+	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
+	connectiontypes "github.com/cosmos/cosmos-sdk/x/ibc/core/03-connection/types"
+	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
+	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
+	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
+
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/x/ibc"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
-	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 const (
@@ -34,7 +36,7 @@ type IBCChaincode struct {
 
 func NewIBCChaincode(appProvider AppProvider, dbProvider DBProvider) *IBCChaincode {
 	logger := log.NewTMLogger(os.Stdout)
-	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)))
+	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)))
 	runner := NewAppRunner(logger, appProvider, dbProvider, &sequenceMgr)
 	c := &IBCChaincode{
 		logger:      logger,
@@ -117,18 +119,18 @@ func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionCont
 func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
 
-		connection, found := app.GetIBCKeeper().ConnectionKeeper.GetConnection(c, connectionID)
+		connection, found := app.GetIBCKeeper().ConnectionKeeper.GetConnection(cctx, connectionID)
 		if !found {
-			return sdkerrors.Wrap(types.ErrConnectionNotFound, "cannot relay ACK of open attempt")
+			return sdkerrors.Wrap(connectiontypes.ErrConnectionNotFound, "cannot relay ACK of open attempt")
 		}
 		bz, err := proto.Marshal(&connection)
 		if err != nil {
 			return err
 		}
 		e, err := commitment.MakeConnectionStateCommitmentEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 			connectionID,
 			bz,
 		)
@@ -147,7 +149,7 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
+		c, writer := app.MakeCacheContext(tmproto.Header{})
 
 		channel, found := app.GetIBCKeeper().ChannelKeeper.GetChannel(c, portID, channelID)
 		if !found {
@@ -158,7 +160,7 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 			return err
 		}
 		e, err := commitment.MakeChannelStateCommitmentEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 			portID,
 			channelID,
 			bz,
@@ -178,14 +180,14 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
-		cmbz := app.GetIBCKeeper().ChannelKeeper.GetPacketCommitment(c, portID, channelID, sequence)
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+		cmbz := app.GetIBCKeeper().ChannelKeeper.GetPacketCommitment(cctx, portID, channelID, sequence)
 		if cmbz == nil {
 			return errors.New("commitment not found")
 		}
 
 		e, err := commitment.MakePacketCommitmentEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)), // TODO use fabric prefix instead of this
 			portID,
 			channelID,
 			sequence,
@@ -206,13 +208,13 @@ func (c *IBCChaincode) EndorsePacketCommitment(ctx contractapi.TransactionContex
 func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
-		ackBytes, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+		ackBytes, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(cctx, portID, channelID, sequence)
 		if !ok {
 			return errors.New("acknowledgement packet not found")
 		}
 		e, err := commitment.MakePacketAcknowledgementEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 			portID,
 			channelID,
 			sequence,
@@ -233,13 +235,13 @@ func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionC
 func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
-		_, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(c, portID, channelID, sequence)
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+		_, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(cctx, portID, channelID, sequence)
 		if ok {
 			return errors.New("acknowledgement packet found")
 		}
 		e, err := commitment.MakePacketAcknowledgementAbsenceEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)),
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 			portID,
 			channelID,
 			sequence,
@@ -259,19 +261,20 @@ func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.Trans
 func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
-		cs, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(c, clientID, height)
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+		h := c.makeHeight(height)
+		cs, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(cctx, clientID, h)
 		if !ok {
 			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
 		}
-		bz, err := app.Codec().Amino.MarshalBinaryBare(cs)
+		bz, err := codec.MarshalAny(app.AppCodec(), cs)
 		if err != nil {
 			return err
 		}
 		e, err := commitment.MakeConsensusStateCommitmentEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)), // TODO use fabric prefix instead of this
 			clientID,
-			height,
+			h,
 			bz,
 		)
 		if err != nil {
@@ -289,16 +292,16 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContextInterface, portID, channelID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		c, writer := app.MakeCacheContext(abci.Header{})
-		seq, found := app.GetIBCKeeper().ChannelKeeper.GetNextSequenceRecv(c, portID, channelID)
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+		seq, found := app.GetIBCKeeper().ChannelKeeper.GetNextSequenceRecv(cctx, portID, channelID)
 		if !found {
 			return sdkerrors.Wrapf(
-				channel.ErrSequenceReceiveNotFound,
+				channeltypes.ErrSequenceReceiveNotFound,
 				"port: %s, channel: %s", portID, channelID,
 			)
 		}
 		e, err := commitment.MakeNextSequenceRecvEntry(
-			commitmenttypes.NewMerklePrefix([]byte(ibc.StoreKey)), // TODO use fabric prefix instead of this
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)), // TODO use fabric prefix instead of this
 			portID,
 			channelID,
 			seq,
@@ -313,4 +316,8 @@ func (c *IBCChaincode) EndorseNextSequenceRecv(ctx contractapi.TransactionContex
 		return nil, err
 	}
 	return entry.ToCommitment(), nil
+}
+
+func (c IBCChaincode) makeHeight(height uint64) clienttypes.Height {
+	return clienttypes.NewHeight(0, height)
 }
