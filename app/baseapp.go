@@ -7,13 +7,14 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	ibckeeper "github.com/cosmos/cosmos-sdk/x/ibc/core/keeper"
 	"github.com/datachainlab/fabric-ibc/store"
-	"github.com/datachainlab/fabric-ibc/x/ibc"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/log"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 )
@@ -23,23 +24,28 @@ type Application interface {
 	RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (result *sdk.Result, err error)
 	Query(req abci.RequestQuery) abci.ResponseQuery
 
-	Codec() *codec.Codec
-	MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func())
-	GetIBCKeeper() ibc.Keeper
+	MakeCacheContext(header tmproto.Header) (ctx sdk.Context, writer func())
+	AppCodec() codec.Marshaler
+	GetIBCKeeper() ibckeeper.Keeper
 }
 
 type BaseApp struct {
-	logger      log.Logger
-	name        string          // application name from abci.Info
-	db          dbm.DB          // common DB backend
-	cms         *store.Store    // Main (uncached) state
-	router      sdk.Router      // handle any kind of message
-	queryRouter sdk.QueryRouter // router for redirecting query calls
+	logger          log.Logger
+	name            string           // application name from abci.Info
+	db              dbm.DB           // common DB backend
+	cms             *store.Store     // Main (uncached) state
+	router          sdk.Router       // handle any kind of message
+	queryRouter     sdk.QueryRouter  // router for redirecting query calls
+	grpcQueryRouter *GRPCQueryRouter // router for redirecting gRPC query calls
+	txDecoder       sdk.TxDecoder    // unmarshal []byte into sdk.Tx
 
-	txDecoder     sdk.TxDecoder
 	anteHandler   sdk.AnteHandler // ante handler for fee and auth
 	initChainer   InitChainer
 	blockProvider BlockProvider
+
+	// paramStore is used to query for ABCI consensus parameters from an
+	// application parameter store.
+	paramStore ParamStore
 
 	// flag for sealing options and parameters to a BaseApp
 	sealed bool
@@ -49,13 +55,14 @@ func NewBaseApp(
 	name string, logger log.Logger, db dbm.DB, txDecoder sdk.TxDecoder,
 ) *BaseApp {
 	app := &BaseApp{
-		logger:      logger,
-		name:        name,
-		db:          db,
-		cms:         store.NewStore(db),
-		router:      NewRouter(),
-		queryRouter: NewQueryRouter(),
-		txDecoder:   txDecoder,
+		logger:          logger,
+		name:            name,
+		db:              db,
+		cms:             store.NewStore(db),
+		router:          NewRouter(),
+		queryRouter:     NewQueryRouter(),
+		grpcQueryRouter: NewGRPCQueryRouter(),
+		txDecoder:       txDecoder,
 	}
 
 	return app
@@ -150,7 +157,7 @@ func (app *BaseApp) InitChain(appStateBytes []byte) error {
 		return nil
 	}
 	ms := app.cms.CacheMultiStore()
-	ctx := sdk.NewContext(ms, abci.Header{}, false, app.logger)
+	ctx := sdk.NewContext(ms, tmproto.Header{}, false, app.logger)
 	if err := app.initChainer(ctx, appStateBytes); err != nil {
 		return err
 	}
@@ -158,9 +165,9 @@ func (app *BaseApp) InitChain(appStateBytes []byte) error {
 	return nil
 }
 
-func (app *BaseApp) getBlockHeader() abci.Header {
+func (app *BaseApp) getBlockHeader() tmproto.Header {
 	block := app.blockProvider()
-	return abci.Header{
+	return tmproto.Header{
 		Height: block.Height() + 1,
 		Time:   tmtime.Now(),
 	}
@@ -244,7 +251,7 @@ func (app *BaseApp) RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (res
 func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg) (*sdk.Result, error) {
 	msgLogs := make(sdk.ABCIMessageLogs, 0, len(msgs))
 	events := sdk.EmptyEvents()
-	txData := &sdk.TxData{
+	txData := &sdk.TxMsgData{
 		Data: make([]*sdk.MsgData, 0, len(msgs)),
 	}
 
@@ -274,7 +281,7 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg) (*sdk.Result, error
 		events = events.AppendEvents(msgEvents)
 
 		txData.Data = append(txData.Data, &sdk.MsgData{MsgType: msg.Type(), Data: msgResult.Data})
-		msgLogs = append(msgLogs, sdk.NewABCIMessageLog(uint16(i), msgResult.Log, msgEvents))
+		msgLogs = append(msgLogs, sdk.NewABCIMessageLog(uint32(i), msgResult.Log, msgEvents))
 	}
 
 	data, err := proto.Marshal(txData)
@@ -363,7 +370,7 @@ func (app *BaseApp) SetBlockProvider(blockProvider BlockProvider) {
 //----------------------------------------
 // +Helpers
 
-func (app *BaseApp) MakeCacheContext(header abci.Header) (ctx sdk.Context, writer func()) {
+func (app *BaseApp) MakeCacheContext(header tmproto.Header) (ctx sdk.Context, writer func()) {
 	ms := app.cms.CacheMultiStore()
 	return sdk.NewContext(ms, header, false, app.logger), ms.Write
 }
