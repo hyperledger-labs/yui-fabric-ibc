@@ -367,6 +367,10 @@ func (app *BaseApp) SetBlockProvider(blockProvider BlockProvider) {
 	app.blockProvider = blockProvider
 }
 
+func (app BaseApp) BlockProvider() BlockProvider {
+	return app.blockProvider
+}
+
 //----------------------------------------
 // +Helpers
 

@@ -46,7 +46,7 @@ func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) 
 
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Application) error) error {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.logger, db, r.traceStore, r.getBlockProvider(stub))
+	app, err := r.appProvider(r.logger, db, r.traceStore, r.GetBlockProvider(stub))
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Applicat
 
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]abci.Event, error) {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.logger, db, r.traceStore, r.getBlockProvider(stub))
+	app, err := r.appProvider(r.logger, db, r.traceStore, r.GetBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]a
 
 func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery) (*app.ResponseQuery, error) {
 	db := r.dbProvider(stub)
-	a, err := r.appProvider(r.logger, db, r.traceStore, r.getBlockProvider(stub))
+	a, err := r.appProvider(r.logger, db, r.traceStore, r.GetBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (bk block) Timestamp() int64 {
 	return bk.timestamp
 }
 
-func (r AppRunner) getBlockProvider(stub shim.ChaincodeStubInterface) app.BlockProvider {
+func (r AppRunner) GetBlockProvider(stub shim.ChaincodeStubInterface) app.BlockProvider {
 	return func() app.Block {
 		seq, err := r.seqMgr.GetCurrentSequence(stub)
 		if err != nil {
