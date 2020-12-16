@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	ClientTypeFabric string = "fabric"
+	Fabric string = "fabric"
 )
 
 var _ exported.ClientState = ClientState{}
@@ -52,7 +52,7 @@ func (cs ClientState) GetChainID() string {
 
 // ClientType is localhost.
 func (cs ClientState) ClientType() string {
-	return ClientTypeFabric
+	return Fabric
 }
 
 // GetLatestHeight returns the latest height.

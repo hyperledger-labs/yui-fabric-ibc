@@ -17,7 +17,7 @@ func NewConsensusState(
 }
 
 func (cs ConsensusState) ClientType() string {
-	return ClientTypeFabric
+	return Fabric
 }
 
 func (cs ConsensusState) GetRoot() exported.Root {
