@@ -23,7 +23,7 @@ func (h Header) GetHeight() exported.Height {
 }
 
 func (h Header) ClientType() string {
-	return ClientTypeFabric
+	return Fabric
 }
 
 func (h Header) ValidateBasic() error {
