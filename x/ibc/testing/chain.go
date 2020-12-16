@@ -633,17 +633,17 @@ func (chain *TestChain) GetPacketData(counterparty TestChainI) []byte {
 func (chain *TestChain) SendPacket(
 	packet exported.PacketI,
 ) error {
+	ctx, writer := chain.GetContext().CacheContext()
 	channelCap := chain.GetChannelCapability(packet.GetSourcePort(), packet.GetSourceChannel())
 
 	// no need to send message, acting as a module
-	err := chain.App.IBCKeeper.ChannelKeeper.SendPacket(chain.GetContext(), channelCap, packet)
+	err := chain.App.IBCKeeper.ChannelKeeper.SendPacket(ctx, channelCap, packet)
 	if err != nil {
 		return err
 	}
 
 	// commit changes
-	// FIXME how do we implement commit?
-	// chain.App.Commit()
+	writer()
 	chain.NextBlock()
 
 	return nil
