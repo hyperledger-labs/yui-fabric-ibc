@@ -4,14 +4,16 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	"github.com/gogo/protobuf/proto"
 )
 
 var _ exported.ConsensusState = (*ConsensusState)(nil)
+var _ proto.Message = (*ClientState)(nil)
 
 func NewConsensusState(
 	timestamp int64,
-) ConsensusState {
-	return ConsensusState{
+) *ConsensusState {
+	return &ConsensusState{
 		Timestamp: timestamp,
 	}
 }

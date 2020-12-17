@@ -116,10 +116,9 @@ func update(clientState ClientState, header Header) (*ClientState, *ConsensusSta
 
 	if header.ChaincodeHeader != nil {
 		clientState.LastChaincodeHeader = *header.ChaincodeHeader
-		cs := NewConsensusState(
+		consensusState = NewConsensusState(
 			header.ChaincodeHeader.Sequence.Timestamp,
 		)
-		consensusState = &cs
 	}
 
 	if header.MSPHeaders != nil {

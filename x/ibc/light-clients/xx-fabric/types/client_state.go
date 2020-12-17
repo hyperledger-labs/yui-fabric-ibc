@@ -17,13 +17,15 @@ import (
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
 	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/gogo/protobuf/proto"
 )
 
 const (
 	Fabric string = "fabric"
 )
 
-var _ exported.ClientState = ClientState{}
+var _ exported.ClientState = (*ClientState)(nil)
+var _ proto.Message = (*ClientState)(nil)
 
 // NewClientState creates a new ClientState instance
 func NewClientState(
@@ -31,8 +33,8 @@ func NewClientState(
 	chaincodeHeader ChaincodeHeader,
 	chaincodeInfo ChaincodeInfo,
 	mspInfos MSPInfos,
-) ClientState {
-	return ClientState{
+) *ClientState {
+	return &ClientState{
 		Id:                  id,
 		LastChaincodeHeader: chaincodeHeader,
 		LastChaincodeInfo:   chaincodeInfo,
