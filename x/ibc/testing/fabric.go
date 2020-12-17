@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"fmt"
 	"strings"
 
 	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
@@ -16,18 +17,12 @@ func queryEndorseCommitment(ctx contractapi.TransactionContextInterface, cc *cha
 	if strings.Contains(k, string(host.KeyClientState())) {
 		parts := strings.Split(k, "/")
 		clientID := parts[1]
-
 		return cc.EndorseClientState(ctx, clientID)
-	}
-
-	if strings.HasPrefix(k, string(host.KeyConnectionPrefix)) {
+	} else if strings.HasPrefix(k, string(host.KeyConnectionPrefix)) {
 		parts := strings.Split(k, "/")
 		connectionID := parts[1]
-
 		return cc.EndorseConnectionState(ctx, connectionID)
-	}
-
-	if strings.Contains(k, "consensusStates/") {
+	} else if strings.Contains(k, "consensusStates/") {
 		parts := strings.Split(k, "/")
 		clientID := parts[1]
 		height, err := clienttypes.ParseHeight(parts[3])
@@ -35,7 +30,14 @@ func queryEndorseCommitment(ctx contractapi.TransactionContextInterface, cc *cha
 			return nil, err
 		}
 		return cc.EndorseConsensusStateCommitment(ctx, clientID, height.VersionHeight)
+	} else if strings.HasPrefix(k, host.KeyChannelPrefix) {
+		parts := strings.Split(k, "/")
+		portID := parts[2]
+		channelID := parts[4]
+		return cc.EndorseChannelState(ctx, portID, channelID)
 	}
+
+	fmt.Println("queryEndorseCommitment:", k)
 
 	panic("not implemented error")
 }
