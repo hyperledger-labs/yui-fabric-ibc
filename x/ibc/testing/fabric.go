@@ -13,17 +13,15 @@ import (
 
 func queryEndorseCommitment(ctx contractapi.TransactionContextInterface, cc *chaincode.IBCChaincode, key []byte) (*commitment.CommitmentEntry, error) {
 	k := string(key)
+	parts := strings.Split(k, "/")
 
 	if strings.Contains(k, string(host.KeyClientState())) {
-		parts := strings.Split(k, "/")
 		clientID := parts[1]
 		return cc.EndorseClientState(ctx, clientID)
 	} else if strings.HasPrefix(k, string(host.KeyConnectionPrefix)) {
-		parts := strings.Split(k, "/")
 		connectionID := parts[1]
 		return cc.EndorseConnectionState(ctx, connectionID)
-	} else if strings.Contains(k, "consensusStates/") {
-		parts := strings.Split(k, "/")
+	} else if strings.Contains(k, string(host.KeyConsensusStatesPrefix)+"/") {
 		clientID := parts[1]
 		height, err := clienttypes.ParseHeight(parts[3])
 		if err != nil {
@@ -31,7 +29,6 @@ func queryEndorseCommitment(ctx contractapi.TransactionContextInterface, cc *cha
 		}
 		return cc.EndorseConsensusStateCommitment(ctx, clientID, height.VersionHeight)
 	} else if strings.HasPrefix(k, host.KeyChannelPrefix) {
-		parts := strings.Split(k, "/")
 		portID := parts[2]
 		channelID := parts[4]
 		return cc.EndorseChannelState(ctx, portID, channelID)
