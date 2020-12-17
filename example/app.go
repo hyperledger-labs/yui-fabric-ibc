@@ -51,6 +51,7 @@ import (
 	_ "github.com/cosmos/cosmos-sdk/client/docs/statik"
 
 	"github.com/datachainlab/fabric-ibc/app"
+	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
 )
 
 const appName = "FabricIBC"
@@ -64,6 +65,7 @@ var (
 		bank.AppModuleBasic{},
 		capability.AppModuleBasic{},
 		ibc.AppModuleBasic{},
+		fabric.AppModuleBasic{},
 		transfer.AppModuleBasic{},
 	)
 

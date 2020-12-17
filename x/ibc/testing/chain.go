@@ -10,6 +10,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -31,15 +32,16 @@ import (
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/cosmos/cosmos-sdk/x/ibc/testing/mock"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
+	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmdb "github.com/tendermint/tm-db"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
@@ -235,6 +237,7 @@ func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
 		t:                  t,
 		ChainID:            chainID,
 		App:                app.(*example.IBCApp),
+		CC:                 cc,
 		Stub:               stub,
 		CurrentHeader:      header,
 		QueryServer:        app.GetIBCKeeper(),
@@ -249,9 +252,17 @@ func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
 		NextChannelVersion: ChannelTransferVersion,
 	}
 
-	cap := chain.App.IBCKeeper.PortKeeper.BindPort(chain.GetContext(), MockPort)
-	err = chain.App.ScopedIBCMockKeeper.ClaimCapability(chain.GetContext(), cap, host.PortPath(MockPort))
-	require.NoError(t, err)
+	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: time.Now().Unix()}, nil)
+	var tctx contractapi.TransactionContext
+	tctx.SetStub(stub)
+
+	// Init chaincode
+	require.NoError(t, chain.CC.InitChaincode(&tctx, "{}"))
+
+	// cap := chain.App.IBCKeeper.PortKeeper.BindPort(chain.GetContext(), MockPort)
+	// pp.Println(chain.App.ScopedIBCMockKeeper)
+	// err = chain.App.ScopedIBCMockKeeper.ClaimCapability(chain.GetContext(), cap, host.PortPath(MockPort))
+	// require.NoError(t, err)
 
 	chain.NextBlock()
 
@@ -813,15 +824,14 @@ func (chain *TestChain) ExpireClient(amount time.Duration) {
 	chain.CurrentHeader.Time = chain.CurrentHeader.Time.Add(amount)
 }
 
-func (chain *TestChain) NewFabricConsensusState(counterparty TestChainI) fabrictypes.ConsensusState {
-	// TODO implements
-	return fabrictypes.ConsensusState{Timestamp: counterparty.GetApp().(*example.IBCApp).BlockProvider()().Timestamp()}
+func (chain *TestChain) NewFabricConsensusState(counterparty TestChainI) *fabrictypes.ConsensusState {
+	return &fabrictypes.ConsensusState{Timestamp: counterparty.GetApp().(*example.IBCApp).BlockProvider()().Timestamp()}
 }
 
-func (chain *TestChain) NewFabricClientState(counterparty TestChainI, clientID string) fabrictypes.ClientState {
-	// TODO implements
-	return fabrictypes.ClientState{
-		Id: clientID,
-		// LastChaincodeHeader: fabrictypes.NewChaincodeHeader(),
+func (chain *TestChain) NewFabricClientState(counterparty TestChainI, clientID string) *fabrictypes.ClientState {
+	block := counterparty.GetApp().(*example.IBCApp).BlockProvider()()
+	return &fabrictypes.ClientState{
+		Id:                  clientID,
+		LastChaincodeHeader: fabrictypes.NewChaincodeHeader(uint64(block.Height()), block.Timestamp(), fabrictypes.CommitmentProof{}),
 	}
 }
