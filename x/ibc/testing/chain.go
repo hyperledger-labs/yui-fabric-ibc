@@ -220,16 +220,6 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 	signers := []tmtypes.PrivValidator{privVal}
 
-	genesisState := makeGenesisState()
-
-	// generate genesis account
-	senderPrivKey := secp256k1.GenPrivKey()
-	acc := authtypes.NewBaseAccount(senderPrivKey.PubKey().Address().Bytes(), senderPrivKey.PubKey(), 0, 0)
-	balance := banktypes.Balance{
-		Address: acc.GetAddress().String(),
-		Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100000000000000))),
-	}
-	_ = balance
 	cc := chaincode.NewIBCChaincode(newApp, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := compat.MakeFakeStub()
@@ -242,6 +232,29 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		runner.GetBlockProvider(stub),
 	)
 	require.NoError(t, err)
+
+	genesisState := makeGenesisState()
+
+	// generate genesis account
+	senderPrivKey := secp256k1.GenPrivKey()
+	acc := authtypes.NewBaseAccount(senderPrivKey.PubKey().Address().Bytes(), senderPrivKey.PubKey(), 0, 0)
+	genAccs := []authtypes.GenesisAccount{acc}
+	authGenesis := authtypes.NewGenesisState(authtypes.DefaultParams(), genAccs)
+	genesisState[authtypes.ModuleName] = app.AppCodec().MustMarshalJSON(authGenesis)
+
+	balance := banktypes.Balance{
+		Address: acc.GetAddress().String(),
+		Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100000000000000))),
+	}
+	balances := []banktypes.Balance{balance}
+
+	bondAmt := sdk.NewInt(1000000)
+	totalSupply := sdk.NewCoins()
+	// add genesis acc tokens and delegated tokens to total supply
+	totalSupply = totalSupply.Add(balance.Coins.Add(sdk.NewCoin(sdk.DefaultBondDenom, bondAmt))...)
+	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{})
+
+	genesisState[banktypes.ModuleName] = app.AppCodec().MustMarshalJSON(bankGenesis)
 
 	// create current header and call begin block
 	header := tmproto.Header{
