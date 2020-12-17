@@ -135,6 +135,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfi
 	interfaceRegistry := encodingConfig.InterfaceRegistry
 
 	bApp := app.NewBaseApp(appName, logger, db, encodingConfig.TxConfig.TxJSONDecoder())
+	bApp.SetInterfaceRegistry(interfaceRegistry)
 	keys := sdk.NewKVStoreKeys(
 		authtypes.StoreKey, banktypes.StoreKey,
 		stakingtypes.StoreKey, paramstypes.StoreKey, ibchost.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey,
@@ -210,6 +211,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfi
 	)
 
 	app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
+	app.mm.RegisterServices(module.NewConfigurator(app.MsgServiceRouter(), app.GRPCQueryRouter()))
 
 	// initialize stores
 	app.MountKVStores(keys)
