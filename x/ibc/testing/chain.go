@@ -31,10 +31,15 @@ import (
 	ibctmtypes "github.com/cosmos/cosmos-sdk/x/ibc/light-clients/07-tendermint/types"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/cosmos/cosmos-sdk/x/ibc/testing/mock"
+	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+	"github.com/hyperledger/fabric-protos-go/common"
+	msppb "github.com/hyperledger/fabric-protos-go/msp"
+	"github.com/hyperledger/fabric/common/policydsl"
+	"github.com/hyperledger/fabric/msp"
+	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
-	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -45,8 +50,11 @@ import (
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
+	"github.com/datachainlab/fabric-ibc/tests"
 	"github.com/datachainlab/fabric-ibc/x/compat"
+	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 )
 
@@ -149,12 +157,13 @@ type TestChainI interface {
 	sendMsgs(msgs ...sdk.Msg) error
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		logger,
 		db,
 		traceStore,
 		example.MakeEncodingConfig(),
+		seqMgr,
 		blockProvider,
 	)
 }
@@ -189,11 +198,17 @@ type TestChain struct {
 	Connections []*ibctesting.TestConnection // track connectionID's created for this chain
 
 	NextChannelVersion string
+
+	// Fabric
+	fabChannelID   string
+	fabChaincodeID fabrictypes.ChaincodeID
+	endorser       msp.SigningIdentity
+	mspConfig      msppb.MSPConfig
 }
 
 var _ TestChainI = (*TestChain)(nil)
 
-func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
+func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	// generate validator private/public key
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
@@ -215,10 +230,12 @@ func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
 	cc := chaincode.NewIBCChaincode(newApp, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := compat.MakeFakeStub()
+	seqMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)))
 	app, err := newApp(
 		tmlog.NewTMLogger(os.Stdout),
 		compat.NewDB(stub),
 		nil,
+		&seqMgr,
 		runner.GetBlockProvider(stub),
 	)
 	require.NoError(t, err)
@@ -230,7 +247,21 @@ func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
 		Time:    globalStartTime,
 	}
 
-	txConfig := simapp.MakeTestEncodingConfig().TxConfig
+	// Fabric configuration
+
+	conf, err := fabrictypes.DefaultConfig()
+	require.NoError(t, err)
+	// setup the MSP manager so that we can sign/verify
+	mconf, bconf, err := fabrictests.GetLocalMspConfig(conf.MSPsDir, mspID)
+	require.NoError(t, err)
+	lcMSP, err := fabrictests.SetupLocalMsp(mconf, bconf)
+	require.NoError(t, err)
+	endorser, err := lcMSP.GetDefaultSigningIdentity()
+	require.NoError(t, err)
+
+	// TODO fix to clarify this method(or name?)
+	err = fabrictests.GetVerifyingConfig(mconf)
+	require.NoError(t, err)
 
 	// create an account to send transactions from
 	chain := &TestChain{
@@ -241,7 +272,7 @@ func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
 		Stub:               stub,
 		CurrentHeader:      header,
 		QueryServer:        app.GetIBCKeeper(),
-		TxConfig:           txConfig,
+		TxConfig:           simapp.MakeTestEncodingConfig().TxConfig,
 		Codec:              app.AppCodec(),
 		Vals:               valSet,
 		Signers:            signers,
@@ -250,6 +281,14 @@ func NewTestFabricChain(t *testing.T, chainID string) *TestChain {
 		ClientIDs:          make([]string, 0),
 		Connections:        make([]*ibctesting.TestConnection, 0),
 		NextChannelVersion: ChannelTransferVersion,
+
+		fabChaincodeID: fabrictypes.ChaincodeID{
+			Name:    "dummyCC",
+			Version: "dummyVer",
+		},
+		fabChannelID: "dummyChannel",
+		mspConfig:    *mconf,
+		endorser:     endorser,
 	}
 
 	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: time.Now().Unix()}, nil)
@@ -301,26 +340,22 @@ func (chain *TestChain) NextBlock() {}
 // QueryProof performs an abci query with the given key and returns the proto encoded merkle proof
 // for the query and the height at which the proof will succeed on a tendermint verifier.
 func (chain *TestChain) QueryProof(key []byte) ([]byte, clienttypes.Height) {
-	res := chain.App.Query(abci.RequestQuery{
-		Path: fmt.Sprintf("store/%s/key", host.StoreKey),
-		// Height: chain.App.LastBlockHeight() - 1,
-		Data:  key,
-		Prove: true,
-	})
+	tctx := contractapi.TransactionContext{}
+	tctx.SetStub(chain.Stub)
+	ce, err := queryEndorseCommitment(&tctx, chain.CC, key)
+	require.NoError(chain.t, err)
+	e, err := commitment.EntryFromCommitment(ce)
+	require.NoError(chain.t, err)
 
-	merkleProof := commitmenttypes.MerkleProof{
-		Proof: res.ProofOps,
-	}
-
-	proof, err := chain.App.AppCodec().MarshalBinaryBare(&merkleProof)
+	proof, err := tests.MakeCommitmentProof(chain.endorser, e.Key, e.Value)
+	require.NoError(chain.t, err)
+	bz, err := chain.App.AppCodec().MarshalBinaryBare(proof)
 	require.NoError(chain.t, err)
 
 	version := clienttypes.ParseChainID(chain.ChainID)
 
-	// proof height + 1 is returned as the proof created corresponds to the height the proof
-	// was created in the IAVL tree. Tendermint and subsequently the clients that rely on it
-	// have heights 1 above the IAVL tree. Thus we return proof height + 1
-	return proof, clienttypes.NewHeight(version, uint64(res.Height)+1)
+	// set height correctly
+	return bz, clienttypes.NewHeight(version, 1)
 }
 
 // QueryClientStateProof performs and abci query for a client state
@@ -385,6 +420,8 @@ func (chain *TestChain) UpdateClient(counterparty TestChainI, clientID string) e
 		panic("not implemented error")
 	}
 
+	return nil
+
 	header, err := chain.ConstructUpdateClientHeader(counterparty, clientID)
 	require.NoError(chain.t, err)
 
@@ -397,8 +434,9 @@ func (chain *TestChain) UpdateClient(counterparty TestChainI, clientID string) e
 	return chain.sendMsgs(msg)
 }
 
-func (chain *TestChain) ConstructUpdateClientHeader(counterparty TestChainI, clientID string) (*ibctmtypes.Header, error) {
+func (chain *TestChain) ConstructUpdateClientHeader(counterparty TestChainI, clientID string) (exported.Header, error) {
 	// TODO implements
+	// return fabrictypes.NewHeader(nil, nil, nil), nil
 	panic("not implemented error")
 }
 
@@ -829,9 +867,51 @@ func (chain *TestChain) NewFabricConsensusState(counterparty TestChainI) *fabric
 }
 
 func (chain *TestChain) NewFabricClientState(counterparty TestChainI, clientID string) *fabrictypes.ClientState {
+	mspID := "SampleOrgMSP"
+	var pcBytes []byte = makePolicy([]string{mspID})
+
 	block := counterparty.GetApp().(*example.IBCApp).BlockProvider()()
+
+	mcBytes, err := proto.Marshal(&chain.mspConfig)
+	require.NoError(chain.t, err)
+	mhs := fabrictypes.NewMSPHeaders([]fabrictypes.MSPHeader{
+		fabrictypes.NewMSPHeader(fabrictypes.MSPHeaderTypeCreate, mspID, mcBytes, pcBytes, &fabrictypes.MessageProof{}),
+	})
+	mspInfos, err := createMSPInitialClientState(mhs.Headers)
+	require.NoError(chain.t, err)
 	return &fabrictypes.ClientState{
 		Id:                  clientID,
 		LastChaincodeHeader: fabrictypes.NewChaincodeHeader(uint64(block.Height()), block.Timestamp(), fabrictypes.CommitmentProof{}),
+		LastChaincodeInfo: fabrictypes.NewChaincodeInfo(
+			chain.fabChannelID,
+			chain.fabChaincodeID,
+			pcBytes, pcBytes,
+			&fabrictypes.MessageProof{},
+		),
+		LastMspInfos: *mspInfos,
 	}
+}
+
+func createMSPInitialClientState(headers []fabrictypes.MSPHeader) (*fabrictypes.MSPInfos, error) {
+	var infos fabrictypes.MSPInfos
+	for _, mh := range headers {
+		if mh.Type != fabrictypes.MSPHeaderTypeCreate {
+			return nil, fmt.Errorf("unexpected fabric type: %v", mh.Type)
+		}
+		infos.Infos = append(infos.Infos, fabrictypes.MSPInfo{
+			MSPID:   mh.MSPID,
+			Config:  mh.Config,
+			Policy:  mh.Policy,
+			Freezed: false,
+		})
+	}
+	return &infos, nil
+}
+
+func makePolicy(mspids []string) []byte {
+	return protoutil.MarshalOrPanic(&common.ApplicationPolicy{
+		Type: &common.ApplicationPolicy_SignaturePolicy{
+			SignaturePolicy: policydsl.SignedByNOutOfGivenRole(int32(len(mspids)/2+1), msppb.MSPRole_MEMBER, mspids),
+		},
+	})
 }

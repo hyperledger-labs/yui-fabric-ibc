@@ -6,6 +6,7 @@ import (
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -27,12 +28,13 @@ func main() {
 	}
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		logger,
 		db,
 		traceStore,
 		example.MakeEncodingConfig(),
+		seqMgr,
 		blockProvider,
 	)
 }
