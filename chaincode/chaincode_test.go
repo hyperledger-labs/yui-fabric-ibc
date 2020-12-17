@@ -9,7 +9,7 @@ import (
 	"github.com/datachainlab/fabric-ibc/chaincode"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
-	"github.com/datachainlab/fabric-ibc/x/compat"
+	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/stretchr/testify/require"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -24,7 +24,7 @@ func TestResponseSerializer(t *testing.T) {
 	chaincode, err := contractapi.NewChaincode(cc)
 	require.NoError(err)
 
-	stub0 := compat.MakeFakeStub()
+	stub0 := testsstub.MakeFakeStub()
 
 	// Initialize chaincode
 	res := chaincode.Init(stub0)

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
-	"github.com/datachainlab/fabric-ibc/x/compat"
+	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -16,7 +16,7 @@ func TestSequence(t *testing.T) {
 	clientTk := newTimeKeeper()
 	endorserTk := newTimeKeeper()
 
-	stub := compat.MakeFakeStub()
+	stub := testsstub.MakeFakeStub()
 	stub.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
 		return &timestamp.Timestamp{Seconds: clientTk.Now().Unix()}, nil
 	}

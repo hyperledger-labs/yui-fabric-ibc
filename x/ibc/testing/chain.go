@@ -54,6 +54,7 @@ import (
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/datachainlab/fabric-ibc/tests"
+	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
@@ -222,7 +223,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 
 	cc := chaincode.NewIBCChaincode(newApp, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
-	stub := compat.MakeFakeStub()
+	stub := testsstub.MakeFakeStub()
 	seqMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)))
 	app, err := newApp(
 		tmlog.NewTMLogger(os.Stdout),
