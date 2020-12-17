@@ -1,4 +1,4 @@
-package compat
+package stub
 
 import (
 	"encoding/hex"

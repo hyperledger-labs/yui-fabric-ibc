@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	db "github.com/tendermint/tm-db"
@@ -118,7 +119,7 @@ func testBackendGetSetDelete(t *testing.T, db db.DB) {
 }
 
 func makeStubBasedDB() *DB {
-	stub := MakeFakeStub()
+	stub := testsstub.MakeFakeStub()
 	return NewDB(stub)
 }
 
