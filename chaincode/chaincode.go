@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
@@ -17,7 +16,7 @@ import (
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/golang/protobuf/proto"
+	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -116,6 +115,71 @@ func (c *IBCChaincode) EndorseSequenceCommitment(ctx contractapi.TransactionCont
 	return entry.ToCommitment(), nil
 }
 
+func (c *IBCChaincode) EndorseClientState(ctx contractapi.TransactionContextInterface, clientID string) (*commitment.CommitmentEntry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+
+		cs, found := app.GetIBCKeeper().ClientKeeper.GetClientState(cctx, clientID)
+		if !found {
+			return sdkerrors.Wrapf(clienttypes.ErrClientNotFound, "clientID '%v' not found", clientID)
+		}
+		bz, err := app.AppCodec().MarshalBinaryBare(cs.(*fabrictypes.ClientState))
+		if err != nil {
+			return err
+		}
+		e, err := commitment.MakeClientStateCommitmentEntry(
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
+			clientID,
+			bz,
+		)
+		if err != nil {
+			return err
+		}
+		entry = e
+		writer()
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry.ToCommitment(), nil
+}
+
+func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.CommitmentEntry, error) {
+	var entry *commitment.Entry
+	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
+		cctx, writer := app.MakeCacheContext(tmproto.Header{})
+		h := c.makeHeight(height)
+		cs, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(cctx, clientID, h)
+		if !ok {
+			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
+		}
+		consensusState, ok := cs.(*fabrictypes.ConsensusState)
+		if !ok {
+			return sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "unexpected consensus state type: %T", cs)
+		}
+		bz, err := app.AppCodec().MarshalBinaryBare(consensusState)
+		if err != nil {
+			return err
+		}
+		e, err := commitment.MakeConsensusStateCommitmentEntry(
+			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)), // TODO use fabric prefix instead of this
+			clientID,
+			h,
+			bz,
+		)
+		if err != nil {
+			return err
+		}
+		entry = e
+		writer()
+		return ctx.GetStub().PutState(e.Key, e.Value)
+	}); err != nil {
+		return nil, err
+	}
+	return entry.ToCommitment(), nil
+}
+
 func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContextInterface, connectionID string) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
@@ -125,7 +189,7 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 		if !found {
 			return sdkerrors.Wrap(connectiontypes.ErrConnectionNotFound, "cannot relay ACK of open attempt")
 		}
-		bz, err := proto.Marshal(&connection)
+		bz, err := app.AppCodec().MarshalBinaryBare(&connection)
 		if err != nil {
 			return err
 		}
@@ -155,7 +219,7 @@ func (c *IBCChaincode) EndorseChannelState(ctx contractapi.TransactionContextInt
 		if !found {
 			return sdkerrors.Wrap(channeltypes.ErrChannelNotFound, channelID)
 		}
-		bz, err := proto.Marshal(&channel)
+		bz, err := app.AppCodec().MarshalBinaryBare(&channel)
 		if err != nil {
 			return err
 		}
@@ -245,37 +309,6 @@ func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.Trans
 			portID,
 			channelID,
 			sequence,
-		)
-		if err != nil {
-			return err
-		}
-		entry = e
-		writer()
-		return ctx.GetStub().PutState(e.Key, e.Value)
-	}); err != nil {
-		return nil, err
-	}
-	return entry.ToCommitment(), nil
-}
-
-func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.TransactionContextInterface, clientID string, height uint64) (*commitment.CommitmentEntry, error) {
-	var entry *commitment.Entry
-	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
-		cctx, writer := app.MakeCacheContext(tmproto.Header{})
-		h := c.makeHeight(height)
-		cs, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(cctx, clientID, h)
-		if !ok {
-			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
-		}
-		bz, err := codec.MarshalAny(app.AppCodec(), cs)
-		if err != nil {
-			return err
-		}
-		e, err := commitment.MakeConsensusStateCommitmentEntry(
-			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)), // TODO use fabric prefix instead of this
-			clientID,
-			h,
-			bz,
 		)
 		if err != nil {
 			return err

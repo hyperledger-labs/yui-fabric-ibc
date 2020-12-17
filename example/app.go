@@ -51,6 +51,8 @@ import (
 	_ "github.com/cosmos/cosmos-sdk/client/docs/statik"
 
 	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
 )
 
@@ -125,7 +127,7 @@ type IBCApp struct {
 	sm *module.SimulationManager
 }
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, blockProvider app.BlockProvider) (*IBCApp, error) {
+func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
 
 	// TODO: Remove cdc in favor of appCodec once all modules are migrated.
 	appCodec := encodingConfig.Marshaler
@@ -168,9 +170,10 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfi
 		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.GetSubspace(banktypes.ModuleName), app.BlockedAddrs(),
 	)
 	// Create IBC Keeper
-	app.IBCKeeper = ibckeeper.NewKeeper(
+	ibcKeeper := ibckeeper.NewKeeper(
 		appCodec, keys[ibchost.StoreKey], app.StakingKeeper, scopedIBCKeeper,
 	)
+	app.IBCKeeper = compat.ApplyPatchToIBCKeeper(*ibcKeeper, appCodec, keys[ibchost.StoreKey], seqMgr)
 
 	// Create Transfer Keepers
 	app.TransferKeeper = ibctransferkeeper.NewKeeper(

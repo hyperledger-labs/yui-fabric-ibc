@@ -26,12 +26,12 @@ type Coordinator struct {
 	Chains map[string]TestChainI
 }
 
-func NewCoordinator(t *testing.T, n int) *Coordinator {
+func NewCoordinator(t *testing.T, n int, mspID string) *Coordinator {
 	chains := make(map[string]TestChainI)
 
 	for i := 0; i < n; i++ {
 		chainID := ibctesting.GetChainID(i)
-		chains[chainID] = NewTestFabricChain(t, chainID)
+		chains[chainID] = NewTestFabricChain(t, chainID, mspID)
 	}
 	return &Coordinator{
 		t:      t,
@@ -256,7 +256,7 @@ func (coord *Coordinator) ConnOpenTry(
 	// update source client on counterparty connection
 	return coord.UpdateClient(
 		counterparty, source,
-		counterpartyConnection.ClientID, SoloMachine,
+		counterpartyConnection.ClientID, counterparty.Type(),
 	)
 }
 
@@ -275,7 +275,7 @@ func (coord *Coordinator) ConnOpenAck(
 	// update source client on counterparty connection
 	return coord.UpdateClient(
 		counterparty, source,
-		counterpartyConnection.ClientID, SoloMachine,
+		counterpartyConnection.ClientID, counterparty.Type(),
 	)
 }
 
@@ -293,7 +293,7 @@ func (coord *Coordinator) ConnOpenConfirm(
 	// update source client on counterparty connection
 	return coord.UpdateClient(
 		counterparty, source,
-		counterpartyConnection.ClientID, SoloMachine,
+		counterpartyConnection.ClientID, counterparty.Type(),
 	)
 }
 

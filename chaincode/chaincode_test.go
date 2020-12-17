@@ -7,6 +7,7 @@ import (
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
+	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
@@ -62,12 +63,13 @@ func TestResponseSerializer(t *testing.T) {
 	// require.EqualValues(200, res.Status, res.String())
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		logger,
 		db,
 		traceStore,
 		example.MakeEncodingConfig(),
+		seqMgr,
 		blockProvider,
 	)
 }
