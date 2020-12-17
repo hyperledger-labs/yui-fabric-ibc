@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -219,6 +220,8 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 	signers := []tmtypes.PrivValidator{privVal}
 
+	genesisState := makeGenesisState()
+
 	// generate genesis account
 	senderPrivKey := secp256k1.GenPrivKey()
 	acc := authtypes.NewBaseAccount(senderPrivKey.PubKey().Address().Bytes(), senderPrivKey.PubKey(), 0, 0)
@@ -296,7 +299,9 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	tctx.SetStub(stub)
 
 	// Init chaincode
-	require.NoError(t, chain.CC.InitChaincode(&tctx, "{}"))
+	jsonBytes, err := json.Marshal(genesisState)
+	require.NoError(t, err)
+	require.NoError(t, chain.CC.InitChaincode(&tctx, string(jsonBytes)))
 
 	// cap := chain.App.IBCKeeper.PortKeeper.BindPort(chain.GetContext(), MockPort)
 	// pp.Println(chain.App.ScopedIBCMockKeeper)
@@ -306,6 +311,10 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	chain.NextBlock()
 
 	return chain
+}
+
+func makeGenesisState() simapp.GenesisState {
+	return example.NewDefaultGenesisState()
 }
 
 // Type implements TestChainI.Type
