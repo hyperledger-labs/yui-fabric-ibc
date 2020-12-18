@@ -127,7 +127,7 @@ type IBCApp struct {
 	sm *module.SimulationManager
 }
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
+func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
 
 	// TODO: Remove cdc in favor of appCodec once all modules are migrated.
 	appCodec := encodingConfig.Marshaler

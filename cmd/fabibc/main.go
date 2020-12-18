@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
@@ -14,7 +15,12 @@ import (
 )
 
 func main() {
-	cc := chaincode.NewIBCChaincode(newApp, chaincode.DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(
+		tmlog.NewTMLogger(os.Stdout),
+		commitment.NewDefaultSequenceManager(),
+		newApp,
+		chaincode.DefaultDBProvider,
+	)
 	chaincode, err := contractapi.NewChaincode(cc)
 
 	if err != nil {
@@ -28,7 +34,7 @@ func main() {
 	}
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		logger,
 		db,

@@ -23,10 +23,10 @@ func TestSequence(t *testing.T) {
 
 	prefix := commitmenttypes.NewMerklePrefix([]byte("ibc"))
 
-	smgr := NewSequenceManager(DefaultConfig(), prefix)
-	smgr.clock = func() time.Time {
+	smgr := NewSequenceManager(DefaultConfig(), prefix).(*sequenceManager)
+	smgr.SetClock(func() time.Time {
 		return endorserTk.Now()
-	}
+	})
 
 	// valid sequence 1
 	seq, err := smgr.InitSequence(stub)

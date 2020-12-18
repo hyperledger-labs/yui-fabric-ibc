@@ -21,10 +21,10 @@ var _ channeltypes.ClientKeeper = (*ClientKeeper)(nil)
 type ClientKeeper struct {
 	clientkeeper.Keeper
 
-	seqMgr *commitment.SequenceManager
+	seqMgr commitment.SequenceManager
 }
 
-func NewClientKeeper(k clientkeeper.Keeper, seqMgr *commitment.SequenceManager) ClientKeeper {
+func NewClientKeeper(k clientkeeper.Keeper, seqMgr commitment.SequenceManager) ClientKeeper {
 	return ClientKeeper{Keeper: k, seqMgr: seqMgr}
 }
 

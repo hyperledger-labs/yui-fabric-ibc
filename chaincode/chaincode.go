@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -33,13 +32,11 @@ type IBCChaincode struct {
 	runner      AppRunner
 }
 
-func NewIBCChaincode(appProvider AppProvider, dbProvider DBProvider) *IBCChaincode {
-	logger := log.NewTMLogger(os.Stdout)
-	sequenceMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)))
-	runner := NewAppRunner(logger, appProvider, dbProvider, &sequenceMgr)
+func NewIBCChaincode(logger log.Logger, seqMgr commitment.SequenceManager, appProvider AppProvider, dbProvider DBProvider) *IBCChaincode {
+	runner := NewAppRunner(logger, appProvider, dbProvider, seqMgr)
 	c := &IBCChaincode{
 		logger:      logger,
-		sequenceMgr: sequenceMgr,
+		sequenceMgr: seqMgr,
 		runner:      runner,
 	}
 	return c

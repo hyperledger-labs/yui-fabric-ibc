@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
+	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -23,17 +25,30 @@ func (seq *Sequence) Bytes() []byte {
 	return bz
 }
 
-type SequenceManager struct {
+type SequenceManager interface {
+	InitSequence(stub shim.ChaincodeStubInterface) (*Sequence, error)
+	GetCurrentSequence(stub shim.ChaincodeStubInterface) (*Sequence, error)
+	GetSequence(stub shim.ChaincodeStubInterface, seq uint64) (*Sequence, error)
+	UpdateSequence(stub shim.ChaincodeStubInterface) (*Sequence, error)
+	ValidateTimestamp(now time.Time, prevSec int64, next *timestamp.Timestamp) error
+	SetClock(clock func() time.Time)
+}
+
+type sequenceManager struct {
 	config CommitmentConfig
 	prefix exported.Prefix
 	clock  func() time.Time
 }
 
 func NewSequenceManager(config CommitmentConfig, prefix exported.Prefix) SequenceManager {
-	return SequenceManager{config: config, prefix: prefix, clock: tmtime.Now}
+	return &sequenceManager{config: config, prefix: prefix, clock: tmtime.Now}
 }
 
-func (m SequenceManager) InitSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
+func NewDefaultSequenceManager() SequenceManager {
+	return NewSequenceManager(DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)))
+}
+
+func (m sequenceManager) InitSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
 	tm, err := stub.GetTxTimestamp()
 	if err != nil {
 		return nil, err
@@ -48,15 +63,15 @@ func (m SequenceManager) InitSequence(stub shim.ChaincodeStubInterface) (*Sequen
 	return &seq, nil
 }
 
-func (m SequenceManager) GetCurrentSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
+func (m sequenceManager) GetCurrentSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
 	return m.getCurrentSequence(stub)
 }
 
-func (m SequenceManager) GetSequence(stub shim.ChaincodeStubInterface, seq uint64) (*Sequence, error) {
+func (m sequenceManager) GetSequence(stub shim.ChaincodeStubInterface, seq uint64) (*Sequence, error) {
 	return m.getSequence(stub, seq)
 }
 
-func (m SequenceManager) UpdateSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
+func (m sequenceManager) UpdateSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
 	current, err := m.getCurrentSequence(stub)
 	if err != nil {
 		return nil, err
@@ -77,7 +92,7 @@ func (m SequenceManager) UpdateSequence(stub shim.ChaincodeStubInterface) (*Sequ
 	return &next, nil
 }
 
-func (m SequenceManager) ValidateTimestamp(now time.Time, prevSec int64, next *timestamp.Timestamp) error {
+func (m sequenceManager) ValidateTimestamp(now time.Time, prevSec int64, next *timestamp.Timestamp) error {
 	if now.Unix()+int64(m.config.MaxTimestampDiff/time.Second) < next.GetSeconds() {
 		return errors.New("the next timestamp indicates future time")
 	}
@@ -90,7 +105,11 @@ func (m SequenceManager) ValidateTimestamp(now time.Time, prevSec int64, next *t
 	return nil
 }
 
-func (m SequenceManager) getCurrentSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
+func (m *sequenceManager) SetClock(clock func() time.Time) {
+	m.clock = clock
+}
+
+func (m sequenceManager) getCurrentSequence(stub shim.ChaincodeStubInterface) (*Sequence, error) {
 	bz, err := stub.GetState(MakeCurrentSequenceKey(m.prefix))
 	if err != nil {
 		return nil, err
@@ -104,7 +123,7 @@ func (m SequenceManager) getCurrentSequence(stub shim.ChaincodeStubInterface) (*
 	return &seq, nil
 }
 
-func (m SequenceManager) getSequence(stub shim.ChaincodeStubInterface, value uint64) (*Sequence, error) {
+func (m sequenceManager) getSequence(stub shim.ChaincodeStubInterface, value uint64) (*Sequence, error) {
 	bz, err := stub.GetState(MakeSequenceKey(m.prefix, value))
 	if err != nil {
 		return nil, err
@@ -118,7 +137,7 @@ func (m SequenceManager) getSequence(stub shim.ChaincodeStubInterface, value uin
 	return &seq, nil
 }
 
-func (m SequenceManager) updateSequence(stub shim.ChaincodeStubInterface, nextSeq Sequence) error {
+func (m sequenceManager) updateSequence(stub shim.ChaincodeStubInterface, nextSeq Sequence) error {
 	if err := stub.PutState(
 		MakeCurrentSequenceKey(m.prefix),
 		nextSeq.Bytes(),

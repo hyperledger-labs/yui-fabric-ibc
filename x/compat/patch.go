@@ -10,7 +10,7 @@ import (
 )
 
 // ApplyPatchToIBCKeeper applies patches to ibc keeper
-func ApplyPatchToIBCKeeper(k ibckeeper.Keeper, cdc codec.BinaryMarshaler, key sdk.StoreKey, seqMgr *commitment.SequenceManager) *ibckeeper.Keeper {
+func ApplyPatchToIBCKeeper(k ibckeeper.Keeper, cdc codec.BinaryMarshaler, key sdk.StoreKey, seqMgr commitment.SequenceManager) *ibckeeper.Keeper {
 	clientKeeper := fabrickeeper.NewClientKeeper(k.ClientKeeper, seqMgr)
 	k.ConnectionKeeper = connectionkeeper.NewKeeper(cdc, key, clientKeeper)
 	return &k

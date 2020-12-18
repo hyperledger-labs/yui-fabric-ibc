@@ -11,7 +11,9 @@ import (
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/datachainlab/fabric-ibc/example"
+	fabricmock "github.com/hyperledger/fabric/core/chaincode/lifecycle/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -511,10 +513,16 @@ func (coord *Coordinator) CommitBlock(chains ...TestChainI) {
 // CONTRACT: this function must be called after every commit on any TestChain.
 func (coord *Coordinator) IncrementTime() {
 	for _, chain := range coord.Chains {
-		_ = chain
-		// TODO increment block time on the chain
-		// chain.CurrentHeader.Time = chain.CurrentHeader.Time.Add(timeIncrement)
-		// chain.App.BeginBlock(abci.RequestBeginBlock{Header: chain.CurrentHeader})
+		switch chain := chain.(type) {
+		case *TestChain: // Fabric
+			chain.currentTime = chain.currentTime.Add(time.Second)
+			chain.Stub.(*fabricmock.ChaincodeStub).GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: chain.currentTime.Unix()}, nil)
+			// case *ibctesting.TestChain: // Tendermint
+			// chain.CurrentHeader.Time = chain.CurrentHeader.Time.Add(timeIncrement)
+			// chain.App.BeginBlock(abci.RequestBeginBlock{Header: chain.CurrentHeader})
+		default:
+			panic("not implemented error")
+		}
 	}
 }
 
