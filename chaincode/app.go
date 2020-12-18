@@ -14,21 +14,21 @@ import (
 	dbm "github.com/tendermint/tm-db"
 )
 
-type AppProvider func(logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error)
+type AppProvider func(logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error)
 
 type AppRunner struct {
 	logger      log.Logger
 	traceStore  io.Writer
 	appProvider AppProvider
 	dbProvider  DBProvider
-	seqMgr      *commitment.SequenceManager
+	seqMgr      commitment.SequenceManager
 }
 
 func NewAppRunner(
 	logger log.Logger,
 	appProvider AppProvider,
 	dbProvider DBProvider,
-	seqMgr *commitment.SequenceManager,
+	seqMgr commitment.SequenceManager,
 ) AppRunner {
 	return AppRunner{
 		logger:      logger,

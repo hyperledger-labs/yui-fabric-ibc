@@ -53,7 +53,6 @@ import (
 	"github.com/datachainlab/fabric-ibc/chaincode"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
-	"github.com/datachainlab/fabric-ibc/tests"
 	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
@@ -159,7 +158,7 @@ type TestChainI interface {
 	sendMsgs(msgs ...sdk.Msg) error
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		logger,
 		db,
@@ -206,6 +205,9 @@ type TestChain struct {
 	fabChaincodeID fabrictypes.ChaincodeID
 	endorser       msp.SigningIdentity
 	mspConfig      msppb.MSPConfig
+	seqMgr         commitment.SequenceManager
+
+	currentTime time.Time
 }
 
 var _ TestChainI = (*TestChain)(nil)
@@ -221,15 +223,22 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 	signers := []tmtypes.PrivValidator{privVal}
 
-	cc := chaincode.NewIBCChaincode(newApp, chaincode.DefaultDBProvider)
+	logger := tmlog.NewTMLogger(os.Stdout)
+	seqMgr := commitment.NewSequenceManager(
+		commitment.CommitmentConfig{
+			MinTimeInterval:  0,
+			MaxTimestampDiff: 30 * time.Second,
+		},
+		commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
+	)
+	cc := chaincode.NewIBCChaincode(logger, seqMgr, newApp, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
-	seqMgr := commitment.NewSequenceManager(commitment.DefaultConfig(), commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)))
 	app, err := newApp(
-		tmlog.NewTMLogger(os.Stdout),
+		logger,
 		compat.NewDB(stub),
 		nil,
-		&seqMgr,
+		seqMgr,
 		runner.GetBlockProvider(stub),
 	)
 	require.NoError(t, err)
@@ -306,11 +315,17 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		fabChannelID: "dummyChannel",
 		mspConfig:    *mconf,
 		endorser:     endorser,
+		currentTime:  globalStartTime,
+		seqMgr:       seqMgr,
 	}
 
-	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: time.Now().Unix()}, nil)
+	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: globalStartTime.Unix()}, nil)
 	var tctx contractapi.TransactionContext
 	tctx.SetStub(stub)
+
+	seqMgr.SetClock(func() time.Time {
+		return chain.currentTime
+	})
 
 	// Init chaincode
 	jsonBytes, err := json.Marshal(genesisState)
@@ -365,14 +380,7 @@ func (chain *TestChain) NextBlock() {}
 func (chain *TestChain) QueryProof(key []byte) ([]byte, clienttypes.Height) {
 	tctx := contractapi.TransactionContext{}
 	tctx.SetStub(chain.Stub)
-	ce, err := queryEndorseCommitment(&tctx, chain.CC, key)
-	require.NoError(chain.t, err)
-	e, err := commitment.EntryFromCommitment(ce)
-	require.NoError(chain.t, err)
-
-	proof, err := tests.MakeCommitmentProof(chain.endorser, e.Key, e.Value)
-	require.NoError(chain.t, err)
-	bz, err := chain.App.AppCodec().MarshalBinaryBare(proof)
+	bz, err := queryEndorseCommitment(&tctx, chain, key)
 	require.NoError(chain.t, err)
 
 	version := clienttypes.ParseChainID(chain.ChainID)
@@ -438,12 +446,12 @@ func (chain *TestChain) CreateClient(counterparty TestChainI, clientID string) e
 	return chain.sendMsgs(msg)
 }
 
+// TODO add tests for other headers
+// UpdateClient updates the sequence and timestamp
 func (chain *TestChain) UpdateClient(counterparty TestChainI, clientID string) error {
 	if counterparty.Type() != Fabric {
 		panic("not implemented error")
 	}
-
-	return nil
 
 	header, err := chain.ConstructUpdateClientHeader(counterparty, clientID)
 	require.NoError(chain.t, err)
@@ -457,10 +465,30 @@ func (chain *TestChain) UpdateClient(counterparty TestChainI, clientID string) e
 	return chain.sendMsgs(msg)
 }
 
-func (chain *TestChain) ConstructUpdateClientHeader(counterparty TestChainI, clientID string) (exported.Header, error) {
-	// TODO implements
-	// return fabrictypes.NewHeader(nil, nil, nil), nil
-	panic("not implemented error")
+func (*TestChain) ConstructUpdateClientHeader(counterparty TestChainI, clientID string) (exported.Header, error) {
+	cp := counterparty.(*TestChain)
+
+	var tctx contractapi.TransactionContext
+	tctx.SetStub(cp.Stub)
+	_, err := cp.CC.UpdateSequence(&tctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seq, err := cp.seqMgr.GetCurrentSequence(cp.Stub)
+	if err != nil {
+		return nil, err
+	}
+	e, err := cp.CC.EndorseSequenceCommitment(&tctx)
+	if err != nil {
+		return nil, err
+	}
+	proof, err := endorseCommitment(&tctx, cp, e)
+	if err != nil {
+		return nil, err
+	}
+	h := fabrictypes.NewChaincodeHeader(seq.Value, seq.Timestamp, *proof)
+	return fabrictypes.NewHeader(&h, nil, nil), nil
 }
 
 // ConnectionOpenInit will construct and execute a MsgConnectionOpenInit.

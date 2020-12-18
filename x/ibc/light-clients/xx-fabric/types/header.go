@@ -14,8 +14,8 @@ import (
 
 var _ exported.Header = (*Header)(nil)
 
-func NewHeader(cheader *ChaincodeHeader, cinfo *ChaincodeInfo, mheaders *MSPHeaders) Header {
-	return Header{ChaincodeHeader: cheader, ChaincodeInfo: cinfo, MSPHeaders: mheaders}
+func NewHeader(cheader *ChaincodeHeader, cinfo *ChaincodeInfo, mheaders *MSPHeaders) *Header {
+	return &Header{ChaincodeHeader: cheader, ChaincodeInfo: cinfo, MSPHeaders: mheaders}
 }
 
 func (h Header) GetHeight() exported.Height {

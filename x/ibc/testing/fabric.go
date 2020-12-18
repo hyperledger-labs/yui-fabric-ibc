@@ -9,10 +9,32 @@ import (
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	"github.com/datachainlab/fabric-ibc/chaincode"
 	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/datachainlab/fabric-ibc/tests"
+	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
-func queryEndorseCommitment(ctx contractapi.TransactionContextInterface, cc *chaincode.IBCChaincode, key []byte) (*commitment.CommitmentEntry, error) {
+func endorseCommitment(ctx contractapi.TransactionContextInterface, chain *TestChain, entry *commitment.CommitmentEntry) (*fabrictypes.CommitmentProof, error) {
+	e, err := commitment.EntryFromCommitment(entry)
+	if err != nil {
+		return nil, err
+	}
+	return tests.MakeCommitmentProof(chain.endorser, e.Key, e.Value)
+}
+
+func queryEndorseCommitment(ctx contractapi.TransactionContextInterface, chain *TestChain, key []byte) ([]byte, error) {
+	e, err := queryCommitment(ctx, chain.CC, key)
+	if err != nil {
+		return nil, err
+	}
+	c, err := endorseCommitment(ctx, chain, e)
+	if err != nil {
+		return nil, err
+	}
+	return chain.App.AppCodec().MarshalBinaryBare(c)
+}
+
+func queryCommitment(ctx contractapi.TransactionContextInterface, cc *chaincode.IBCChaincode, key []byte) (*commitment.CommitmentEntry, error) {
 	k := string(key)
 	parts := strings.Split(k, "/")
 

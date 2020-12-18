@@ -3,6 +3,7 @@ package chaincode_test
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -23,7 +24,12 @@ import (
 func TestResponseSerializer(t *testing.T) {
 	require := require.New(t)
 
-	cc := chaincode.NewIBCChaincode(newApp, chaincode.DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(
+		tmlog.NewTMLogger(os.Stdout),
+		commitment.NewDefaultSequenceManager(),
+		newApp,
+		chaincode.DefaultDBProvider,
+	)
 	chaincode, err := contractapi.NewChaincode(cc)
 	require.NoError(err)
 
@@ -66,7 +72,7 @@ func TestResponseSerializer(t *testing.T) {
 	require.EqualValues(int32(200), res.Status, res.String())
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr *commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		logger,
 		db,
