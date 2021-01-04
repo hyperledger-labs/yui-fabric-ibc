@@ -16,6 +16,7 @@ import (
 
 func main() {
 	cc := chaincode.NewIBCChaincode(
+		"fabricibc",
 		tmlog.NewTMLogger(os.Stdout),
 		commitment.NewDefaultSequenceManager(),
 		newApp,
@@ -34,8 +35,9 @@ func main() {
 	}
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
+		appName,
 		logger,
 		db,
 		traceStore,

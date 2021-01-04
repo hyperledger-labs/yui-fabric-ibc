@@ -173,8 +173,9 @@ func (app *BaseApp) InitChain(appStateBytes []byte) error {
 func (app *BaseApp) getBlockHeader() tmproto.Header {
 	block := app.blockProvider()
 	return tmproto.Header{
-		Height: block.Height() + 1,
-		Time:   tmtime.Now(),
+		ChainID: app.name,
+		Height:  block.Height() + 1,
+		Time:    tmtime.Now(),
 	}
 }
 

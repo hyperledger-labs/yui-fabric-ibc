@@ -8,15 +8,17 @@ import (
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
 	dbm "github.com/tendermint/tm-db"
 )
 
-type AppProvider func(logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error)
+type AppProvider func(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error)
 
 type AppRunner struct {
+	appName     string
 	logger      log.Logger
 	traceStore  io.Writer
 	appProvider AppProvider
@@ -25,12 +27,14 @@ type AppRunner struct {
 }
 
 func NewAppRunner(
+	appName string,
 	logger log.Logger,
 	appProvider AppProvider,
 	dbProvider DBProvider,
 	seqMgr commitment.SequenceManager,
 ) AppRunner {
 	return AppRunner{
+		appName:     appName,
 		logger:      logger,
 		appProvider: appProvider,
 		dbProvider:  dbProvider,
@@ -46,7 +50,7 @@ func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) 
 
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Application) error) error {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
+	app, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
 	if err != nil {
 		return err
 	}
@@ -56,22 +60,22 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Applicat
 	return nil
 }
 
-func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]abci.Event, error) {
+func (r AppRunner) RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (*app.ResponseTx, []abci.Event, error) {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
+	app, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	res, err := app.RunTx(stub, txBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return res.Events, nil
+	return makeResponseTx(*res), res.Events, nil
 }
 
 func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery) (*app.ResponseQuery, error) {
 	db := r.dbProvider(stub)
-	a, err := r.appProvider(r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
+	a, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}
@@ -109,4 +113,11 @@ type DBProvider func(shim.ChaincodeStubInterface) dbm.DB
 
 func DefaultDBProvider(stub shim.ChaincodeStubInterface) dbm.DB {
 	return compat.NewDB(stub)
+}
+
+func makeResponseTx(res sdk.Result) *app.ResponseTx {
+	return &app.ResponseTx{
+		Data: string(res.Data),
+		Log:  res.Log,
+	}
 }
