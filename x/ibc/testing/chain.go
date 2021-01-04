@@ -70,8 +70,7 @@ const (
 	UnbondingPeriod time.Duration = time.Hour * 24 * 7 * 3
 	MaxClockDrift   time.Duration = time.Second * 10
 
-	// ChannelTransferVersion = ibctransfertypes.Version
-	ChannelCrossVersion = "cross-1"
+	ChannelTransferVersion = ibctransfertypes.Version
 
 	ConnectionIDPrefix = "conn"
 	ChannelIDPrefix    = "chan"
@@ -309,7 +308,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		SenderAccount:      acc,
 		ClientIDs:          make([]string, 0),
 		Connections:        make([]*ibctesting.TestConnection, 0),
-		NextChannelVersion: ChannelCrossVersion,
+		NextChannelVersion: ChannelTransferVersion,
 
 		fabChaincodeID: fabrictypes.ChaincodeID{
 			Name:    "dummyCC",
@@ -589,10 +588,6 @@ func (chain *TestChain) CreatePortCapability(portID string) {
 		case TransferPort:
 			// claim capability using the transfer capability keeper
 			err = chain.App.ScopedTransferKeeper.ClaimCapability(chain.GetContext(), cap, host.PortPath(portID))
-			require.NoError(chain.t, err)
-		case "cross":
-			// claim capability using the cross capability keeper
-			err = chain.App.ScopedCrossKeeper.ClaimCapability(chain.GetContext(), cap, host.PortPath(portID))
 			require.NoError(chain.t, err)
 		default:
 			panic(fmt.Sprintf("unsupported ibc testing package port ID %s", portID))

@@ -6,10 +6,10 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/confio/ics23/go v0.6.3
 	github.com/cosmos/cosmos-sdk v0.40.0-rc3
-	github.com/datachainlab/cross v0.0.8-0.20201207142928-1095340854de
 	github.com/fsouza/go-dockerclient v1.6.5 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.3
+	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/grpc-gateway v1.15.2
 	github.com/hyperledger/fabric v1.4.0-rc1.0.20200416031218-eff2f9306191
@@ -23,6 +23,7 @@ require (
 	github.com/tedsuo/ifrit v0.0.0-20191009134036-9a97d0632f00 // indirect
 	github.com/tendermint/tendermint v0.34.0-rc6
 	github.com/tendermint/tm-db v0.6.2
+	google.golang.org/genproto v0.0.0-20201111145450-ac7456db90a6 // indirect
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.25.0
 )

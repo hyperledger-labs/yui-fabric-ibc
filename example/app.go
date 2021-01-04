@@ -54,22 +54,6 @@ import (
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
-
-	"github.com/datachainlab/cross/simapp/samplemod"
-	samplemodkeeper "github.com/datachainlab/cross/simapp/samplemod/keeper"
-	samplemodtypes "github.com/datachainlab/cross/simapp/samplemod/types"
-	cross "github.com/datachainlab/cross/x/core"
-	crossatomic "github.com/datachainlab/cross/x/core/atomic"
-	atomickeeper "github.com/datachainlab/cross/x/core/atomic/keeper"
-	atomictypes "github.com/datachainlab/cross/x/core/atomic/types"
-	contractkeeper "github.com/datachainlab/cross/x/core/contract/keeper"
-	crosskeeper "github.com/datachainlab/cross/x/core/keeper"
-	"github.com/datachainlab/cross/x/core/router"
-	crossstorekeeper "github.com/datachainlab/cross/x/core/store/keeper"
-	crossstoretypes "github.com/datachainlab/cross/x/core/store/types"
-	crosstypes "github.com/datachainlab/cross/x/core/types"
-	xcctypes "github.com/datachainlab/cross/x/core/xcc/types"
-	"github.com/datachainlab/cross/x/packets"
 )
 
 var (
@@ -83,9 +67,6 @@ var (
 		ibc.AppModuleBasic{},
 		fabric.AppModuleBasic{},
 		transfer.AppModuleBasic{},
-		cross.AppModuleBasic{},
-		crossatomic.AppModuleBasic{},
-		samplemod.AppModuleBasic{},
 	)
 
 	// module account permissions
@@ -132,18 +113,10 @@ type IBCApp struct {
 	EvidenceKeeper   evidencekeeper.Keeper
 	TransferKeeper   ibctransferkeeper.Keeper
 
-	CrossKeeper     crosskeeper.Keeper
-	AtomicKeeper    atomickeeper.Keeper
-	SamplemodKeeper samplemodkeeper.Keeper
-
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper      capabilitykeeper.ScopedKeeper
 	ScopedTransferKeeper capabilitykeeper.ScopedKeeper
-	ScopedCrossKeeper    capabilitykeeper.ScopedKeeper
 	ScopedIBCMockKeeper  capabilitykeeper.ScopedKeeper
-
-	// other modules
-	XCCResolver xcctypes.XCCResolver
 
 	// the module manager
 	mm *module.Manager
@@ -164,7 +137,6 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 	keys := sdk.NewKVStoreKeys(
 		authtypes.StoreKey, banktypes.StoreKey,
 		stakingtypes.StoreKey, paramstypes.StoreKey, ibchost.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey,
-		crosstypes.StoreKey, samplemodtypes.StoreKey,
 	)
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
@@ -188,7 +160,6 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 	app.CapabilityKeeper = capabilitykeeper.NewKeeper(appCodec, keys[capabilitytypes.StoreKey], memKeys[capabilitytypes.MemStoreKey])
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibchost.ModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
-	scopedCrossKeeper := app.CapabilityKeeper.ScopeToModule(crosstypes.ModuleName)
 
 	// add keepers
 	app.AccountKeeper = authkeeper.NewAccountKeeper(
@@ -211,48 +182,9 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 	)
 	transferModule := transfer.NewAppModule(app.TransferKeeper)
 
-	// Create a sample module
-	xstore := crossstorekeeper.NewStore(appCodec, crosstypes.NewPrefixStoreKey(keys[crosstypes.StoreKey], crosstypes.ContractStoreKeyPrefix))
-	app.SamplemodKeeper = samplemodkeeper.NewKeeper(appCodec, keys[samplemodtypes.StoreKey], xstore)
-	samplemodModule := samplemod.NewAppModule(app.SamplemodKeeper)
-
-	// Setup a cross module
-	app.XCCResolver = xcctypes.NewChannelInfoResolver(app.IBCKeeper.ChannelKeeper)
-	cmgr := contractkeeper.NewContractManager(
-		appCodec,
-		crosstypes.NewPrefixStoreKey(keys[crosstypes.StoreKey], crosstypes.ContractManagerPrefix),
-		samplemodModule,
-		xstore,
-		crossstoretypes.DefaultContractHandleDecorators(),
-	)
-	app.AtomicKeeper = atomickeeper.NewKeeper(
-		appCodec, crosstypes.NewPrefixStoreKey(keys[crosstypes.StoreKey], crosstypes.AtomicKeyPrefix),
-		app.IBCKeeper.ChannelKeeper, &app.IBCKeeper.PortKeeper, scopedCrossKeeper,
-		cmgr, app.XCCResolver, packets.NewNOPPacketMiddleware(),
-	)
-	crossAtomicModule := crossatomic.NewAppModule(appCodec, app.AtomicKeeper)
-
-	router := router.NewRouter()
-	crossAtomicModule.RegisterPacketRoutes(router)
-
-	// Create Cross Keepers
-	app.CrossKeeper = crosskeeper.NewKeeper(
-		appCodec,
-		crosstypes.NewPrefixStoreKey(keys[crosstypes.StoreKey], crosstypes.InitiatorKeyPrefix),
-		crosstypes.NewPrefixStoreKey(keys[crosstypes.StoreKey], crosstypes.AuthKeyPrefix),
-		app.IBCKeeper.ChannelKeeper, &app.IBCKeeper.PortKeeper,
-		scopedCrossKeeper,
-		packets.NewNOPPacketMiddleware(),
-		app.XCCResolver,
-		app.AtomicKeeper,
-		router,
-	)
-	crossModule := cross.NewAppModule(appCodec, app.CrossKeeper)
-
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter()
 	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferModule)
-	ibcRouter.AddRoute(crosstypes.ModuleName, crossModule)
 	app.IBCKeeper.SetRouter(ibcRouter)
 
 	// NOTE: Any module instantiated in the module manager that is later modified
@@ -264,9 +196,6 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 		ibc.NewAppModule(app.IBCKeeper),
 		params.NewAppModule(app.ParamsKeeper),
 		transferModule,
-		crossModule,
-		crossAtomicModule,
-		samplemodModule,
 	)
 
 	// NOTE: The genutils module must occur after staking so that pools are
@@ -276,7 +205,7 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 	// can do so safely.
 	app.mm.SetOrderInitGenesis(
 		capabilitytypes.ModuleName, authtypes.ModuleName, banktypes.ModuleName, distrtypes.ModuleName, stakingtypes.ModuleName,
-		ibchost.ModuleName, ibctransfertypes.ModuleName, samplemodtypes.ModuleName, crosstypes.ModuleName, atomictypes.ModuleName,
+		ibchost.ModuleName, ibctransfertypes.ModuleName,
 	)
 
 	app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
@@ -309,7 +238,6 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
 	app.ScopedTransferKeeper = scopedTransferKeeper
-	app.ScopedCrossKeeper = scopedCrossKeeper
 
 	return app, nil
 }
