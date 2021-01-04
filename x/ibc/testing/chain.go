@@ -155,11 +155,12 @@ type TestChainI interface {
 	NewClientID(counterpartyChainID string) string
 	GetPrefix() commitmenttypes.MerklePrefix
 
-	sendMsgs(msgs ...sdk.Msg) error
+	SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error)
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
+		appName,
 		logger,
 		db,
 		traceStore,
@@ -231,10 +232,11 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		},
 		commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 	)
-	cc := chaincode.NewIBCChaincode(logger, seqMgr, newApp, chaincode.DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
 	app, err := newApp(
+		chainID,
 		logger,
 		compat.NewDB(stub),
 		nil,
@@ -802,14 +804,14 @@ func (chain *TestChain) SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error) {
 	bz, err := cfg.TxJSONEncoder()(tx)
 	require.NoError(chain.t, err)
 
-	_, err = chain.CC.GetAppRunner().RunMsg(chain.Stub, bz)
+	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
 	if err != nil {
 		return nil, err
 	}
 
 	// increment sequence for successful transaction execution
 	chain.SenderAccount.SetSequence(chain.SenderAccount.GetSequence() + 1)
-	return nil, nil
+	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
 }
 
 // GetClientState retrieves the client state for the provided clientID. The client is

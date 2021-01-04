@@ -56,8 +56,6 @@ import (
 	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
 )
 
-const appName = "FabricIBC"
-
 var (
 	// ModuleBasics defines the module BasicManager is in charge of setting up basic,
 	// non-dependant module elements, such as codec registration
@@ -127,7 +125,7 @@ type IBCApp struct {
 	sm *module.SimulationManager
 }
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
+func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
 
 	// TODO: Remove cdc in favor of appCodec once all modules are migrated.
 	appCodec := encodingConfig.Marshaler
