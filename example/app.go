@@ -3,7 +3,9 @@ package example
 import (
 	"io"
 
+	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	simappparams "github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/std"
@@ -12,6 +14,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
@@ -19,25 +22,38 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/capability"
 	capabilitykeeper "github.com/cosmos/cosmos-sdk/x/capability/keeper"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
+	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
+	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
-	transfer "github.com/cosmos/cosmos-sdk/x/ibc-transfer"
-	ibctransferkeeper "github.com/cosmos/cosmos-sdk/x/ibc-transfer/keeper"
-	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc-transfer/types"
-	port "github.com/cosmos/cosmos-sdk/x/ibc/05-port"
+	evidencekeeper "github.com/cosmos/cosmos-sdk/x/evidence/keeper"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
+	transfer "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer"
+	ibctransferkeeper "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/keeper"
+	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/types"
+	ibc "github.com/cosmos/cosmos-sdk/x/ibc/core"
+	porttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/05-port/types"
+	ibchost "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
+	ibckeeper "github.com/cosmos/cosmos-sdk/x/ibc/core/keeper"
+	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
 	"github.com/cosmos/cosmos-sdk/x/params"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
+	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/datachainlab/fabric-ibc/app"
-	ibcapp "github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/chaincode"
-	"github.com/datachainlab/fabric-ibc/x/ibc"
-	ibcante "github.com/datachainlab/fabric-ibc/x/ibc/ante"
-	abci "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
+	upgradekeeper "github.com/cosmos/cosmos-sdk/x/upgrade/keeper"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	dbm "github.com/tendermint/tm-db"
+
+	// unnamed import of statik for swagger UI support
+	_ "github.com/cosmos/cosmos-sdk/client/docs/statik"
+
+	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/datachainlab/fabric-ibc/x/compat"
+	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
 )
 
 const appName = "FabricIBC"
@@ -51,6 +67,7 @@ var (
 		bank.AppModuleBasic{},
 		capability.AppModuleBasic{},
 		ibc.AppModuleBasic{},
+		fabric.AppModuleBasic{},
 		transfer.AppModuleBasic{},
 	)
 
@@ -67,100 +84,115 @@ var (
 	}
 )
 
-var _ ibcapp.Application = (*IBCApp)(nil)
+var _ app.Application = (*IBCApp)(nil)
 
 type IBCApp struct {
-	*ibcapp.BaseApp
-	cdc      *codec.Codec
-	appCodec codec.Marshaler
+	*app.BaseApp
+	cdc               *codec.LegacyAmino
+	appCodec          codec.Marshaler
+	interfaceRegistry types.InterfaceRegistry
 
-	txDecoder sdk.TxDecoder
+	invCheckPeriod uint
 
 	// keys to access the substores
 	keys    map[string]*sdk.KVStoreKey
+	tkeys   map[string]*sdk.TransientStoreKey
 	memKeys map[string]*sdk.MemoryStoreKey
-
-	// subspaces
-	subspaces map[string]paramstypes.Subspace
 
 	// keepers
 	AccountKeeper    authkeeper.AccountKeeper
 	BankKeeper       bankkeeper.Keeper
 	CapabilityKeeper *capabilitykeeper.Keeper
+	StakingKeeper    stakingkeeper.Keeper
+	SlashingKeeper   slashingkeeper.Keeper
+	MintKeeper       mintkeeper.Keeper
+	DistrKeeper      distrkeeper.Keeper
+	GovKeeper        govkeeper.Keeper
+	CrisisKeeper     crisiskeeper.Keeper
+	UpgradeKeeper    upgradekeeper.Keeper
 	ParamsKeeper     paramskeeper.Keeper
-	IBCKeeper        *ibc.Keeper
+	IBCKeeper        *ibckeeper.Keeper // IBC Keeper must be a pointer in the app, so we can SetRouter on it correctly
+	EvidenceKeeper   evidencekeeper.Keeper
 	TransferKeeper   ibctransferkeeper.Keeper
 
 	// make scoped keepers public for test purposes
-	ScopedIBCKeeper capabilitykeeper.ScopedKeeper
+	ScopedIBCKeeper      capabilitykeeper.ScopedKeeper
+	ScopedTransferKeeper capabilitykeeper.ScopedKeeper
+	ScopedIBCMockKeeper  capabilitykeeper.ScopedKeeper
 
 	// the module manager
 	mm *module.Manager
+
+	// simulation manager
+	sm *module.SimulationManager
 }
 
-var AppProvider chaincode.AppProvider = NewIBCApp
+func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider app.SelfConsensusStateKeeperProvider, blockProvider app.BlockProvider) (app.Application, error) {
-	appCodec, cdc := MakeCodecs()
-	bApp := ibcapp.NewBaseApp(appName, logger, db, ibcapp.JSONTxDecoder(cdc))
+	// TODO: Remove cdc in favor of appCodec once all modules are migrated.
+	appCodec := encodingConfig.Marshaler
+	cdc := encodingConfig.Amino
+	interfaceRegistry := encodingConfig.InterfaceRegistry
+
+	bApp := app.NewBaseApp(appName, logger, db, encodingConfig.TxConfig.TxJSONDecoder())
+	bApp.SetInterfaceRegistry(interfaceRegistry)
 	keys := sdk.NewKVStoreKeys(
 		authtypes.StoreKey, banktypes.StoreKey,
-		stakingtypes.StoreKey, paramstypes.StoreKey, ibc.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey,
+		stakingtypes.StoreKey, paramstypes.StoreKey, ibchost.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey,
 	)
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
 
 	app := &IBCApp{
-		BaseApp:   bApp,
-		cdc:       cdc,
-		appCodec:  appCodec,
-		keys:      keys,
-		memKeys:   memKeys,
-		txDecoder: ibcapp.JSONTxDecoder(cdc),
-		subspaces: make(map[string]paramstypes.Subspace),
+		BaseApp:           bApp,
+		cdc:               cdc,
+		appCodec:          appCodec,
+		interfaceRegistry: interfaceRegistry,
+		keys:              keys,
+		memKeys:           memKeys,
 	}
 
 	// init params keeper and subspaces
-	app.ParamsKeeper = paramskeeper.NewKeeper(appCodec, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
-	app.subspaces[authtypes.ModuleName] = app.ParamsKeeper.Subspace(authtypes.DefaultParamspace)
-	app.subspaces[banktypes.ModuleName] = app.ParamsKeeper.Subspace(banktypes.DefaultParamspace)
+	app.ParamsKeeper = initParamsKeeper(appCodec, cdc, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
 
-	// // set the BaseApp's parameter store
-	// bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(std.ConsensusParamsKeyTable()))
+	// set the BaseApp's parameter store
+	bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramskeeper.ConsensusParamsKeyTable()))
 
 	// add capability keeper and ScopeToModule for ibc module
 	app.CapabilityKeeper = capabilitykeeper.NewKeeper(appCodec, keys[capabilitytypes.StoreKey], memKeys[capabilitytypes.MemStoreKey])
-	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibc.ModuleName)
+	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibchost.ModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
 
 	// add keepers
 	app.AccountKeeper = authkeeper.NewAccountKeeper(
-		appCodec, keys[authtypes.StoreKey], app.subspaces[authtypes.ModuleName], authtypes.ProtoBaseAccount, maccPerms,
+		appCodec, keys[authtypes.StoreKey], app.GetSubspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms,
 	)
 	app.BankKeeper = bankkeeper.NewBaseKeeper(
-		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.subspaces[banktypes.ModuleName], make(map[string]bool),
+		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.GetSubspace(banktypes.ModuleName), app.BlockedAddrs(),
 	)
-	app.IBCKeeper = ibc.NewKeeper(
-		app.cdc, appCodec, keys[ibc.StoreKey], nil, cskProvider(), scopedIBCKeeper, // TODO set stakingKeeper
+	// Create IBC Keeper
+	ibcKeeper := ibckeeper.NewKeeper(
+		appCodec, keys[ibchost.StoreKey], app.StakingKeeper, scopedIBCKeeper,
 	)
+	app.IBCKeeper = compat.ApplyPatchToIBCKeeper(*ibcKeeper, appCodec, keys[ibchost.StoreKey], seqMgr)
 
 	// Create Transfer Keepers
 	app.TransferKeeper = ibctransferkeeper.NewKeeper(
-		appCodec, keys[ibctransfertypes.StoreKey],
+		appCodec, keys[ibctransfertypes.StoreKey], app.GetSubspace(ibctransfertypes.ModuleName),
 		app.IBCKeeper.ChannelKeeper, &app.IBCKeeper.PortKeeper,
 		app.AccountKeeper, app.BankKeeper, scopedTransferKeeper,
 	)
 	transferModule := transfer.NewAppModule(app.TransferKeeper)
 
 	// Create static IBC router, add transfer route, then set and seal it
-	ibcRouter := port.NewRouter()
+	ibcRouter := porttypes.NewRouter()
 	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferModule)
 	app.IBCKeeper.SetRouter(ibcRouter)
 
 	// NOTE: Any module instantiated in the module manager that is later modified
 	// must be passed by reference here.
 	app.mm = module.NewManager(
-		auth.NewAppModule(appCodec, app.AccountKeeper),
+		auth.NewAppModule(appCodec, app.AccountKeeper, authsims.RandomGenesisAccounts),
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper),
 		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		ibc.NewAppModule(app.IBCKeeper),
@@ -168,7 +200,18 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider a
 		transferModule,
 	)
 
-	app.mm.RegisterRoutes(app.Router(), app.QueryRouter())
+	// NOTE: The genutils module must occur after staking so that pools are
+	// properly initialized with tokens from genesis accounts.
+	// NOTE: Capability module must occur first so that it can initialize any capabilities
+	// so that other modules that want to create or claim capabilities afterwards in InitChain
+	// can do so safely.
+	app.mm.SetOrderInitGenesis(
+		capabilitytypes.ModuleName, authtypes.ModuleName, banktypes.ModuleName, distrtypes.ModuleName, stakingtypes.ModuleName,
+		ibchost.ModuleName, ibctransfertypes.ModuleName,
+	)
+
+	app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
+	app.mm.RegisterServices(module.NewConfigurator(app.MsgServiceRouter(), app.GRPCQueryRouter()))
 
 	// initialize stores
 	app.MountKVStores(keys)
@@ -176,8 +219,12 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider a
 	app.MountMemoryStores(memKeys)
 
 	// initialize BaseApp
-	app.SetAnteHandler(NewAnteHandler(*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer))
 	app.SetInitChainer(app.InitChainer)
+	app.SetAnteHandler(
+		NewAnteHandler(
+			*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer,
+		),
+	)
 	app.SetBlockProvider(blockProvider)
 
 	if err := app.LoadLatestVersion(); err != nil {
@@ -187,60 +234,78 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider a
 	// Initialize and seal the capability keeper so all persistent capabilities
 	// are loaded in-memory and prevent any further modules from creating scoped
 	// sub-keepers.
-	ctx, writer := app.MakeCacheContext(abci.Header{})
+	ctx, writer := app.MakeCacheContext(tmproto.Header{})
 	app.CapabilityKeeper.InitializeAndSeal(ctx)
 	writer()
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
+	app.ScopedTransferKeeper = scopedTransferKeeper
 
 	return app, nil
 }
 
-// This key was created for ICS-20 testing
-var MasterAccount crypto.PrivKey
+// initParamsKeeper init params keeper and its subspaces
+func initParamsKeeper(appCodec codec.BinaryMarshaler, legacyAmino *codec.LegacyAmino, key, tkey sdk.StoreKey) paramskeeper.Keeper {
+	paramsKeeper := paramskeeper.NewKeeper(appCodec, legacyAmino, key, tkey)
 
-func init() {
-	MasterAccount = secp256k1.GenPrivKeySecp256k1([]byte("secret"))
+	paramsKeeper.Subspace(authtypes.ModuleName)
+	paramsKeeper.Subspace(banktypes.ModuleName)
+	paramsKeeper.Subspace(stakingtypes.ModuleName)
+	paramsKeeper.Subspace(distrtypes.ModuleName)
+	paramsKeeper.Subspace(ibctransfertypes.ModuleName)
+
+	return paramsKeeper
+}
+
+// GetSubspace returns a param subspace for a given module name.
+//
+// NOTE: This is solely to be used for testing purposes.
+func (app *IBCApp) GetSubspace(moduleName string) paramstypes.Subspace {
+	subspace, _ := app.ParamsKeeper.GetSubspace(moduleName)
+	return subspace
+}
+
+// BlockedAddrs returns all the app's module account addresses that are not
+// allowed to receive external tokens.
+func (app *IBCApp) BlockedAddrs() map[string]bool {
+	blockedAddrs := make(map[string]bool)
+	for acc := range maccPerms {
+		blockedAddrs[authtypes.NewModuleAddress(acc).String()] = !allowedReceivingModAcc[acc]
+	}
+
+	return blockedAddrs
+}
+
+// LegacyAmino returns IBCApp's amino codec.
+//
+// NOTE: This is solely to be used for testing purposes as it may be desirable
+// for modules to register their own custom testing types.
+func (app *IBCApp) LegacyAmino() *codec.LegacyAmino {
+	return app.cdc
+}
+
+// AppCodec returns IBCApp's app codec.
+//
+// NOTE: This is solely to be used for testing purposes as it may be desirable
+// for modules to register their own custom testing types.
+func (app *IBCApp) AppCodec() codec.Marshaler {
+	return app.appCodec
+}
+
+func (app *IBCApp) InterfaceRegistry() types.InterfaceRegistry {
+	return app.interfaceRegistry
 }
 
 func (app *IBCApp) InitChainer(ctx sdk.Context, appStateBytes []byte) error {
 	var genesisState simapp.GenesisState
-	app.cdc.MustUnmarshalJSON(appStateBytes, &genesisState)
-
-	// res := app.mm.InitGenesis(ctx, app.cdc, genesisState)
-	// https://github.com/cosmos/cosmos-sdk/blob/24b9be0ef841303a2e2b6f60042b5da3b74af2ef/simapp/cmd/simd/genaccounts.go#L73
-	// FIXME these states should be moved into genesisState
-	auth.InitGenesis(
-		ctx,
-		app.AccountKeeper,
-		authtypes.NewGenesisState(
-			authtypes.DefaultParams(),
-			authtypes.GenesisAccounts{
-				authtypes.NewBaseAccount(
-					sdk.AccAddress(MasterAccount.PubKey().Address()),
-					MasterAccount.PubKey(),
-					1,
-					1,
-				),
-			},
-		),
-	)
-	addr := sdk.AccAddress(MasterAccount.PubKey().Address())
-	coins := sdk.NewCoins(sdk.NewCoin("ftk", sdk.NewInt(1000)))
-	balances := banktypes.Balance{Address: addr, Coins: coins.Sort()}
-	bankState := banktypes.DefaultGenesisState()
-	bankState.Balances = append(bankState.Balances, balances)
-	bank.InitGenesis(ctx, app.BankKeeper, bankState)
-	transfer.InitGenesis(ctx, app.TransferKeeper, ibctransfertypes.DefaultGenesisState())
-
+	if err := tmjson.Unmarshal(appStateBytes, &genesisState); err != nil {
+		return err
+	}
+	app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 	return nil
 }
 
-func (app *IBCApp) Codec() *codec.Codec {
-	return app.cdc
-}
-
-func (app *IBCApp) GetIBCKeeper() ibc.Keeper {
+func (app *IBCApp) GetIBCKeeper() ibckeeper.Keeper {
 	return *app.IBCKeeper
 }
 
@@ -248,7 +313,7 @@ func (app *IBCApp) GetIBCKeeper() ibc.Keeper {
 // numbers, checks signatures & account numbers, and deducts fees from the first
 // signer.
 func NewAnteHandler(
-	ibcKeeper ibc.Keeper,
+	ibcKeeper ibckeeper.Keeper,
 	sigGasConsumer ante.SignatureVerificationGasConsumer,
 ) sdk.AnteHandler {
 	return sdk.ChainAnteDecorators(
@@ -263,26 +328,21 @@ func NewAnteHandler(
 		// NewSigGasConsumeDecorator(ak, sigGasConsumer),
 		// NewSigVerificationDecorator(ak),
 		// NewIncrementSequenceDecorator(ak),
-		ibcante.NewProofVerificationDecorator(ibcKeeper.ClientKeeper, ibcKeeper.ChannelKeeper), // innermost AnteDecorator
 	)
 }
 
-// MakeCodecs constructs the *std.Codec and *codec.Codec instances used by
-// simapp. It is useful for tests and clients who do not want to construct the
-// full simapp
-func MakeCodecs() (codec.Marshaler, *codec.Codec) {
-	config := MakeEncodingConfig()
-	return config.Marshaler, config.Amino
+// MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
+func MakeEncodingConfig() simappparams.EncodingConfig {
+	encodingConfig := simappparams.MakeTestEncodingConfig()
+	std.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	ModuleBasics.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	ModuleBasics.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	return encodingConfig
 }
 
-// MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
-//
-// TODO: this file should add a "+build test_amino" flag for #6190 and a proto.go file with a protobuf configuration
-func MakeEncodingConfig() simappparams.EncodingConfig {
-	encodingConfig := simappparams.MakeEncodingConfig()
-	std.RegisterCodec(encodingConfig.Amino)
-	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-	ModuleBasics.RegisterCodec(encodingConfig.Amino)
-	ModuleBasics.RegisterInterfaceModules(encodingConfig.InterfaceRegistry)
-	return encodingConfig
+// NewDefaultGenesisState generates the default state for the application.
+func NewDefaultGenesisState() simapp.GenesisState {
+	encCfg := MakeEncodingConfig()
+	return ModuleBasics.DefaultGenesis(encCfg.Marshaler)
 }

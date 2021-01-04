@@ -7,29 +7,28 @@ import (
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/x/compat"
-	client "github.com/datachainlab/fabric-ibc/x/ibc/02-client"
-	fabric "github.com/datachainlab/fabric-ibc/x/ibc/xx-fabric"
+
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
 	dbm "github.com/tendermint/tm-db"
 )
 
-type AppProvider func(logger log.Logger, db dbm.DB, traceStore io.Writer, cskProvider app.SelfConsensusStateKeeperProvider, blockProvider app.BlockProvider) (app.Application, error)
+type AppProvider func(logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error)
 
 type AppRunner struct {
 	logger      log.Logger
 	traceStore  io.Writer
 	appProvider AppProvider
 	dbProvider  DBProvider
-	seqMgr      *commitment.SequenceManager
+	seqMgr      commitment.SequenceManager
 }
 
 func NewAppRunner(
 	logger log.Logger,
 	appProvider AppProvider,
 	dbProvider DBProvider,
-	seqMgr *commitment.SequenceManager,
+	seqMgr commitment.SequenceManager,
 ) AppRunner {
 	return AppRunner{
 		logger:      logger,
@@ -47,7 +46,7 @@ func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) 
 
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Application) error) error {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
+	app, err := r.appProvider(r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
 	if err != nil {
 		return err
 	}
@@ -59,7 +58,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Applicat
 
 func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]abci.Event, error) {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
+	app, err := r.appProvider(r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +71,7 @@ func (r AppRunner) RunMsg(stub shim.ChaincodeStubInterface, txBytes []byte) ([]a
 
 func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery) (*app.ResponseQuery, error) {
 	db := r.dbProvider(stub)
-	a, err := r.appProvider(r.logger, db, r.traceStore, r.getSelfConsensusStateProvider(stub), r.getBlockProvider(stub))
+	a, err := r.appProvider(r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +80,6 @@ func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery)
 		return nil, fmt.Errorf("failed to query '%v': %v", req.Path, res.Log)
 	}
 	return &app.ResponseQuery{Key: string(res.Key), Value: string(res.Value)}, nil
-}
-
-func (r AppRunner) getSelfConsensusStateProvider(stub shim.ChaincodeStubInterface) app.SelfConsensusStateKeeperProvider {
-	return func() client.SelfConsensusStateKeeper {
-		return fabric.NewConsensusStateKeeper(stub, r.seqMgr)
-	}
 }
 
 type block struct {
@@ -102,7 +95,7 @@ func (bk block) Timestamp() int64 {
 	return bk.timestamp
 }
 
-func (r AppRunner) getBlockProvider(stub shim.ChaincodeStubInterface) app.BlockProvider {
+func (r AppRunner) GetBlockProvider(stub shim.ChaincodeStubInterface) app.BlockProvider {
 	return func() app.Block {
 		seq, err := r.seqMgr.GetCurrentSequence(stub)
 		if err != nil {
