@@ -61,6 +61,7 @@ import (
 	cross "github.com/datachainlab/cross/x/core"
 	crossatomic "github.com/datachainlab/cross/x/core/atomic"
 	atomickeeper "github.com/datachainlab/cross/x/core/atomic/keeper"
+	atomictypes "github.com/datachainlab/cross/x/core/atomic/types"
 	contractkeeper "github.com/datachainlab/cross/x/core/contract/keeper"
 	crosskeeper "github.com/datachainlab/cross/x/core/keeper"
 	"github.com/datachainlab/cross/x/core/router"
@@ -70,8 +71,6 @@ import (
 	xcctypes "github.com/datachainlab/cross/x/core/xcc/types"
 	"github.com/datachainlab/cross/x/packets"
 )
-
-const appName = "FabricIBC"
 
 var (
 	// ModuleBasics defines the module BasicManager is in charge of setting up basic,
@@ -153,7 +152,7 @@ type IBCApp struct {
 	sm *module.SimulationManager
 }
 
-func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
+func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
 
 	// TODO: Remove cdc in favor of appCodec once all modules are migrated.
 	appCodec := encodingConfig.Marshaler
@@ -277,7 +276,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfi
 	// can do so safely.
 	app.mm.SetOrderInitGenesis(
 		capabilitytypes.ModuleName, authtypes.ModuleName, banktypes.ModuleName, distrtypes.ModuleName, stakingtypes.ModuleName,
-		ibchost.ModuleName, ibctransfertypes.ModuleName,
+		ibchost.ModuleName, ibctransfertypes.ModuleName, samplemodtypes.ModuleName, crosstypes.ModuleName, atomictypes.ModuleName,
 	)
 
 	app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
@@ -310,6 +309,7 @@ func NewIBCApp(logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfi
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
 	app.ScopedTransferKeeper = scopedTransferKeeper
+	app.ScopedCrossKeeper = scopedCrossKeeper
 
 	return app, nil
 }

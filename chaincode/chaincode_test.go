@@ -25,6 +25,7 @@ func TestResponseSerializer(t *testing.T) {
 	require := require.New(t)
 
 	cc := chaincode.NewIBCChaincode(
+		"fabricibc",
 		tmlog.NewTMLogger(os.Stdout),
 		commitment.NewDefaultSequenceManager(),
 		newApp,
@@ -72,8 +73,9 @@ func TestResponseSerializer(t *testing.T) {
 	require.EqualValues(int32(200), res.Status, res.String())
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
+		appName,
 		logger,
 		db,
 		traceStore,

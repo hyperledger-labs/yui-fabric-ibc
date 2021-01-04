@@ -70,7 +70,8 @@ const (
 	UnbondingPeriod time.Duration = time.Hour * 24 * 7 * 3
 	MaxClockDrift   time.Duration = time.Second * 10
 
-	ChannelTransferVersion = ibctransfertypes.Version
+	// ChannelTransferVersion = ibctransfertypes.Version
+	ChannelCrossVersion = "cross-1"
 
 	ConnectionIDPrefix = "conn"
 	ChannelIDPrefix    = "chan"
@@ -155,11 +156,12 @@ type TestChainI interface {
 	NewClientID(counterpartyChainID string) string
 	GetPrefix() commitmenttypes.MerklePrefix
 
-	sendMsgs(msgs ...sdk.Msg) error
+	SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error)
 }
 
-func newApp(logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
 	return example.NewIBCApp(
+		appName,
 		logger,
 		db,
 		traceStore,
@@ -231,10 +233,11 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		},
 		commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 	)
-	cc := chaincode.NewIBCChaincode(logger, seqMgr, newApp, chaincode.DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
 	app, err := newApp(
+		chainID,
 		logger,
 		compat.NewDB(stub),
 		nil,
@@ -306,7 +309,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		SenderAccount:      acc,
 		ClientIDs:          make([]string, 0),
 		Connections:        make([]*ibctesting.TestConnection, 0),
-		NextChannelVersion: ChannelTransferVersion,
+		NextChannelVersion: ChannelCrossVersion,
 
 		fabChaincodeID: fabrictypes.ChaincodeID{
 			Name:    "dummyCC",
@@ -586,6 +589,10 @@ func (chain *TestChain) CreatePortCapability(portID string) {
 		case TransferPort:
 			// claim capability using the transfer capability keeper
 			err = chain.App.ScopedTransferKeeper.ClaimCapability(chain.GetContext(), cap, host.PortPath(portID))
+			require.NoError(chain.t, err)
+		case "cross":
+			// claim capability using the cross capability keeper
+			err = chain.App.ScopedCrossKeeper.ClaimCapability(chain.GetContext(), cap, host.PortPath(portID))
 			require.NoError(chain.t, err)
 		default:
 			panic(fmt.Sprintf("unsupported ibc testing package port ID %s", portID))

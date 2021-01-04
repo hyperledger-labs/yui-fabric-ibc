@@ -543,7 +543,7 @@ func (coord *Coordinator) SendMsg(source, counterparty TestChainI, counterpartyC
 // SendMsgs delivers the provided messages to the chain. The counterparty
 // client is updated with the new source consensus state.
 func (coord *Coordinator) SendMsgs(source, counterparty TestChainI, counterpartyClientID string, msgs []sdk.Msg) error {
-	if err := source.sendMsgs(msgs...); err != nil {
+	if _, err := source.SendMsgs(msgs...); err != nil {
 		return err
 	}
 
