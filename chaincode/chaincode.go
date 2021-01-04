@@ -55,16 +55,16 @@ func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface
 }
 
 // HandleIBCTx handles IBC Transaction
-func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, txJSON string) error {
-	events, err := c.runner.RunMsg(ctx.GetStub(), []byte(txJSON))
+func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, txJSON string) (*app.ResponseTx, error) {
+	res, events, err := c.runner.RunTx(ctx.GetStub(), []byte(txJSON))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	bz, err := json.Marshal(events)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return ctx.GetStub().SetEvent(EventIBC, bz)
+	return res, ctx.GetStub().SetEvent(EventIBC, bz)
 }
 
 func (c *IBCChaincode) Query(ctx contractapi.TransactionContextInterface, reqJSON string) (*app.ResponseQuery, error) {

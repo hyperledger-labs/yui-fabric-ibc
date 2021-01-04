@@ -809,14 +809,14 @@ func (chain *TestChain) SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error) {
 	bz, err := cfg.TxJSONEncoder()(tx)
 	require.NoError(chain.t, err)
 
-	_, err = chain.CC.GetAppRunner().RunMsg(chain.Stub, bz)
+	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
 	if err != nil {
 		return nil, err
 	}
 
 	// increment sequence for successful transaction execution
 	chain.SenderAccount.SetSequence(chain.SenderAccount.GetSequence() + 1)
-	return nil, nil
+	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
 }
 
 // GetClientState retrieves the client state for the provided clientID. The client is
