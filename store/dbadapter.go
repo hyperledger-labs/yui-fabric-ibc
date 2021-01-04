@@ -1,10 +1,12 @@
 package store
 
 import (
-	"github.com/cosmos/cosmos-sdk/codec"
+	"fmt"
+
 	"github.com/cosmos/cosmos-sdk/store/dbadapter"
 	"github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/cosmos/cosmos-sdk/types/kv"
 	abci "github.com/tendermint/tendermint/abci/types"
 )
 
@@ -19,6 +21,7 @@ type commitDBStoreAdapter struct {
 	dbadapter.Store
 }
 
+var _ types.CommitKVStore = (*commitDBStoreAdapter)(nil)
 var _ Queryable = (*commitDBStoreAdapter)(nil)
 
 func (cdsa commitDBStoreAdapter) Commit() types.CommitID {
@@ -37,6 +40,10 @@ func (cdsa commitDBStoreAdapter) LastCommitID() types.CommitID {
 
 func (cdsa commitDBStoreAdapter) SetPruning(_ types.PruningOptions) {}
 
+func (cdsa commitDBStoreAdapter) GetPruning() types.PruningOptions {
+	return types.PruningOptions{}
+}
+
 // Query returns a result correspond to given query
 func (cdsa commitDBStoreAdapter) Query(req abci.RequestQuery) (res abci.ResponseQuery) {
 	if len(req.Data) == 0 {
@@ -49,20 +56,25 @@ func (cdsa commitDBStoreAdapter) Query(req abci.RequestQuery) (res abci.Response
 		res.Key = key
 		res.Value = cdsa.Get(key)
 	case "/subspace":
-		var KVs []types.KVPair
+		pairs := kv.Pairs{
+			Pairs: make([]kv.Pair, 0),
+		}
 
 		subspace := req.Data
 		res.Key = subspace
 
 		iterator := types.KVStorePrefixIterator(cdsa.Store, subspace)
 		for ; iterator.Valid(); iterator.Next() {
-			KVs = append(KVs, types.KVPair{Key: iterator.Key(), Value: iterator.Value()})
+			pairs.Pairs = append(pairs.Pairs, kv.Pair{Key: iterator.Key(), Value: iterator.Value()})
 		}
-
 		iterator.Close()
 
-		cdc := codec.New()
-		res.Value = cdc.MustMarshalBinaryBare(KVs)
+		bz, err := pairs.Marshal()
+		if err != nil {
+			panic(fmt.Errorf("failed to marshal KV pairs: %w", err))
+		}
+
+		res.Value = bz
 	default:
 		return sdkerrors.QueryResult(sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unexpected query path: %v", req.Path))
 	}

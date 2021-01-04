@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/types"
-	"github.com/datachainlab/fabric-ibc/x/compat"
+	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
+	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -16,17 +16,17 @@ func TestSequence(t *testing.T) {
 	clientTk := newTimeKeeper()
 	endorserTk := newTimeKeeper()
 
-	stub := compat.MakeFakeStub()
+	stub := testsstub.MakeFakeStub()
 	stub.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
 		return &timestamp.Timestamp{Seconds: clientTk.Now().Unix()}, nil
 	}
 
 	prefix := commitmenttypes.NewMerklePrefix([]byte("ibc"))
 
-	smgr := NewSequenceManager(DefaultConfig(), prefix)
-	smgr.clock = func() time.Time {
+	smgr := NewSequenceManager(DefaultConfig(), prefix).(*sequenceManager)
+	smgr.SetClock(func() time.Time {
 		return endorserTk.Now()
-	}
+	})
 
 	// valid sequence 1
 	seq, err := smgr.InitSequence(stub)

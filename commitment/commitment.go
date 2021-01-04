@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	commitmentexported "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
-	host "github.com/cosmos/cosmos-sdk/x/ibc/24-host"
+	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
+	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
 )
 
 type Entry struct {
@@ -32,11 +32,32 @@ func EntryFromCommitment(ce *CommitmentEntry) (*Entry, error) {
 	}, nil
 }
 
+/// ClientStateCommitment
+
+func MakeClientStateCommitmentEntry(
+	prefix exported.Prefix,
+	clientID string,
+	clientStateBytes []byte,
+) (*Entry, error) {
+	key := MakeClientStateCommitmentEntryKey(prefix, clientID)
+	return &Entry{
+		Key:   key,
+		Value: clientStateBytes,
+	}, nil
+}
+
+func MakeClientStateCommitmentEntryKey(
+	prefix exported.Prefix,
+	clientID string,
+) string {
+	return fmt.Sprintf("h/k:%v/clients/%v/clientState", string(prefix.Bytes()), clientID)
+}
+
 /// ConsensusStateCommitment
 
 func MakeConsensusStateCommitmentEntry(
-	prefix commitmentexported.Prefix,
-	clientID string, height uint64, consensusStateBytes []byte,
+	prefix exported.Prefix,
+	clientID string, height exported.Height, consensusStateBytes []byte,
 ) (*Entry, error) {
 	key := MakeConsensusStateCommitmentEntryKey(prefix, clientID, height)
 	return &Entry{
@@ -45,7 +66,7 @@ func MakeConsensusStateCommitmentEntry(
 	}, nil
 }
 
-func MakeConsensusStateCommitmentEntryKey(prefix commitmentexported.Prefix, clientID string, height uint64) string {
+func MakeConsensusStateCommitmentEntryKey(prefix exported.Prefix, clientID string, height exported.Height) string {
 	return fmt.Sprintf("h/k:%v/clients/%v/%v/commitment", string(prefix.Bytes()), clientID, host.ConsensusStatePath(height))
 }
 
@@ -68,7 +89,7 @@ func MakeSequenceCommitmentEntryKey(seq uint64) string {
 /// ConnectionStateCommitment
 
 func MakeConnectionStateCommitmentEntry(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	connectionID string,
 	connectionBytes []byte,
 ) (*Entry, error) {
@@ -79,14 +100,14 @@ func MakeConnectionStateCommitmentEntry(
 	}, nil
 }
 
-func MakeConnectionStateCommitmentEntryKey(prefix commitmentexported.Prefix, connectionID string) string {
+func MakeConnectionStateCommitmentEntryKey(prefix exported.Prefix, connectionID string) string {
 	return fmt.Sprintf("h/k:%v/%v/commitment", string(prefix.Bytes()), host.ConnectionPath(connectionID))
 }
 
 /// ChannelStateCommitment
 
 func MakeChannelStateCommitmentEntry(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID string,
 	channelID string,
 	channelBytes []byte,
@@ -98,14 +119,14 @@ func MakeChannelStateCommitmentEntry(
 	}, nil
 }
 
-func MakeChannelStateCommitmentEntryKey(prefix commitmentexported.Prefix, portID, channelID string) string {
+func MakeChannelStateCommitmentEntryKey(prefix exported.Prefix, portID, channelID string) string {
 	return fmt.Sprintf("h/k:%v/%v/commitment", string(prefix.Bytes()), host.ChannelPath(portID, channelID))
 }
 
 /// PacketCommitment
 
 func MakePacketCommitmentEntry(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, sequence uint64, packetCommitmentBytes []byte,
 ) (*Entry, error) {
 	key := MakePacketCommitmentEntryKey(prefix, portID, channelID, sequence)
@@ -116,7 +137,7 @@ func MakePacketCommitmentEntry(
 }
 
 func MakePacketCommitmentEntryKey(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, sequence uint64,
 ) string {
 	key := host.PacketCommitmentPath(portID, channelID, sequence)
@@ -126,7 +147,7 @@ func MakePacketCommitmentEntryKey(
 /// PacketAcknowledgement
 
 func MakePacketAcknowledgementEntry(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, sequence uint64, ackBytes []byte) (*Entry, error) {
 	key := MakePacketAcknowledgementEntryKey(prefix, portID, channelID, sequence)
 	return &Entry{
@@ -136,7 +157,7 @@ func MakePacketAcknowledgementEntry(
 }
 
 func MakePacketAcknowledgementEntryKey(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, sequence uint64,
 ) string {
 	key := host.PacketAcknowledgementPath(portID, channelID, sequence)
@@ -146,7 +167,7 @@ func MakePacketAcknowledgementEntryKey(
 /// PacketAcknowledgementAbsence
 
 func MakePacketAcknowledgementAbsenceEntry(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, sequence uint64) (*Entry, error) {
 	key := MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
 	return &Entry{
@@ -156,7 +177,7 @@ func MakePacketAcknowledgementAbsenceEntry(
 }
 
 func MakePacketAcknowledgementAbsenceEntryKey(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, sequence uint64,
 ) string {
 	key := host.PacketAcknowledgementPath(portID, channelID, sequence)
@@ -166,7 +187,7 @@ func MakePacketAcknowledgementAbsenceEntryKey(
 /// NextSequenceRecv
 
 func MakeNextSequenceRecvEntry(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string, seq uint64,
 ) (*Entry, error) {
 	key := MakeNextSequenceRecvEntryKey(prefix, portID, channelID)
@@ -177,7 +198,7 @@ func MakeNextSequenceRecvEntry(
 }
 
 func MakeNextSequenceRecvEntryKey(
-	prefix commitmentexported.Prefix,
+	prefix exported.Prefix,
 	portID, channelID string,
 ) string {
 	key := host.NextSequenceRecvPath(portID, channelID)
