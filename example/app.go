@@ -50,11 +50,6 @@ import (
 	// unnamed import of statik for swagger UI support
 	_ "github.com/cosmos/cosmos-sdk/client/docs/statik"
 
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/x/compat"
-	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
-
 	"github.com/datachainlab/cross/simapp/samplemod"
 	samplemodkeeper "github.com/datachainlab/cross/simapp/samplemod/keeper"
 	samplemodtypes "github.com/datachainlab/cross/simapp/samplemod/types"
@@ -70,6 +65,11 @@ import (
 	crosstypes "github.com/datachainlab/cross/x/core/types"
 	xcctypes "github.com/datachainlab/cross/x/core/xcc/types"
 	"github.com/datachainlab/cross/x/packets"
+
+	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/datachainlab/fabric-ibc/x/compat"
+	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
 )
 
 var (
