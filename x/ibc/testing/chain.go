@@ -158,7 +158,7 @@ type TestChainI interface {
 	SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error)
 }
 
-func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider, anteHandlerProvider app.AnteHandlerProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		appName,
 		logger,
@@ -167,6 +167,7 @@ func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Write
 		example.MakeEncodingConfig(),
 		seqMgr,
 		blockProvider,
+		anteHandlerProvider,
 	)
 }
 
@@ -232,7 +233,8 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		},
 		commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 	)
-	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, chaincode.DefaultDBProvider)
+	anteHandlerProvider := example.DefaultAnteHandler
+	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
 	app, err := newApp(
@@ -242,6 +244,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		nil,
 		seqMgr,
 		runner.GetBlockProvider(stub),
+		anteHandlerProvider,
 	)
 	require.NoError(t, err)
 
