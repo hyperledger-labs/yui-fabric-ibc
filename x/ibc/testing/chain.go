@@ -35,11 +35,12 @@ import (
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/cosmos/cosmos-sdk/x/ibc/testing/mock"
 	"github.com/gogo/protobuf/proto"
-	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
+	protomsp "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/common/policydsl"
+	fabricmock "github.com/hyperledger/fabric/core/chaincode/lifecycle/mock"
 	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
@@ -57,7 +58,6 @@ import (
 	"github.com/datachainlab/fabric-ibc/example"
 	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	fabricauthante "github.com/datachainlab/fabric-ibc/x/auth/ante"
-	fabricauthtypes "github.com/datachainlab/fabric-ibc/x/auth/types"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
@@ -185,7 +185,7 @@ type TestChain struct {
 
 	App  *example.IBCApp
 	CC   *chaincode.IBCChaincode
-	Stub shim.ChaincodeStubInterface
+	Stub *fabricmock.ChaincodeStub
 
 	ChainID       string
 	LastHeader    *ibctmtypes.Header // header for last block height committed
@@ -345,6 +345,13 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode T
 		currentTime:  globalStartTime,
 		seqMgr:       seqMgr,
 		txSignMode:   txSignMode,
+	}
+
+	switch txSignMode {
+	case TxSignModeFabricTx:
+		chain.SenderAccount = NewAccount(acc, getIdBytes())
+	default:
+		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
 	}
 
 	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: globalStartTime.Unix()}, nil)
@@ -861,16 +868,53 @@ func (chain *TestChain) sendMsgsWithStdTx(msgs ...sdk.Msg) (*sdk.Result, error) 
 func (chain *TestChain) sendMsgsWithFabricTx(msgs ...sdk.Msg) (*sdk.Result, error) {
 	marshaler := codec.NewProtoCodec(chain.App.InterfaceRegistry())
 	cfg := authtx.NewTxConfig(marshaler, []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
-	tx := fabricauthtypes.NewStdTx(msgs)
-	bz, err := cfg.TxJSONEncoder()(tx)
-	if err != nil {
-		return nil, err
+	txBuilder := cfg.NewTxBuilder()
+	require.NoError(chain.t, txBuilder.SetMsgs(msgs...))
+	sig := signing.SignatureV2{
+		PubKey: chain.SenderAccount.GetPubKey(),
+		Data: &signing.SingleSignatureData{
+			SignMode: signing.SignMode_SIGN_MODE_DIRECT,
+		},
+		Sequence: chain.SenderAccount.GetSequence(),
 	}
+	require.NoError(chain.t, txBuilder.SetSignatures(sig))
+	tx := txBuilder.GetTx()
+	bz, err := cfg.TxJSONEncoder()(tx)
+	require.NoError(chain.t, err)
+
+	chain.Stub.GetCreatorStub = func() ([]byte, error) {
+		return getIdBytes(), nil
+	}
+
 	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
 	if err != nil {
 		return nil, err
 	}
 	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
+}
+
+func getIdBytes() []byte {
+	csr := `-----BEGIN CERTIFICATE-----
+MIICCDCCAa6gAwIBAgIRANLH5Ue5a6tHuzCQtap1BP8wCgYIKoZIzj0EAwIwZzEL
+MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+cmFuY2lzY28xEzARBgNVBAoTCmhybC5pYm0uaWwxFjAUBgNVBAMTDWNhLmhybC5p
+Ym0uaWwwHhcNMTcwODE5MTIxOTQ4WhcNMjcwODE3MTIxOTQ4WjBVMQswCQYDVQQG
+EwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj
+bzEZMBcGA1UEAwwQVXNlcjFAaHJsLmlibS5pbDBZMBMGByqGSM49AgEGCCqGSM49
+AwEHA0IABE7fF65KsF0nxNgIBFVA2x/QU0LuAyuTsRaSWc/ycQAuLQfCti5bYp4W
+WaQUc5sBaKAmVbFQTm9RhmOhtIz7PL6jTTBLMA4GA1UdDwEB/wQEAwIHgDAMBgNV
+HRMBAf8EAjAAMCsGA1UdIwQkMCKAIMjiBsyFZlbO6pRxo7VgoqKhl78Ujd9sdWUk
+epB05fodMAoGCCqGSM49BAMCA0gAMEUCIQCiOzbaApF46NVobwh3wqHf8ID1zxja
+j23HPXR3FjjFZgIgXLujyDGETptNrELaytjG+dxO3Kzq/SM07K2zPUg4368=
+-----END CERTIFICATE-----`
+	sid := &protomsp.SerializedIdentity{
+		IdBytes: []byte(csr),
+	}
+	bz, err := proto.Marshal(sid)
+	if err != nil {
+		panic(err)
+	}
+	return bz
 }
 
 // GetClientState retrieves the client state for the provided clientID. The client is

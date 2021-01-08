@@ -11,7 +11,6 @@ import (
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/datachainlab/fabric-ibc/example"
-	fabricmock "github.com/hyperledger/fabric/core/chaincode/lifecycle/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -516,7 +515,7 @@ func (coord *Coordinator) IncrementTime() {
 		switch chain := chain.(type) {
 		case *TestChain: // Fabric
 			chain.currentTime = chain.currentTime.Add(time.Second)
-			chain.Stub.(*fabricmock.ChaincodeStub).GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: chain.currentTime.Unix()}, nil)
+			chain.Stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: chain.currentTime.Unix()}, nil)
 			// case *ibctesting.TestChain: // Tendermint
 			// chain.CurrentHeader.Time = chain.CurrentHeader.Time.Add(timeIncrement)
 			// chain.App.BeginBlock(abci.RequestBeginBlock{Header: chain.CurrentHeader})
