@@ -38,7 +38,6 @@ import (
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
-	protomsp "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/common/policydsl"
 	fabricmock "github.com/hyperledger/fabric/core/chaincode/lifecycle/mock"
 	"github.com/hyperledger/fabric/msp"
@@ -1052,7 +1051,7 @@ func makePolicy(mspids []string) []byte {
 // WARNING !!! This certificate must be only used in test !!!
 // This certificate is a copy of
 // https://github.com/hyperledger/fabric/blob/665ace61890f79cb09060af0807e344c0d8f19d6/common/crypto/testdata/cert.pem
-func getTestId() *protomsp.SerializedIdentity {
+func getTestId() *msppb.SerializedIdentity {
 	csr := `-----BEGIN CERTIFICATE-----
 MIICCDCCAa6gAwIBAgIRANLH5Ue5a6tHuzCQtap1BP8wCgYIKoZIzj0EAwIwZzEL
 MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
@@ -1066,7 +1065,7 @@ HRMBAf8EAjAAMCsGA1UdIwQkMCKAIMjiBsyFZlbO6pRxo7VgoqKhl78Ujd9sdWUk
 epB05fodMAoGCCqGSM49BAMCA0gAMEUCIQCiOzbaApF46NVobwh3wqHf8ID1zxja
 j23HPXR3FjjFZgIgXLujyDGETptNrELaytjG+dxO3Kzq/SM07K2zPUg4368=
 -----END CERTIFICATE-----`
-	return &protomsp.SerializedIdentity{
+	return &msppb.SerializedIdentity{
 		IdBytes: []byte(csr),
 	}
 }
