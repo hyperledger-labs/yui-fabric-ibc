@@ -330,7 +330,6 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode T
 		Vals:               valSet,
 		Signers:            signers,
 		senderPrivKey:      senderPrivKey,
-		SenderAccount:      acc,
 		ClientIDs:          make([]string, 0),
 		Connections:        make([]*ibctesting.TestConnection, 0),
 		NextChannelVersion: ChannelTransferVersion,
@@ -348,8 +347,10 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode T
 	}
 
 	switch txSignMode {
+	case TxSignModeStdTx:
+		chain.SenderAccount = acc
 	case TxSignModeFabricTx:
-		chain.SenderAccount = NewAccount(acc, getIdBytes())
+		chain.SenderAccount = NewAccount(acc, getTestId())
 	default:
 		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
 	}
@@ -883,7 +884,7 @@ func (chain *TestChain) sendMsgsWithFabricTx(msgs ...sdk.Msg) (*sdk.Result, erro
 	require.NoError(chain.t, err)
 
 	chain.Stub.GetCreatorStub = func() ([]byte, error) {
-		return getIdBytes(), nil
+		return proto.Marshal(getTestId())
 	}
 
 	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
@@ -891,30 +892,6 @@ func (chain *TestChain) sendMsgsWithFabricTx(msgs ...sdk.Msg) (*sdk.Result, erro
 		return nil, err
 	}
 	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
-}
-
-func getIdBytes() []byte {
-	csr := `-----BEGIN CERTIFICATE-----
-MIICCDCCAa6gAwIBAgIRANLH5Ue5a6tHuzCQtap1BP8wCgYIKoZIzj0EAwIwZzEL
-MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
-cmFuY2lzY28xEzARBgNVBAoTCmhybC5pYm0uaWwxFjAUBgNVBAMTDWNhLmhybC5p
-Ym0uaWwwHhcNMTcwODE5MTIxOTQ4WhcNMjcwODE3MTIxOTQ4WjBVMQswCQYDVQQG
-EwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj
-bzEZMBcGA1UEAwwQVXNlcjFAaHJsLmlibS5pbDBZMBMGByqGSM49AgEGCCqGSM49
-AwEHA0IABE7fF65KsF0nxNgIBFVA2x/QU0LuAyuTsRaSWc/ycQAuLQfCti5bYp4W
-WaQUc5sBaKAmVbFQTm9RhmOhtIz7PL6jTTBLMA4GA1UdDwEB/wQEAwIHgDAMBgNV
-HRMBAf8EAjAAMCsGA1UdIwQkMCKAIMjiBsyFZlbO6pRxo7VgoqKhl78Ujd9sdWUk
-epB05fodMAoGCCqGSM49BAMCA0gAMEUCIQCiOzbaApF46NVobwh3wqHf8ID1zxja
-j23HPXR3FjjFZgIgXLujyDGETptNrELaytjG+dxO3Kzq/SM07K2zPUg4368=
------END CERTIFICATE-----`
-	sid := &protomsp.SerializedIdentity{
-		IdBytes: []byte(csr),
-	}
-	bz, err := proto.Marshal(sid)
-	if err != nil {
-		panic(err)
-	}
-	return bz
 }
 
 // GetClientState retrieves the client state for the provided clientID. The client is
@@ -1070,4 +1047,26 @@ func makePolicy(mspids []string) []byte {
 			SignaturePolicy: policydsl.SignedByNOutOfGivenRole(int32(len(mspids)/2+1), msppb.MSPRole_MEMBER, mspids),
 		},
 	})
+}
+
+// WARNING !!! This certificate must be only used in test !!!
+// This certificate is a copy of
+// https://github.com/hyperledger/fabric/blob/665ace61890f79cb09060af0807e344c0d8f19d6/common/crypto/testdata/cert.pem
+func getTestId() *protomsp.SerializedIdentity {
+	csr := `-----BEGIN CERTIFICATE-----
+MIICCDCCAa6gAwIBAgIRANLH5Ue5a6tHuzCQtap1BP8wCgYIKoZIzj0EAwIwZzEL
+MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+cmFuY2lzY28xEzARBgNVBAoTCmhybC5pYm0uaWwxFjAUBgNVBAMTDWNhLmhybC5p
+Ym0uaWwwHhcNMTcwODE5MTIxOTQ4WhcNMjcwODE3MTIxOTQ4WjBVMQswCQYDVQQG
+EwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj
+bzEZMBcGA1UEAwwQVXNlcjFAaHJsLmlibS5pbDBZMBMGByqGSM49AgEGCCqGSM49
+AwEHA0IABE7fF65KsF0nxNgIBFVA2x/QU0LuAyuTsRaSWc/ycQAuLQfCti5bYp4W
+WaQUc5sBaKAmVbFQTm9RhmOhtIz7PL6jTTBLMA4GA1UdDwEB/wQEAwIHgDAMBgNV
+HRMBAf8EAjAAMCsGA1UdIwQkMCKAIMjiBsyFZlbO6pRxo7VgoqKhl78Ujd9sdWUk
+epB05fodMAoGCCqGSM49BAMCA0gAMEUCIQCiOzbaApF46NVobwh3wqHf8ID1zxja
+j23HPXR3FjjFZgIgXLujyDGETptNrELaytjG+dxO3Kzq/SM07K2zPUg4368=
+-----END CERTIFICATE-----`
+	return &protomsp.SerializedIdentity{
+		IdBytes: []byte(csr),
+	}
 }
