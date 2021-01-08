@@ -29,6 +29,7 @@ func TestResponseSerializer(t *testing.T) {
 		tmlog.NewTMLogger(os.Stdout),
 		commitment.NewDefaultSequenceManager(),
 		newApp,
+		example.DefaultAnteHandler,
 		chaincode.DefaultDBProvider,
 	)
 	chaincode, err := contractapi.NewChaincode(cc)
@@ -73,7 +74,7 @@ func TestResponseSerializer(t *testing.T) {
 	require.EqualValues(int32(200), res.Status, res.String())
 }
 
-func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider, anteHandlerProvider app.AnteHandlerProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		appName,
 		logger,
@@ -82,5 +83,6 @@ func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Write
 		example.MakeEncodingConfig(),
 		seqMgr,
 		blockProvider,
+		anteHandlerProvider,
 	)
 }

@@ -32,8 +32,8 @@ type IBCChaincode struct {
 	runner      AppRunner
 }
 
-func NewIBCChaincode(appName string, logger log.Logger, seqMgr commitment.SequenceManager, appProvider AppProvider, dbProvider DBProvider) *IBCChaincode {
-	runner := NewAppRunner(appName, logger, appProvider, dbProvider, seqMgr)
+func NewIBCChaincode(appName string, logger log.Logger, seqMgr commitment.SequenceManager, appProvider AppProvider, anteHandlerProvider app.AnteHandlerProvider, dbProvider DBProvider) *IBCChaincode {
+	runner := NewAppRunner(appName, logger, appProvider, anteHandlerProvider, dbProvider, seqMgr)
 	c := &IBCChaincode{
 		logger:      logger,
 		sequenceMgr: seqMgr,

@@ -26,13 +26,11 @@ type AppTestSuite struct {
 	chainB fabrictesting.TestChainI
 }
 
-func (suite *AppTestSuite) SetupTest() {
-	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP")
+func (suite *AppTestSuite) TestTransfer() {
+	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeStdTx)
 	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
 	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
-}
 
-func (suite *AppTestSuite) TestTransfer() {
 	clientA, clientB, connA, connB := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
 	channelA, channelB := suite.coordinator.CreateTransferChannels(suite.chainA, suite.chainB, connA, connB, channeltypes.UNORDERED)
 
@@ -90,4 +88,15 @@ func (suite *AppTestSuite) TestTransfer() {
 	// check that balance on chain B is empty
 	balance = chainB.App.BankKeeper.GetBalance(suite.chainB.GetContext(), chainB.SenderAccount.GetAddress(), voucherDenomTrace.IBCDenom())
 	suite.Require().Zero(balance.Amount.Int64())
+}
+
+func (suite *AppTestSuite) TestAuthFabricTx() {
+	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeFabricTx)
+	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
+	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
+
+	clientA, clientB, connA, connB := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
+	channelA, channelB := suite.coordinator.CreateTransferChannels(suite.chainA, suite.chainB, connA, connB, channeltypes.UNORDERED)
+
+	_, _, _, _ = clientA, clientB, channelA, channelB
 }
