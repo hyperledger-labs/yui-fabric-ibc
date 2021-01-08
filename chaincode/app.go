@@ -15,30 +15,33 @@ import (
 	dbm "github.com/tendermint/tm-db"
 )
 
-type AppProvider func(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error)
+type AppProvider func(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider, anteHandlerProvider app.AnteHandlerProvider) (app.Application, error)
 
 type AppRunner struct {
-	appName     string
-	logger      log.Logger
-	traceStore  io.Writer
-	appProvider AppProvider
-	dbProvider  DBProvider
-	seqMgr      commitment.SequenceManager
+	appName             string
+	logger              log.Logger
+	traceStore          io.Writer
+	appProvider         AppProvider
+	anteHandlerProvider app.AnteHandlerProvider
+	dbProvider          DBProvider
+	seqMgr              commitment.SequenceManager
 }
 
 func NewAppRunner(
 	appName string,
 	logger log.Logger,
 	appProvider AppProvider,
+	anteHandlerProvider app.AnteHandlerProvider,
 	dbProvider DBProvider,
 	seqMgr commitment.SequenceManager,
 ) AppRunner {
 	return AppRunner{
-		appName:     appName,
-		logger:      logger,
-		appProvider: appProvider,
-		dbProvider:  dbProvider,
-		seqMgr:      seqMgr,
+		appName:             appName,
+		logger:              logger,
+		appProvider:         appProvider,
+		anteHandlerProvider: anteHandlerProvider,
+		dbProvider:          dbProvider,
+		seqMgr:              seqMgr,
 	}
 }
 
@@ -50,7 +53,7 @@ func (r AppRunner) Init(stub shim.ChaincodeStubInterface, appStateBytes []byte) 
 
 func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Application) error) error {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
+	app, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub), r.anteHandlerProvider)
 	if err != nil {
 		return err
 	}
@@ -62,7 +65,7 @@ func (r AppRunner) RunFunc(stub shim.ChaincodeStubInterface, f func(app.Applicat
 
 func (r AppRunner) RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (*app.ResponseTx, []abci.Event, error) {
 	db := r.dbProvider(stub)
-	app, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
+	app, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub), r.anteHandlerProvider)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,7 +78,7 @@ func (r AppRunner) RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (*app
 
 func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery) (*app.ResponseQuery, error) {
 	db := r.dbProvider(stub)
-	a, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub))
+	a, err := r.appProvider(r.appName, r.logger, db, r.traceStore, r.seqMgr, r.GetBlockProvider(stub), r.anteHandlerProvider)
 	if err != nil {
 		return nil, err
 	}

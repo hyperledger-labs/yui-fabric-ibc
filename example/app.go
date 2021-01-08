@@ -125,7 +125,7 @@ type IBCApp struct {
 	sm *module.SimulationManager
 }
 
-func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (*IBCApp, error) {
+func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Writer, encodingConfig simappparams.EncodingConfig, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider, anteHandlerProvider app.AnteHandlerProvider) (*IBCApp, error) {
 
 	// TODO: Remove cdc in favor of appCodec once all modules are migrated.
 	appCodec := encodingConfig.Marshaler
@@ -219,7 +219,7 @@ func NewIBCApp(appName string, logger log.Logger, db dbm.DB, traceStore io.Write
 	// initialize BaseApp
 	app.SetInitChainer(app.InitChainer)
 	app.SetAnteHandler(
-		NewAnteHandler(
+		anteHandlerProvider(
 			*app.IBCKeeper, ante.DefaultSigVerificationGasConsumer,
 		),
 	)
@@ -307,10 +307,10 @@ func (app *IBCApp) GetIBCKeeper() ibckeeper.Keeper {
 	return *app.IBCKeeper
 }
 
-// NewAnteHandler returns an AnteHandler that checks and increments sequence
+// DefaultAnteHandler returns an AnteHandler that checks and increments sequence
 // numbers, checks signatures & account numbers, and deducts fees from the first
 // signer.
-func NewAnteHandler(
+func DefaultAnteHandler(
 	ibcKeeper ibckeeper.Keeper,
 	sigGasConsumer ante.SignatureVerificationGasConsumer,
 ) sdk.AnteHandler {

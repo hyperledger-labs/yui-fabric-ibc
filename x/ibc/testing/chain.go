@@ -16,6 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -27,17 +28,19 @@ import (
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	ibckeeper "github.com/cosmos/cosmos-sdk/x/ibc/core/keeper"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/types"
 	solomachinetypes "github.com/cosmos/cosmos-sdk/x/ibc/light-clients/06-solomachine/types"
 	ibctmtypes "github.com/cosmos/cosmos-sdk/x/ibc/light-clients/07-tendermint/types"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/cosmos/cosmos-sdk/x/ibc/testing/mock"
 	"github.com/gogo/protobuf/proto"
-	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
+	protomsp "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/common/policydsl"
+	fabricmock "github.com/hyperledger/fabric/core/chaincode/lifecycle/mock"
 	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
@@ -54,6 +57,7 @@ import (
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
 	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
+	fabricauthante "github.com/datachainlab/fabric-ibc/x/auth/ante"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
@@ -158,7 +162,7 @@ type TestChainI interface {
 	SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error)
 }
 
-func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider) (app.Application, error) {
+func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Writer, seqMgr commitment.SequenceManager, blockProvider app.BlockProvider, anteHandlerProvider app.AnteHandlerProvider) (app.Application, error) {
 	return example.NewIBCApp(
 		appName,
 		logger,
@@ -167,6 +171,7 @@ func newApp(appName string, logger tmlog.Logger, db tmdb.DB, traceStore io.Write
 		example.MakeEncodingConfig(),
 		seqMgr,
 		blockProvider,
+		anteHandlerProvider,
 	)
 }
 
@@ -180,7 +185,7 @@ type TestChain struct {
 
 	App  *example.IBCApp
 	CC   *chaincode.IBCChaincode
-	Stub shim.ChaincodeStubInterface
+	Stub *fabricmock.ChaincodeStub
 
 	ChainID       string
 	LastHeader    *ibctmtypes.Header // header for last block height committed
@@ -209,11 +214,19 @@ type TestChain struct {
 	seqMgr         commitment.SequenceManager
 
 	currentTime time.Time
+	txSignMode  TxSignMode
 }
 
 var _ TestChainI = (*TestChain)(nil)
 
-func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
+type TxSignMode uint8
+
+const (
+	TxSignModeStdTx TxSignMode = iota + 1
+	TxSignModeFabricTx
+)
+
+func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode TxSignMode) *TestChain {
 	// generate validator private/public key
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
@@ -232,7 +245,18 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		},
 		commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 	)
-	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, chaincode.DefaultDBProvider)
+
+	var anteHandlerProvider app.AnteHandlerProvider
+	switch txSignMode {
+	case TxSignModeStdTx:
+		anteHandlerProvider = example.DefaultAnteHandler
+	case TxSignModeFabricTx:
+		anteHandlerProvider = newAnteHandler
+	default:
+		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
+	}
+
+	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
 	app, err := newApp(
@@ -242,6 +266,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		nil,
 		seqMgr,
 		runner.GetBlockProvider(stub),
+		anteHandlerProvider,
 	)
 	require.NoError(t, err)
 
@@ -305,7 +330,6 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		Vals:               valSet,
 		Signers:            signers,
 		senderPrivKey:      senderPrivKey,
-		SenderAccount:      acc,
 		ClientIDs:          make([]string, 0),
 		Connections:        make([]*ibctesting.TestConnection, 0),
 		NextChannelVersion: ChannelTransferVersion,
@@ -319,6 +343,16 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		endorser:     endorser,
 		currentTime:  globalStartTime,
 		seqMgr:       seqMgr,
+		txSignMode:   txSignMode,
+	}
+
+	switch txSignMode {
+	case TxSignModeStdTx:
+		chain.SenderAccount = acc
+	case TxSignModeFabricTx:
+		chain.SenderAccount = NewAccount(acc, getTestId())
+	default:
+		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
 	}
 
 	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: globalStartTime.Unix()}, nil)
@@ -342,6 +376,15 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	chain.NextBlock()
 
 	return chain
+}
+
+func newAnteHandler(
+	ibcKeeper ibckeeper.Keeper,
+	sigGasConsumer ante.SignatureVerificationGasConsumer,
+) sdk.AnteHandler {
+	return sdk.ChainAnteDecorators(
+		fabricauthante.NewFabricIDVerificationDecorator(),
+	)
 }
 
 func makeGenesisState() simapp.GenesisState {
@@ -786,8 +829,17 @@ func (chain *TestChain) sendMsgs(msgs ...sdk.Msg) error {
 // number and updates the TestChain's headers. It returns the result and error if one
 // occurred.
 func (chain *TestChain) SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error) {
-	// TODO use fabric-ibc auth tx instead of default
+	switch chain.txSignMode {
+	case TxSignModeStdTx:
+		return chain.sendMsgsWithStdTx(msgs...)
+	case TxSignModeFabricTx:
+		return chain.sendMsgsWithFabricTx(msgs...)
+	default:
+		return nil, fmt.Errorf("unknown txSignMode '%v'", chain.txSignMode)
+	}
+}
 
+func (chain *TestChain) sendMsgsWithStdTx(msgs ...sdk.Msg) (*sdk.Result, error) {
 	marshaler := codec.NewProtoCodec(chain.App.InterfaceRegistry())
 	cfg := authtx.NewTxConfig(marshaler, []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
 	txBuilder := cfg.NewTxBuilder()
@@ -811,6 +863,34 @@ func (chain *TestChain) SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error) {
 
 	// increment sequence for successful transaction execution
 	chain.SenderAccount.SetSequence(chain.SenderAccount.GetSequence() + 1)
+	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
+}
+
+func (chain *TestChain) sendMsgsWithFabricTx(msgs ...sdk.Msg) (*sdk.Result, error) {
+	marshaler := codec.NewProtoCodec(chain.App.InterfaceRegistry())
+	cfg := authtx.NewTxConfig(marshaler, []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
+	txBuilder := cfg.NewTxBuilder()
+	require.NoError(chain.t, txBuilder.SetMsgs(msgs...))
+	sig := signing.SignatureV2{
+		PubKey: chain.SenderAccount.GetPubKey(),
+		Data: &signing.SingleSignatureData{
+			SignMode: signing.SignMode_SIGN_MODE_DIRECT,
+		},
+		Sequence: chain.SenderAccount.GetSequence(),
+	}
+	require.NoError(chain.t, txBuilder.SetSignatures(sig))
+	tx := txBuilder.GetTx()
+	bz, err := cfg.TxJSONEncoder()(tx)
+	require.NoError(chain.t, err)
+
+	chain.Stub.GetCreatorStub = func() ([]byte, error) {
+		return proto.Marshal(getTestId())
+	}
+
+	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
+	if err != nil {
+		return nil, err
+	}
 	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
 }
 
@@ -967,4 +1047,26 @@ func makePolicy(mspids []string) []byte {
 			SignaturePolicy: policydsl.SignedByNOutOfGivenRole(int32(len(mspids)/2+1), msppb.MSPRole_MEMBER, mspids),
 		},
 	})
+}
+
+// WARNING !!! This certificate must be only used in test !!!
+// This certificate is a copy of
+// https://github.com/hyperledger/fabric/blob/665ace61890f79cb09060af0807e344c0d8f19d6/common/crypto/testdata/cert.pem
+func getTestId() *protomsp.SerializedIdentity {
+	csr := `-----BEGIN CERTIFICATE-----
+MIICCDCCAa6gAwIBAgIRANLH5Ue5a6tHuzCQtap1BP8wCgYIKoZIzj0EAwIwZzEL
+MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+cmFuY2lzY28xEzARBgNVBAoTCmhybC5pYm0uaWwxFjAUBgNVBAMTDWNhLmhybC5p
+Ym0uaWwwHhcNMTcwODE5MTIxOTQ4WhcNMjcwODE3MTIxOTQ4WjBVMQswCQYDVQQG
+EwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj
+bzEZMBcGA1UEAwwQVXNlcjFAaHJsLmlibS5pbDBZMBMGByqGSM49AgEGCCqGSM49
+AwEHA0IABE7fF65KsF0nxNgIBFVA2x/QU0LuAyuTsRaSWc/ycQAuLQfCti5bYp4W
+WaQUc5sBaKAmVbFQTm9RhmOhtIz7PL6jTTBLMA4GA1UdDwEB/wQEAwIHgDAMBgNV
+HRMBAf8EAjAAMCsGA1UdIwQkMCKAIMjiBsyFZlbO6pRxo7VgoqKhl78Ujd9sdWUk
+epB05fodMAoGCCqGSM49BAMCA0gAMEUCIQCiOzbaApF46NVobwh3wqHf8ID1zxja
+j23HPXR3FjjFZgIgXLujyDGETptNrELaytjG+dxO3Kzq/SM07K2zPUg4368=
+-----END CERTIFICATE-----`
+	return &protomsp.SerializedIdentity{
+		IdBytes: []byte(csr),
+	}
 }
