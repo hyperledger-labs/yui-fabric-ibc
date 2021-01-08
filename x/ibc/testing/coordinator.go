@@ -28,12 +28,12 @@ type Coordinator struct {
 	Chains map[string]TestChainI
 }
 
-func NewCoordinator(t *testing.T, n int, mspID string) *Coordinator {
+func NewCoordinator(t *testing.T, n int, mspID string, txSignMode TxSignMode) *Coordinator {
 	chains := make(map[string]TestChainI)
 
 	for i := 0; i < n; i++ {
 		chainID := ibctesting.GetChainID(i)
-		chains[chainID] = NewTestFabricChain(t, chainID, mspID)
+		chains[chainID] = NewTestFabricChain(t, chainID, mspID, txSignMode)
 	}
 	return &Coordinator{
 		t:      t,

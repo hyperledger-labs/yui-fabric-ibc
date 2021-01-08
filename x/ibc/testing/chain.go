@@ -16,6 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -27,6 +28,7 @@ import (
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	ibckeeper "github.com/cosmos/cosmos-sdk/x/ibc/core/keeper"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/types"
 	solomachinetypes "github.com/cosmos/cosmos-sdk/x/ibc/light-clients/06-solomachine/types"
 	ibctmtypes "github.com/cosmos/cosmos-sdk/x/ibc/light-clients/07-tendermint/types"
@@ -54,6 +56,8 @@ import (
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/datachainlab/fabric-ibc/example"
 	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
+	fabricauthante "github.com/datachainlab/fabric-ibc/x/auth/ante"
+	fabricauthtypes "github.com/datachainlab/fabric-ibc/x/auth/types"
 	"github.com/datachainlab/fabric-ibc/x/compat"
 	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
@@ -210,11 +214,19 @@ type TestChain struct {
 	seqMgr         commitment.SequenceManager
 
 	currentTime time.Time
+	txSignMode  TxSignMode
 }
 
 var _ TestChainI = (*TestChain)(nil)
 
-func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
+type TxSignMode uint8
+
+const (
+	TxSignModeStdTx TxSignMode = iota + 1
+	TxSignModeFabricTx
+)
+
+func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode TxSignMode) *TestChain {
 	// generate validator private/public key
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
@@ -233,7 +245,17 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		},
 		commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 	)
-	anteHandlerProvider := example.DefaultAnteHandler
+
+	var anteHandlerProvider app.AnteHandlerProvider
+	switch txSignMode {
+	case TxSignModeStdTx:
+		anteHandlerProvider = example.DefaultAnteHandler
+	case TxSignModeFabricTx:
+		anteHandlerProvider = newAnteHandler
+	default:
+		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
+	}
+
 	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider)
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
@@ -322,6 +344,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 		endorser:     endorser,
 		currentTime:  globalStartTime,
 		seqMgr:       seqMgr,
+		txSignMode:   txSignMode,
 	}
 
 	stub.GetTxTimestampReturns(&timestamppb.Timestamp{Seconds: globalStartTime.Unix()}, nil)
@@ -345,6 +368,15 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string) *TestChain {
 	chain.NextBlock()
 
 	return chain
+}
+
+func newAnteHandler(
+	ibcKeeper ibckeeper.Keeper,
+	sigGasConsumer ante.SignatureVerificationGasConsumer,
+) sdk.AnteHandler {
+	return sdk.ChainAnteDecorators(
+		fabricauthante.NewFabricIDVerificationDecorator(),
+	)
 }
 
 func makeGenesisState() simapp.GenesisState {
@@ -789,8 +821,17 @@ func (chain *TestChain) sendMsgs(msgs ...sdk.Msg) error {
 // number and updates the TestChain's headers. It returns the result and error if one
 // occurred.
 func (chain *TestChain) SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error) {
-	// TODO use fabric-ibc auth tx instead of default
+	switch chain.txSignMode {
+	case TxSignModeStdTx:
+		return chain.sendMsgsWithStdTx(msgs...)
+	case TxSignModeFabricTx:
+		return chain.sendMsgsWithFabricTx(msgs...)
+	default:
+		return nil, fmt.Errorf("unknown txSignMode '%v'", chain.txSignMode)
+	}
+}
 
+func (chain *TestChain) sendMsgsWithStdTx(msgs ...sdk.Msg) (*sdk.Result, error) {
 	marshaler := codec.NewProtoCodec(chain.App.InterfaceRegistry())
 	cfg := authtx.NewTxConfig(marshaler, []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
 	txBuilder := cfg.NewTxBuilder()
@@ -814,6 +855,21 @@ func (chain *TestChain) SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error) {
 
 	// increment sequence for successful transaction execution
 	chain.SenderAccount.SetSequence(chain.SenderAccount.GetSequence() + 1)
+	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
+}
+
+func (chain *TestChain) sendMsgsWithFabricTx(msgs ...sdk.Msg) (*sdk.Result, error) {
+	marshaler := codec.NewProtoCodec(chain.App.InterfaceRegistry())
+	cfg := authtx.NewTxConfig(marshaler, []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
+	tx := fabricauthtypes.NewStdTx(msgs)
+	bz, err := cfg.TxJSONEncoder()(tx)
+	if err != nil {
+		return nil, err
+	}
+	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
+	if err != nil {
+		return nil, err
+	}
 	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
 }
 

@@ -27,7 +27,7 @@ type AppTestSuite struct {
 }
 
 func (suite *AppTestSuite) SetupTest() {
-	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP")
+	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeStdTx)
 	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
 	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
 }
