@@ -1,6 +1,7 @@
 package chaincode
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 
@@ -86,7 +87,7 @@ func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery)
 	if res.IsErr() {
 		return nil, fmt.Errorf("failed to query '%v': %v", req.Path, res.Log)
 	}
-	return &app.ResponseQuery{Key: string(res.Key), Value: string(res.Value)}, nil
+	return &app.ResponseQuery{Key: string(res.Key), Value: EncodeResponseToString(res.Value)}, nil
 }
 
 type block struct {
@@ -123,4 +124,12 @@ func makeResponseTx(res sdk.Result) *app.ResponseTx {
 		Data: string(res.Data),
 		Log:  res.Log,
 	}
+}
+
+func EncodeResponseToString(bz []byte) string {
+	return base64.StdEncoding.EncodeToString(bz)
+}
+
+func DecodeResponseToBytes(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(s)
 }

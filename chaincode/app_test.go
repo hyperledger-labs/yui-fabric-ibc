@@ -1,6 +1,7 @@
 package chaincode_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -8,7 +9,11 @@ import (
 	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
 	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
+	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/chaincode"
 	fabrictesting "github.com/datachainlab/fabric-ibc/x/ibc/testing"
+	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -99,4 +104,33 @@ func (suite *AppTestSuite) TestAuthFabricTx() {
 	channelA, channelB := suite.coordinator.CreateTransferChannels(suite.chainA, suite.chainB, connA, connB, channeltypes.UNORDERED)
 
 	_, _, _, _ = clientA, clientB, channelA, channelB
+}
+
+func (suite *AppTestSuite) TestQuery() {
+	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeFabricTx)
+	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
+	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
+
+	clientA, _, _, _ := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
+
+	cc, err := contractapi.NewChaincode(suite.chainA.(*fabrictesting.TestChain).CC)
+	suite.Require().NoError(err)
+	req := &clienttypes.QueryClientStateRequest{
+		ClientId: clientA,
+	}
+	data, err := proto.Marshal(req)
+	jbz, err := json.Marshal(app.RequestQuery{
+		Path: "/ibc.core.client.v1.Query/ClientState",
+		Data: string(data),
+	})
+	stubA := suite.chainA.(*fabrictesting.TestChain).Stub
+	stubA.GetFunctionAndParametersReturns("Query", []string{string(jbz)})
+	res := cc.Invoke(stubA)
+	var r app.ResponseQuery
+	suite.Require().NoError(json.Unmarshal(res.Payload, &r))
+
+	var cres clienttypes.QueryClientStateResponse
+	bz, err := chaincode.DecodeResponseToBytes(r.Value)
+	suite.Require().NoError(err)
+	suite.Require().NoError(cres.Unmarshal(bz))
 }
