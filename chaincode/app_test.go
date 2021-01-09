@@ -1,6 +1,7 @@
 package chaincode_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -151,7 +152,11 @@ func (suite *AppTestSuite) TestAuthFabricTx() {
 		// }
 		var cres clienttypes.QueryClientStateResponse
 		// fmt.Println("Query result:", string(resJSON))
-		suite.Require().NoError(cres.Unmarshal([]byte(res.Value)))
+
+		bz, err := base64.StdEncoding.DecodeString(res.Value)
+		suite.Require().NoError(err)
+
+		suite.Require().NoError(cres.Unmarshal(bz))
 	}
 
 	{
@@ -175,6 +180,10 @@ func (suite *AppTestSuite) TestAuthFabricTx() {
 
 		var cres clienttypes.QueryClientStateResponse
 		// fmt.Println("Query result:", string(resJSON))
-		suite.Require().NoError(cres.Unmarshal([]byte(r.Value)))
+		// suite.Require().NoError(cres.Unmarshal([]byte(r.Value)))
+
+		bz, err := base64.StdEncoding.DecodeString(r.Value)
+		suite.Require().NoError(err)
+		suite.Require().NoError(cres.Unmarshal(bz))
 	}
 }
