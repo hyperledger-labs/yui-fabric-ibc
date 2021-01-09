@@ -15,7 +15,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/stretchr/testify/suite"
-	abci "github.com/tendermint/tendermint/abci/types"
 )
 
 func TestAppTestSuite(t *testing.T) {
@@ -96,94 +95,31 @@ func (suite *AppTestSuite) TestTransfer() {
 	suite.Require().Zero(balance.Amount.Int64())
 }
 
-func (suite *AppTestSuite) TestAuthFabricTx() {
+func (suite *AppTestSuite) TestQuery() {
 	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeFabricTx)
 	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
 	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
 
-	clientA, clientB, connA, connB := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
-	channelA, channelB := suite.coordinator.CreateTransferChannels(suite.chainA, suite.chainB, connA, connB, channeltypes.UNORDERED)
+	clientA, _, _, _ := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
 
-	_, _, _, _ = clientA, clientB, channelA, channelB
-
-	appA := suite.chainA.(*fabrictesting.TestChain).App
-
-	{
-		req := &clienttypes.QueryClientStateRequest{
-			ClientId: clientA,
-		}
-		data, err := proto.Marshal(req)
-		suite.Require().NoError(err)
-		res := appA.Query(abci.RequestQuery{
-			Path: "/ibc.core.client.v1.Query/ClientState",
-			Data: data,
-		})
-
-		var cres clienttypes.QueryClientStateResponse
-		suite.Require().NoError(cres.Unmarshal(res.Value))
+	cc, err := contractapi.NewChaincode(suite.chainA.(*fabrictesting.TestChain).CC)
+	suite.Require().NoError(err)
+	req := &clienttypes.QueryClientStateRequest{
+		ClientId: clientA,
 	}
+	data, err := proto.Marshal(req)
+	jbz, err := json.Marshal(app.RequestQuery{
+		Path: "/ibc.core.client.v1.Query/ClientState",
+		Data: string(data),
+	})
+	stubA := suite.chainA.(*fabrictesting.TestChain).Stub
+	stubA.GetFunctionAndParametersReturns("Query", []string{string(jbz)})
+	res := cc.Invoke(stubA)
+	var r app.ResponseQuery
+	suite.Require().NoError(json.Unmarshal(res.Payload, &r))
 
-	{
-		req := &clienttypes.QueryClientStateRequest{
-			ClientId: clientA,
-		}
-		data, err := proto.Marshal(req)
-		jbz, err := json.Marshal(app.RequestQuery{
-			Path: "/ibc.core.client.v1.Query/ClientState",
-			Data: string(data),
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		var tctx contractapi.TransactionContext
-		tctx.SetStub(suite.chainA.(*fabrictesting.TestChain).Stub)
-
-		res, err := suite.chainA.(*fabrictesting.TestChain).CC.Query(
-			&tctx,
-			string(jbz),
-		)
-		if err != nil {
-			panic(err)
-		}
-		// resJSON, err := json.Marshal(res)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		var cres clienttypes.QueryClientStateResponse
-		// fmt.Println("Query result:", string(resJSON))
-
-		bz, err := base64.StdEncoding.DecodeString(res.Value)
-		suite.Require().NoError(err)
-
-		suite.Require().NoError(cres.Unmarshal(bz))
-	}
-
-	{
-		ccA := suite.chainA.(*fabrictesting.TestChain).CC
-		cc, err := contractapi.NewChaincode(ccA)
-		suite.Require().NoError(err)
-		req := &clienttypes.QueryClientStateRequest{
-			ClientId: clientA,
-		}
-		data, err := proto.Marshal(req)
-		jbz, err := json.Marshal(app.RequestQuery{
-			Path: "/ibc.core.client.v1.Query/ClientState",
-			Data: string(data),
-		})
-		stubA := suite.chainA.(*fabrictesting.TestChain).Stub
-		stubA.GetFunctionAndParametersReturns("Query", []string{string(jbz)})
-		res := cc.Invoke(stubA)
-		// fmt.Println(string(res.Payload))
-		var r app.ResponseQuery
-		suite.Require().NoError(json.Unmarshal(res.Payload, &r))
-
-		var cres clienttypes.QueryClientStateResponse
-		// fmt.Println("Query result:", string(resJSON))
-		// suite.Require().NoError(cres.Unmarshal([]byte(r.Value)))
-
-		bz, err := base64.StdEncoding.DecodeString(r.Value)
-		suite.Require().NoError(err)
-		suite.Require().NoError(cres.Unmarshal(bz))
-	}
+	var cres clienttypes.QueryClientStateResponse
+	bz, err := base64.StdEncoding.DecodeString(r.Value)
+	suite.Require().NoError(err)
+	suite.Require().NoError(cres.Unmarshal(bz))
 }
