@@ -1,7 +1,6 @@
 package chaincode_test
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
 	"github.com/datachainlab/fabric-ibc/app"
+	"github.com/datachainlab/fabric-ibc/chaincode"
 	fabrictesting "github.com/datachainlab/fabric-ibc/x/ibc/testing"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
@@ -119,7 +119,7 @@ func (suite *AppTestSuite) TestQuery() {
 	suite.Require().NoError(json.Unmarshal(res.Payload, &r))
 
 	var cres clienttypes.QueryClientStateResponse
-	bz, err := base64.StdEncoding.DecodeString(r.Value)
+	bz, err := chaincode.DecodeResponseToBytes(r.Value)
 	suite.Require().NoError(err)
 	suite.Require().NoError(cres.Unmarshal(bz))
 }
