@@ -121,7 +121,7 @@ func (suite *AppTestSuite) TestQuery() {
 	data, err := proto.Marshal(req)
 	jbz, err := json.Marshal(app.RequestQuery{
 		Path: "/ibc.core.client.v1.Query/ClientState",
-		Data: string(data),
+		Data: chaincode.EncodeToString(data),
 	})
 	stubA := suite.chainA.(*fabrictesting.TestChain).Stub
 	stubA.GetFunctionAndParametersReturns("Query", []string{string(jbz)})
@@ -130,7 +130,7 @@ func (suite *AppTestSuite) TestQuery() {
 	suite.Require().NoError(json.Unmarshal(res.Payload, &r))
 
 	var cres clienttypes.QueryClientStateResponse
-	bz, err := chaincode.DecodeResponseToBytes(r.Value)
+	bz, err := chaincode.DecodeString(r.Value)
 	suite.Require().NoError(err)
 	suite.Require().NoError(cres.Unmarshal(bz))
 }

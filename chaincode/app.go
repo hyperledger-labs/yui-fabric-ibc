@@ -83,11 +83,15 @@ func (r AppRunner) Query(stub shim.ChaincodeStubInterface, req app.RequestQuery)
 	if err != nil {
 		return nil, err
 	}
-	res := a.Query(abci.RequestQuery{Data: []byte(req.Data), Path: req.Path})
+	data, err := DecodeString(req.Data)
+	if err != nil {
+		return nil, err
+	}
+	res := a.Query(abci.RequestQuery{Data: data, Path: req.Path})
 	if res.IsErr() {
 		return nil, fmt.Errorf("failed to query '%v': %v", req.Path, res.Log)
 	}
-	return &app.ResponseQuery{Key: string(res.Key), Value: EncodeResponseToString(res.Value)}, nil
+	return &app.ResponseQuery{Key: string(res.Key), Value: EncodeToString(res.Value)}, nil
 }
 
 type block struct {
@@ -126,10 +130,10 @@ func makeResponseTx(res sdk.Result) *app.ResponseTx {
 	}
 }
 
-func EncodeResponseToString(bz []byte) string {
+func EncodeToString(bz []byte) string {
 	return base64.StdEncoding.EncodeToString(bz)
 }
 
-func DecodeResponseToBytes(s string) ([]byte, error) {
+func DecodeString(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
 }
