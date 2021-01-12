@@ -15,7 +15,6 @@ import (
 
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/commitment"
-	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -121,7 +120,7 @@ func (c *IBCChaincode) EndorseClientState(ctx contractapi.TransactionContextInte
 		if !found {
 			return sdkerrors.Wrapf(clienttypes.ErrClientNotFound, "clientID '%v' not found", clientID)
 		}
-		bz, err := app.AppCodec().MarshalBinaryBare(cs.(*fabrictypes.ClientState))
+		bz, err := clienttypes.MarshalClientState(app.AppCodec(), cs)
 		if err != nil {
 			return err
 		}
@@ -147,15 +146,11 @@ func (c *IBCChaincode) EndorseConsensusStateCommitment(ctx contractapi.Transacti
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		cctx, writer := app.MakeCacheContext(tmproto.Header{})
 		h := c.makeHeight(height)
-		cs, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(cctx, clientID, h)
+		css, ok := app.GetIBCKeeper().ClientKeeper.GetClientConsensusState(cctx, clientID, h)
 		if !ok {
 			return fmt.Errorf("consensusState not found: clientID=%v height=%v", clientID, height)
 		}
-		consensusState, ok := cs.(*fabrictypes.ConsensusState)
-		if !ok {
-			return sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "unexpected consensus state type: %T", cs)
-		}
-		bz, err := app.AppCodec().MarshalBinaryBare(consensusState)
+		bz, err := clienttypes.MarshalConsensusState(app.AppCodec(), css)
 		if err != nil {
 			return err
 		}

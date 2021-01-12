@@ -147,12 +147,7 @@ func (cs ClientState) VerifyClientState(
 		return sdkerrors.Wrap(clienttypes.ErrInvalidClient, "client state cannot be empty")
 	}
 
-	fcs, ok := clientState.(*ClientState)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidClient, "invalid client type %T, expected %T", clientState, &ClientState{})
-	}
-
-	bz, err := cdc.MarshalBinaryBare(fcs)
+	bz, err := clienttypes.MarshalClientState(cdc, clientState)
 	if err != nil {
 		return err
 	}
@@ -187,11 +182,8 @@ func (cs ClientState) VerifyClientConsensusState(
 	if err != nil {
 		return err
 	}
-	fcs, ok := consensusState.(*ConsensusState)
-	if !ok {
-		return sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "invalid client type %T, expected %T", consensusState, &ConsensusState{})
-	}
-	bz, err := cdc.MarshalBinaryBare(fcs)
+
+	bz, err := clienttypes.MarshalConsensusState(cdc, consensusState)
 	if err != nil {
 		return err
 	}
