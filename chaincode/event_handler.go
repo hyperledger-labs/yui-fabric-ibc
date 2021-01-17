@@ -12,7 +12,10 @@ type EventHandler interface {
 
 // DefaultMultiEventHandler returns a handler which satisfies minimum requirements
 func DefaultMultiEventHandler() MultiEventHandler {
-	return NewMultiEventHandler(EventHandlerFunc(HandlePacketEvent))
+	return NewMultiEventHandler(
+		EventHandlerFunc(HandlePacketEvent),
+		EventHandlerFunc(HandlePacketAcknowledgementEvent),
+	)
 }
 
 // EventHandlerFunc is a function type which handles application events
