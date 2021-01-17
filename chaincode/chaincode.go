@@ -71,11 +71,7 @@ func (c *IBCChaincode) HandleTx(ctx contractapi.TransactionContextInterface, txJ
 	if err := c.eventHandler.Handle(ctx, events); err != nil {
 		return nil, err
 	}
-	bz, err := json.Marshal(events)
-	if err != nil {
-		return nil, err
-	}
-	return res, ctx.GetStub().SetEvent(EventIBC, bz)
+	return res, ctx.GetStub().SetEvent(EventIBC, []byte(res.Events))
 }
 
 func (c *IBCChaincode) Query(ctx contractapi.TransactionContextInterface, reqJSON string) (*app.ResponseQuery, error) {

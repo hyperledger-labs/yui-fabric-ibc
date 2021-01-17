@@ -18,4 +18,5 @@ message ResponseQuery {
 message ResponseTx {
     string data = 1 [(gogoproto.jsontag) = "data"];
     string log  = 2 [(gogoproto.jsontag) = "log"];
+    string events = 3 [(gogoproto.jsontag) = "events"];
 }

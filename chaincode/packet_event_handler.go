@@ -24,6 +24,8 @@ func (c *IBCChaincode) QueryPacket(ctx contractapi.TransactionContextInterface, 
 	bz, err := ctx.GetStub().GetState(k)
 	if err != nil {
 		return "", err
+	} else if bz == nil {
+		return "", fmt.Errorf("key not found: %v", k)
 	}
 	var p channeltypes.Packet
 	if err := p.Unmarshal(bz); err != nil {
