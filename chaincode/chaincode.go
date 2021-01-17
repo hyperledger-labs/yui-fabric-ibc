@@ -53,8 +53,8 @@ func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface
 	return nil
 }
 
-// HandleIBCTx handles IBC Transaction
-func (c *IBCChaincode) HandleIBCTx(ctx contractapi.TransactionContextInterface, txJSON string) (*app.ResponseTx, error) {
+// HandleTx handles a transaction
+func (c *IBCChaincode) HandleTx(ctx contractapi.TransactionContextInterface, txJSON string) (*app.ResponseTx, error) {
 	res, events, err := c.runner.RunTx(ctx.GetStub(), []byte(txJSON))
 	if err != nil {
 		return nil, err
