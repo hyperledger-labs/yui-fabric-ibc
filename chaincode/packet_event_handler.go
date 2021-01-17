@@ -13,9 +13,14 @@ import (
 	abci "github.com/tendermint/tendermint/abci/types"
 )
 
+// TODO make key prefixes configurable
+const (
+	packetEventKeyPrefix = "/packets"
+)
+
 // QueryPacket returns a packet that matches given arguments
 func (c *IBCChaincode) QueryPacket(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (string, error) {
-	k := makePacketKey(portID, channelID, sequence)
+	k := makePacketKey(packetEventKeyPrefix, portID, channelID, sequence)
 	bz, err := ctx.GetStub().GetState(k)
 	if err != nil {
 		return "", err
@@ -39,7 +44,7 @@ func HandlePacketEvent(ctx contractapi.TransactionContextInterface, events []abc
 	}
 
 	for _, p := range packets {
-		k := makePacketKey(p.SourcePort, p.SourceChannel, p.Sequence)
+		k := makePacketKey(packetEventKeyPrefix, p.SourcePort, p.SourceChannel, p.Sequence)
 		bz, err := p.Marshal()
 		if err != nil {
 			return false, err
@@ -52,8 +57,8 @@ func HandlePacketEvent(ctx contractapi.TransactionContextInterface, events []abc
 	return true, nil
 }
 
-func makePacketKey(portID, channelID string, sequence uint64) string {
-	return fmt.Sprintf("/packets/%v/%v/%v", portID, channelID, sequence)
+func makePacketKey(keyPrefix string, portID, channelID string, sequence uint64) string {
+	return fmt.Sprintf("%v/%v/%v/%v", keyPrefix, portID, channelID, sequence)
 }
 
 func getPacketsFromEvents(events []abci.Event) ([]channeltypes.Packet, error) {
