@@ -24,21 +24,30 @@ const (
 	EventIBC = "ibc"
 )
 
+// IBCChaincode provides Cosmos-SDK based Applicatoin which implements IBC
 type IBCChaincode struct {
 	contractapi.Contract
-	logger      log.Logger
-	sequenceMgr commitment.SequenceManager
-	runner      AppRunner
+	logger       log.Logger
+	sequenceMgr  commitment.SequenceManager
+	runner       AppRunner
+	eventHandler MultiEventHandler
 }
 
-func NewIBCChaincode(appName string, logger log.Logger, seqMgr commitment.SequenceManager, appProvider AppProvider, anteHandlerProvider app.AnteHandlerProvider, dbProvider DBProvider) *IBCChaincode {
+// NewIBCChaincode returns a new instance of IBCChaincode
+func NewIBCChaincode(appName string, logger log.Logger, seqMgr commitment.SequenceManager, appProvider AppProvider, anteHandlerProvider app.AnteHandlerProvider, dbProvider DBProvider, eventHandler MultiEventHandler) *IBCChaincode {
 	runner := NewAppRunner(appName, logger, appProvider, anteHandlerProvider, dbProvider, seqMgr)
 	c := &IBCChaincode{
-		logger:      logger,
-		sequenceMgr: seqMgr,
-		runner:      runner,
+		logger:       logger,
+		sequenceMgr:  seqMgr,
+		runner:       runner,
+		eventHandler: eventHandler,
 	}
 	return c
+}
+
+// SetEventHandler sets IBCChaincode to a given handler
+func (c *IBCChaincode) SetEventHandler(handler MultiEventHandler) {
+	c.eventHandler = handler
 }
 
 // InitChaincode initialize the state of the chaincode
@@ -57,6 +66,9 @@ func (c *IBCChaincode) InitChaincode(ctx contractapi.TransactionContextInterface
 func (c *IBCChaincode) HandleTx(ctx contractapi.TransactionContextInterface, txJSON string) (*app.ResponseTx, error) {
 	res, events, err := c.runner.RunTx(ctx.GetStub(), []byte(txJSON))
 	if err != nil {
+		return nil, err
+	}
+	if err := c.eventHandler.Handle(ctx, events); err != nil {
 		return nil, err
 	}
 	bz, err := json.Marshal(events)
@@ -352,5 +364,5 @@ func (c IBCChaincode) GetAppRunner() AppRunner {
 }
 
 func (c *IBCChaincode) GetIgnoredFunctions() []string {
-	return []string{"GetAppRunner"}
+	return []string{"SetEventHandler", "GetAppRunner"}
 }

@@ -255,7 +255,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode T
 		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
 	}
 
-	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider, chaincode.DefaultMultiEventHandler())
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
 	app, err := newApp(
