@@ -55,9 +55,21 @@ func (suite *AppTestSuite) TestTransfer() {
 	// relay send
 	fungibleTokenPacket := transfertypes.NewFungibleTokenPacketData(coinToSendToB.Denom, coinToSendToB.Amount.Uint64(), chainA.SenderAccount.GetAddress().String(), chainB.SenderAccount.GetAddress().String())
 	packet := channeltypes.NewPacket(fungibleTokenPacket.GetBytes(), 1, channelA.PortID, channelA.ID, channelB.PortID, channelB.ID, timeoutHeight, 0)
+
+	// ensure that the expected packet is created on chainA
+	{
+		p, err := chainA.CC.QueryPacket(chainA.GetFabricContext(), channelA.PortID, channelA.ID, 1)
+		suite.Require().NoError(err)
+		var actual channeltypes.Packet
+		suite.Require().NoError(json.Unmarshal([]byte(p), &actual))
+		suite.Require().Equal(actual, packet)
+	}
+
 	ack := channeltypes.NewResultAcknowledgement([]byte{byte(1)})
 	err = suite.coordinator.RelayPacket(suite.chainA, suite.chainB, clientA, clientB, packet, ack.GetBytes())
 	suite.Require().NoError(err) // relay committed
+	_, err = chainB.CC.QueryPacketAcknowledgement(chainB.GetFabricContext(), channelB.PortID, channelB.ID, 1)
+	suite.Require().NoError(err)
 
 	// check that voucher exists on chain B
 	voucherDenomTrace := transfertypes.ParseDenomTrace(transfertypes.GetPrefixedDenom(packet.GetDestPort(), packet.GetDestChannel(), sdk.DefaultBondDenom))
@@ -77,8 +89,20 @@ func (suite *AppTestSuite) TestTransfer() {
 	voucherDenom := voucherDenomTrace.GetPrefix() + voucherDenomTrace.BaseDenom
 	fungibleTokenPacket = transfertypes.NewFungibleTokenPacketData(voucherDenom, coinToSendBackToA.Amount.Uint64(), chainB.SenderAccount.GetAddress().String(), chainA.SenderAccount.GetAddress().String())
 	packet = channeltypes.NewPacket(fungibleTokenPacket.GetBytes(), 1, channelB.PortID, channelB.ID, channelA.PortID, channelA.ID, timeoutHeight, 0)
+
+	// ensure that the expected packet is created on chainB
+	{
+		p, err := chainB.CC.QueryPacket(chainB.GetFabricContext(), channelB.PortID, channelB.ID, 1)
+		suite.Require().NoError(err)
+		var actual channeltypes.Packet
+		suite.Require().NoError(json.Unmarshal([]byte(p), &actual))
+		suite.Require().Equal(actual, packet)
+	}
+
 	err = suite.coordinator.RelayPacket(suite.chainB, suite.chainA, clientB, clientA, packet, ack.GetBytes())
 	suite.Require().NoError(err) // relay committed
+	_, err = chainA.CC.QueryPacketAcknowledgement(chainA.GetFabricContext(), channelA.PortID, channelA.ID, 1)
+	suite.Require().NoError(err)
 
 	balance = chainA.App.BankKeeper.GetBalance(suite.chainA.GetContext(), chainA.SenderAccount.GetAddress(), sdk.DefaultBondDenom)
 

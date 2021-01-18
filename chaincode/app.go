@@ -2,6 +2,7 @@ package chaincode
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -124,9 +125,14 @@ func DefaultDBProvider(stub shim.ChaincodeStubInterface) dbm.DB {
 }
 
 func makeResponseTx(res sdk.Result) *app.ResponseTx {
+	bz, err := json.Marshal(res.Events)
+	if err != nil {
+		panic(err)
+	}
 	return &app.ResponseTx{
-		Data: string(res.Data),
-		Log:  res.Log,
+		Data:   string(res.Data),
+		Events: string(bz),
+		Log:    res.Log,
 	}
 }
 
