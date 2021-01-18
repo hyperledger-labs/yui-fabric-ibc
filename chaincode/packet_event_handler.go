@@ -84,7 +84,7 @@ func HandlePacketAcknowledgementEvent(ctx contractapi.TransactionContextInterfac
 	}
 
 	for _, a := range acks {
-		k := makePacketAcknowledgementKey(packetAcknowledgementEventKeyPrefix, a.srcPortID, a.srcChannelID, a.sequence)
+		k := makePacketAcknowledgementKey(packetAcknowledgementEventKeyPrefix, a.dstPortID, a.dstChannelID, a.sequence)
 		if err := ctx.GetStub().PutState(k, a.data); err != nil {
 			return false, err
 		}
