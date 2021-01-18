@@ -22,6 +22,7 @@ func main() {
 		newApp,
 		example.DefaultAnteHandler,
 		chaincode.DefaultDBProvider,
+		chaincode.DefaultMultiEventHandler(),
 	)
 	chaincode, err := contractapi.NewChaincode(cc)
 

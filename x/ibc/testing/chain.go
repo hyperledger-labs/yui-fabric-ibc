@@ -43,6 +43,7 @@ import (
 	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/stretchr/testify/require"
+	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -255,7 +256,7 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode T
 		panic(fmt.Sprintf("unknown txSignMode %v", txSignMode))
 	}
 
-	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider)
+	cc := chaincode.NewIBCChaincode(chainID, logger, seqMgr, newApp, anteHandlerProvider, chaincode.DefaultDBProvider, chaincode.DefaultMultiEventHandler())
 	runner := cc.GetAppRunner()
 	stub := testsstub.MakeFakeStub()
 	app, err := newApp(
@@ -400,6 +401,12 @@ func (chain *TestChain) GetContext() sdk.Context {
 	return ctx
 }
 
+func (chain *TestChain) GetFabricContext() *contractapi.TransactionContext {
+	ctx := contractapi.TransactionContext{}
+	ctx.SetStub(chain.Stub)
+	return &ctx
+}
+
 func (chain TestChain) GetApp() interface{} {
 	return chain.App
 }
@@ -422,9 +429,7 @@ func (chain *TestChain) NextBlock() {}
 // QueryProof performs an abci query with the given key and returns the proto encoded merkle proof
 // for the query and the height at which the proof will succeed on a tendermint verifier.
 func (chain *TestChain) QueryProof(key []byte) ([]byte, clienttypes.Height) {
-	tctx := contractapi.TransactionContext{}
-	tctx.SetStub(chain.Stub)
-	bz, err := queryEndorseCommitment(&tctx, chain, key)
+	bz, err := queryEndorseCommitment(chain.GetFabricContext(), chain, key)
 	require.NoError(chain.t, err)
 
 	version := clienttypes.ParseChainID(chain.ChainID)
@@ -855,10 +860,10 @@ func (chain *TestChain) sendMsgsWithStdTx(msgs ...sdk.Msg) (*sdk.Result, error) 
 	bz, err := cfg.TxJSONEncoder()(tx)
 	require.NoError(chain.t, err)
 
-	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
-	if err != nil {
-		return nil, err
-	}
+	res, err := chain.CC.HandleTx(chain.GetFabricContext(), string(bz))
+	require.NoError(chain.t, err)
+	var events []abci.Event
+	require.NoError(chain.t, json.Unmarshal([]byte(res.Events), &events))
 
 	// increment sequence for successful transaction execution
 	chain.SenderAccount.SetSequence(chain.SenderAccount.GetSequence() + 1)
@@ -886,10 +891,10 @@ func (chain *TestChain) sendMsgsWithFabricTx(msgs ...sdk.Msg) (*sdk.Result, erro
 		return proto.Marshal(getTestId())
 	}
 
-	res, events, err := chain.CC.GetAppRunner().RunTx(chain.Stub, bz)
-	if err != nil {
-		return nil, err
-	}
+	res, err := chain.CC.HandleTx(chain.GetFabricContext(), string(bz))
+	require.NoError(chain.t, err)
+	var events []abci.Event
+	require.NoError(chain.t, json.Unmarshal([]byte(res.Events), &events))
 	return &sdk.Result{Data: []byte(res.Data), Log: res.Log, Events: events}, nil
 }
 
