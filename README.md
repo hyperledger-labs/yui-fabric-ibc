@@ -14,3 +14,4 @@ Please see [here](https://github.com/datachainlab/public-docs/tree/master/fabric
 ## Maintainers
 
 - [Jun Kimura](https://github.com/bluele)
+- [Ryo Sato](https://github.com/3100)
