@@ -3,7 +3,7 @@ package commitment
 import (
 	"fmt"
 
-	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	"github.com/cosmos/ibc-go/modules/core/exported"
 )
 
 func MakeCurrentSequenceKey(prefix exported.Prefix) string {

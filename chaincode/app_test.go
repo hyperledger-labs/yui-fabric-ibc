@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	transfertypes "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/types"
-	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
-	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
-	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
+	transfertypes "github.com/cosmos/ibc-go/modules/apps/transfer/types"
+	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
+	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
 	"github.com/datachainlab/fabric-ibc/app"
 	"github.com/datachainlab/fabric-ibc/chaincode"
 	fabrictesting "github.com/datachainlab/fabric-ibc/x/ibc/testing"
@@ -33,8 +32,8 @@ type AppTestSuite struct {
 
 func (suite *AppTestSuite) TestTransfer() {
 	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeStdTx)
-	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
-	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
+	suite.chainA = suite.coordinator.GetChain(fabrictesting.GetChainID(0))
+	suite.chainB = suite.coordinator.GetChain(fabrictesting.GetChainID(1))
 
 	clientA, clientB, connA, connB := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
 	channelA, channelB := suite.coordinator.CreateTransferChannels(suite.chainA, suite.chainB, connA, connB, channeltypes.UNORDERED)
@@ -48,7 +47,7 @@ func (suite *AppTestSuite) TestTransfer() {
 	coinToSendToB := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100))
 
 	// send from chainA to chainB
-	msg := transfertypes.NewMsgTransfer(channelA.PortID, channelA.ID, coinToSendToB, chainA.SenderAccount.GetAddress(), chainB.SenderAccount.GetAddress().String(), timeoutHeight, 0)
+	msg := transfertypes.NewMsgTransfer(channelA.PortID, channelA.ID, coinToSendToB, chainA.SenderAccount.GetAddress().String(), chainB.SenderAccount.GetAddress().String(), timeoutHeight, 0)
 	err := suite.coordinator.SendMsg(suite.chainA, suite.chainB, clientB, msg)
 	suite.Require().NoError(err) // message committed
 
@@ -66,7 +65,7 @@ func (suite *AppTestSuite) TestTransfer() {
 	}
 
 	ack := channeltypes.NewResultAcknowledgement([]byte{byte(1)})
-	err = suite.coordinator.RelayPacket(suite.chainA, suite.chainB, clientA, clientB, packet, ack.GetBytes())
+	err = suite.coordinator.RelayPacket(suite.chainA, suite.chainB, clientA, clientB, packet, ack.Acknowledgement())
 	suite.Require().NoError(err) // relay committed
 	_, err = chainB.CC.QueryPacketAcknowledgement(chainB.GetFabricContext(), channelB.PortID, channelB.ID, 1)
 	suite.Require().NoError(err)
@@ -79,7 +78,7 @@ func (suite *AppTestSuite) TestTransfer() {
 	suite.Require().Equal(coinToSendBackToA, balance)
 
 	// send from chainB back to chainA
-	msg = transfertypes.NewMsgTransfer(channelB.PortID, channelB.ID, coinToSendBackToA, chainB.SenderAccount.GetAddress(), chainA.SenderAccount.GetAddress().String(), timeoutHeight, 0)
+	msg = transfertypes.NewMsgTransfer(channelB.PortID, channelB.ID, coinToSendBackToA, chainB.SenderAccount.GetAddress().String(), chainA.SenderAccount.GetAddress().String(), timeoutHeight, 0)
 
 	err = suite.coordinator.SendMsg(suite.chainB, suite.chainA, clientA, msg)
 	suite.Require().NoError(err) // message committed
@@ -99,7 +98,7 @@ func (suite *AppTestSuite) TestTransfer() {
 		suite.Require().Equal(actual, packet)
 	}
 
-	err = suite.coordinator.RelayPacket(suite.chainB, suite.chainA, clientB, clientA, packet, ack.GetBytes())
+	err = suite.coordinator.RelayPacket(suite.chainB, suite.chainA, clientB, clientA, packet, ack.Acknowledgement())
 	suite.Require().NoError(err) // relay committed
 	_, err = chainA.CC.QueryPacketAcknowledgement(chainA.GetFabricContext(), channelA.PortID, channelA.ID, 1)
 	suite.Require().NoError(err)
@@ -121,8 +120,8 @@ func (suite *AppTestSuite) TestTransfer() {
 
 func (suite *AppTestSuite) TestAuthFabricTx() {
 	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeFabricTx)
-	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
-	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
+	suite.chainA = suite.coordinator.GetChain(fabrictesting.GetChainID(0))
+	suite.chainB = suite.coordinator.GetChain(fabrictesting.GetChainID(1))
 
 	clientA, clientB, connA, connB := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
 	channelA, channelB := suite.coordinator.CreateTransferChannels(suite.chainA, suite.chainB, connA, connB, channeltypes.UNORDERED)
@@ -132,8 +131,8 @@ func (suite *AppTestSuite) TestAuthFabricTx() {
 
 func (suite *AppTestSuite) TestQuery() {
 	suite.coordinator = fabrictesting.NewCoordinator(suite.T(), 2, "SampleOrgMSP", fabrictesting.TxSignModeFabricTx)
-	suite.chainA = suite.coordinator.GetChain(ibctesting.GetChainID(0))
-	suite.chainB = suite.coordinator.GetChain(ibctesting.GetChainID(1))
+	suite.chainA = suite.coordinator.GetChain(fabrictesting.GetChainID(0))
+	suite.chainB = suite.coordinator.GetChain(fabrictesting.GetChainID(1))
 
 	clientA, _, _, _ := suite.coordinator.SetupClientConnections(suite.chainA, suite.chainB, fabrictesting.Fabric)
 

@@ -8,7 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
-	ibckeeper "github.com/cosmos/cosmos-sdk/x/ibc/core/keeper"
+	ibckeeper "github.com/cosmos/ibc-go/modules/core/keeper"
 	"github.com/datachainlab/fabric-ibc/store"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -26,7 +26,7 @@ type Application interface {
 	Query(req abci.RequestQuery) abci.ResponseQuery
 
 	MakeCacheContext(header tmproto.Header) (ctx sdk.Context, writer func())
-	AppCodec() codec.Marshaler
+	AppCodec() codec.Codec
 	GetIBCKeeper() ibckeeper.Keeper
 }
 

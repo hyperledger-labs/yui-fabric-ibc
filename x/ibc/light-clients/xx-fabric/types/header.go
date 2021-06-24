@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
-	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
+	"github.com/cosmos/ibc-go/modules/core/exported"
 	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/peer"
