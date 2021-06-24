@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
+	"github.com/cosmos/cosmos-sdk/x/auth/legacy/legacytx"
 	ibckeeper "github.com/cosmos/ibc-go/modules/core/keeper"
 	"github.com/datachainlab/fabric-ibc/store"
 	"github.com/gogo/protobuf/proto"
@@ -32,14 +34,14 @@ type Application interface {
 
 type BaseApp struct {
 	logger           log.Logger
-	name             string            // application name from abci.Info
-	db               dbm.DB            // common DB backend
-	cms              *store.Store      // Main (uncached) state
-	router           sdk.Router        // handle any kind of message
-	queryRouter      sdk.QueryRouter   // router for redirecting query calls
-	grpcQueryRouter  *GRPCQueryRouter  // router for redirecting gRPC query calls
-	msgServiceRouter *MsgServiceRouter // router for redirecting Msg service messages
-	txDecoder        sdk.TxDecoder     // unmarshal []byte into sdk.Tx
+	name             string                    // application name from abci.Info
+	db               dbm.DB                    // common DB backend
+	cms              *store.Store              // Main (uncached) state
+	router           sdk.Router                // handle any kind of message
+	queryRouter      sdk.QueryRouter           // router for redirecting query calls
+	grpcQueryRouter  *GRPCQueryRouter          // router for redirecting gRPC query calls
+	msgServiceRouter *baseapp.MsgServiceRouter // router for redirecting Msg service messages
+	txDecoder        sdk.TxDecoder             // unmarshal []byte into sdk.Tx
 
 	anteHandler   sdk.AnteHandler // ante handler for fee and auth
 	initChainer   InitChainer
@@ -61,10 +63,10 @@ func NewBaseApp(
 		name:             name,
 		db:               db,
 		cms:              store.NewStore(db),
-		router:           NewRouter(),
-		queryRouter:      NewQueryRouter(),
+		router:           baseapp.NewRouter(),
+		queryRouter:      baseapp.NewQueryRouter(),
 		grpcQueryRouter:  NewGRPCQueryRouter(),
-		msgServiceRouter: NewMsgServiceRouter(),
+		msgServiceRouter: baseapp.NewMsgServiceRouter(),
 		txDecoder:        txDecoder,
 	}
 
@@ -82,7 +84,7 @@ func (app *BaseApp) Logger() log.Logger {
 }
 
 // MsgServiceRouter returns the MsgServiceRouter of a BaseApp.
-func (app *BaseApp) MsgServiceRouter() *MsgServiceRouter { return app.msgServiceRouter }
+func (app *BaseApp) MsgServiceRouter() *baseapp.MsgServiceRouter { return app.msgServiceRouter }
 
 // Router returns the router of the BaseApp.
 func (app *BaseApp) Router() sdk.Router {
@@ -258,44 +260,46 @@ func (app *BaseApp) RunTx(stub shim.ChaincodeStubInterface, txBytes []byte) (res
 func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg) (*sdk.Result, error) {
 	msgLogs := make(sdk.ABCIMessageLogs, 0, len(msgs))
 	events := sdk.EmptyEvents()
-	txData := &sdk.TxMsgData{
+	txMsgData := &sdk.TxMsgData{
 		Data: make([]*sdk.MsgData, 0, len(msgs)),
 	}
 
 	// NOTE: GasWanted is determined by the AnteHandler and GasUsed by the GasMeter.
 	for i, msg := range msgs {
 		var (
-			msgEvents sdk.Events
-			msgResult *sdk.Result
-			msgFqName string
-			err       error
+			msgResult    *sdk.Result
+			eventMsgName string // name to use as value in event `message.action`
+			err          error
 		)
 
-		if svcMsg, ok := msg.(sdk.ServiceMsg); ok {
-			msgFqName = svcMsg.MethodName
-			handler := app.msgServiceRouter.Handler(msgFqName)
-			if handler == nil {
-				return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized message service method: %s; message index: %d", msgFqName, i)
-			}
-			msgResult, err = handler(ctx, svcMsg.Request)
-		} else {
+		if handler := app.msgServiceRouter.Handler(msg); handler != nil {
+			// ADR 031 request type routing
+			msgResult, err = handler(ctx, msg)
+			eventMsgName = sdk.MsgTypeURL(msg)
+		} else if legacyMsg, ok := msg.(legacytx.LegacyMsg); ok {
 			// legacy sdk.Msg routing
-			msgRoute := msg.Route()
-			msgFqName = msg.Type()
+			// Assuming that the app developer has migrated all their Msgs to
+			// proto messages and has registered all `Msg services`, then this
+			// path should never be called, because all those Msgs should be
+			// registered within the `msgServiceRouter` already.
+			msgRoute := legacyMsg.Route()
+			eventMsgName = legacyMsg.Type()
 			handler := app.router.Route(ctx, msgRoute)
 			if handler == nil {
 				return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized message route: %s; message index: %d", msgRoute, i)
 			}
 
 			msgResult, err = handler(ctx, msg)
+		} else {
+			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "can't route message %+v", msg)
 		}
 
 		if err != nil {
 			return nil, sdkerrors.Wrapf(err, "failed to execute message; message index: %d", i)
 		}
 
-		msgEvents = sdk.Events{
-			sdk.NewEvent(sdk.EventTypeMessage, sdk.NewAttribute(sdk.AttributeKeyAction, msg.Type())),
+		msgEvents := sdk.Events{
+			sdk.NewEvent(sdk.EventTypeMessage, sdk.NewAttribute(sdk.AttributeKeyAction, eventMsgName)),
 		}
 		msgEvents = msgEvents.AppendEvents(msgResult.GetEvents())
 
@@ -305,11 +309,11 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg) (*sdk.Result, error
 		// separate each result.
 		events = events.AppendEvents(msgEvents)
 
-		txData.Data = append(txData.Data, &sdk.MsgData{MsgType: msg.Type(), Data: msgResult.Data})
+		txMsgData.Data = append(txMsgData.Data, &sdk.MsgData{MsgType: sdk.MsgTypeURL(msg), Data: msgResult.Data})
 		msgLogs = append(msgLogs, sdk.NewABCIMessageLog(uint32(i), msgResult.Log, msgEvents))
 	}
 
-	data, err := proto.Marshal(txData)
+	data, err := proto.Marshal(txMsgData)
 	if err != nil {
 		return nil, sdkerrors.Wrap(err, "failed to marshal tx data")
 	}

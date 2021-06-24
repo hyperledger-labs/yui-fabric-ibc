@@ -69,7 +69,7 @@ func (coord *Coordinator) SetupClientConnections(
 
 	clientA, clientB := coord.SetupClients(chainA, chainB, clientType)
 
-	connA, connB := coord.CreateConnection(chainA, chainB, clientA, clientB)
+	connA, connB := coord.CreateConnection(chainA, chainB, clientA, clientB, ChannelTransferVersion)
 
 	return clientA, clientB, connA, connB
 }
@@ -97,7 +97,7 @@ func (coord *Coordinator) CreateClient(
 ) (clientID string, err error) {
 	coord.CommitBlock(source, counterparty)
 
-	clientID = source.NewClientID(counterparty.GetChainID())
+	clientID = source.NewClientID(clientType)
 
 	switch clientType {
 	// case Tendermint:
@@ -154,9 +154,10 @@ func (coord *Coordinator) UpdateClient(
 func (coord *Coordinator) CreateConnection(
 	chainA, chainB TestChainI,
 	clientA, clientB string,
+	nextChannelVersion string,
 ) (*TestConnection, *TestConnection) {
 
-	connA, connB, err := coord.ConnOpenInit(chainA, chainB, clientA, clientB)
+	connA, connB, err := coord.ConnOpenInit(chainA, chainB, clientA, clientB, nextChannelVersion)
 	require.NoError(coord.t, err)
 
 	err = coord.ConnOpenTry(chainB, chainA, connB, connA)
@@ -225,10 +226,10 @@ func (coord *Coordinator) CreateMockChannels(
 // application state.
 func (coord *Coordinator) ConnOpenInit(
 	source, counterparty TestChainI,
-	clientID, counterpartyClientID string,
+	clientID, counterpartyClientID string, nextChannelVersion string,
 ) (*TestConnection, *TestConnection, error) {
-	sourceConnection := source.AddTestConnection(clientID, counterpartyClientID)
-	counterpartyConnection := counterparty.AddTestConnection(counterpartyClientID, clientID)
+	sourceConnection := source.AddTestConnection(clientID, counterpartyClientID, nextChannelVersion)
+	counterpartyConnection := counterparty.AddTestConnection(counterpartyClientID, clientID, nextChannelVersion)
 
 	// initialize connection on source
 	if err := source.ConnectionOpenInit(counterparty, sourceConnection, counterpartyConnection); err != nil {

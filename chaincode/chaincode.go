@@ -187,7 +187,7 @@ func (c *IBCChaincode) EndorseConnectionState(ctx contractapi.TransactionContext
 
 		connection, found := app.GetIBCKeeper().ConnectionKeeper.GetConnection(cctx, connectionID)
 		if !found {
-			return sdkerrors.Wrap(connectiontypes.ErrConnectionNotFound, "cannot relay ACK of open attempt")
+			return sdkerrors.Wrapf(connectiontypes.ErrConnectionNotFound, "cannot relay ACK of open attempt: %v", connectionID)
 		}
 		bz, err := app.AppCodec().Marshal(&connection)
 		if err != nil {

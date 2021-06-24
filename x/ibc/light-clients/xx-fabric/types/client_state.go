@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	Fabric string = "fabric"
+	Fabric string = "hyperledgerfabric"
 )
 
 var _ exported.ClientState = (*ClientState)(nil)

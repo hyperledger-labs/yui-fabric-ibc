@@ -51,7 +51,7 @@ func queryCommitment(ctx contractapi.TransactionContextInterface, cc *chaincode.
 			return nil, err
 		}
 		return cc.EndorseConsensusStateCommitment(ctx, clientID, height.RevisionHeight)
-	} else if strings.HasPrefix(k, host.KeyChannelPrefix+"/") {
+	} else if strings.HasPrefix(k, host.KeyChannelEndPrefix+"/") {
 		portID := parts[2]
 		channelID := parts[4]
 		return cc.EndorseChannelState(ctx, portID, channelID)

@@ -21,6 +21,7 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/modules/apps/transfer/types"
+	ibc "github.com/cosmos/ibc-go/modules/core"
 	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
@@ -29,6 +30,7 @@ import (
 	"github.com/cosmos/ibc-go/modules/core/exported"
 	ibckeeper "github.com/cosmos/ibc-go/modules/core/keeper"
 	"github.com/cosmos/ibc-go/modules/core/types"
+	ibctypes "github.com/cosmos/ibc-go/modules/core/types"
 	ibctmtypes "github.com/cosmos/ibc-go/modules/light-clients/07-tendermint/types"
 	ibctesting "github.com/cosmos/ibc-go/testing"
 	"github.com/cosmos/ibc-go/testing/mock"
@@ -102,9 +104,9 @@ type TestChainI interface {
 	NextBlock()
 	GetContext() sdk.Context
 
-	AddTestConnection(clientID, counterpartyClientID string) *TestConnection
+	AddTestConnection(clientID, counterpartyClientID, nextChannelVersion string) *TestConnection
 	AddTestChannel(conn *TestConnection, portID string) TestChannel
-	ConstructNextTestConnection(clientID, counterpartyClientID string) *TestConnection
+	ConstructNextTestConnection(clientID, counterpartyClientID, nextChannelVersion string) *TestConnection
 
 	GetChannel(testChannel TestChannel) channeltypes.Channel
 
@@ -155,7 +157,7 @@ type TestChainI interface {
 	QueryProof(key []byte) ([]byte, clienttypes.Height)
 	QueryConsensusStateProof(clientID string) ([]byte, clienttypes.Height)
 
-	NewClientID(counterpartyChainID string) string
+	NewClientID(clientType string) string
 	GetPrefix() commitmenttypes.MerklePrefix
 
 	SendMsgs(msgs ...sdk.Msg) (*sdk.Result, error)
@@ -283,13 +285,18 @@ func NewTestFabricChain(t *testing.T, chainID string, mspID string, txSignMode T
 	}
 	balances := []banktypes.Balance{balance}
 
-	bondAmt := sdk.NewInt(1000000)
-	totalSupply := sdk.NewCoins()
+	// bondAmt := sdk.NewInt(1000000)
+	// totalSupply := sdk.NewCoins()
 	// add genesis acc tokens and delegated tokens to total supply
-	totalSupply = totalSupply.Add(balance.Coins.Add(sdk.NewCoin(sdk.DefaultBondDenom, bondAmt))...)
+	// totalSupply = totalSupply.Add(balance.Coins.Add(sdk.NewCoin(sdk.DefaultBondDenom, bondAmt))...)
+	totalSupply := balance.Coins
 	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{})
 
 	genesisState[banktypes.ModuleName] = app.AppCodec().MustMarshalJSON(bankGenesis)
+
+	ibcGenesisState := ibctypes.DefaultGenesisState()
+	ibcGenesisState.ClientGenesis.Params.AllowedClients = append(ibcGenesisState.ClientGenesis.Params.AllowedClients, fabrictypes.Fabric)
+	genesisState[ibc.AppModule{}.Name()] = app.AppCodec().MustMarshalJSON(ibcGenesisState)
 
 	// create current header and call begin block
 	header := tmproto.Header{
@@ -462,8 +469,8 @@ func (chain *TestChain) QueryConsensusStateProof(clientID string) ([]byte, clien
 
 // AddTestConnection appends a new TestConnection which contains references
 // to the connection id, client id and counterparty client id.
-func (chain *TestChain) AddTestConnection(clientID, counterpartyClientID string) *TestConnection {
-	conn := chain.ConstructNextTestConnection(clientID, counterpartyClientID)
+func (chain *TestChain) AddTestConnection(clientID, counterpartyClientID, nextChannelVersion string) *TestConnection {
+	conn := chain.ConstructNextTestConnection(clientID, counterpartyClientID, nextChannelVersion)
 
 	chain.Connections = append(chain.Connections, conn)
 	return conn
@@ -500,12 +507,12 @@ func (chain *TestChain) NextTestChannel(conn *TestConnection, portID string) Tes
 // ConstructNextTestConnection constructs the next test connection to be
 // created given a clientID and counterparty clientID. The connection id
 // format: <chainID>-conn<index>
-func (chain *TestChain) ConstructNextTestConnection(clientID, counterpartyClientID string) *TestConnection {
-	connectionID := fmt.Sprintf("%s-%s%d", chain.ChainID, ConnectionIDPrefix, len(chain.Connections))
+func (chain *TestChain) ConstructNextTestConnection(clientID, counterpartyClientID, nextChannelVersion string) *TestConnection {
+	connectionID := connectiontypes.FormatConnectionIdentifier(uint64(len(chain.Connections)))
 	return &TestConnection{
 		ID:                   connectionID,
 		ClientID:             clientID,
-		NextChannelVersion:   chain.NextChannelVersion,
+		NextChannelVersion:   nextChannelVersion,
 		CounterpartyClientID: counterpartyClientID,
 	}
 }
@@ -965,20 +972,10 @@ func (chain *TestChain) GetAcknowledgement(packet exported.PacketI) []byte {
 
 // NewClientID appends a new clientID string in the format:
 // ClientFor<counterparty-chain-id><index>
-func (chain *TestChain) NewClientID(counterpartyChainID string) string {
-	clientID := "client" + strconv.Itoa(len(chain.ClientIDs)) + "For" + counterpartyChainID
+func (chain *TestChain) NewClientID(clientType string) string {
+	clientID := fmt.Sprintf("%s-%s", clientType, strconv.Itoa(len(chain.ClientIDs)))
 	chain.ClientIDs = append(chain.ClientIDs, clientID)
 	return clientID
-}
-
-// GetFirstTestConnection returns the first test connection for a given clientID.
-// The connection may or may not exist in the chain state.
-func (chain *TestChain) GetFirstTestConnection(clientID, counterpartyClientID string) *TestConnection {
-	if len(chain.Connections) > 0 {
-		return chain.Connections[0]
-	}
-
-	return chain.ConstructNextTestConnection(clientID, counterpartyClientID)
 }
 
 // ConstructMsgCreateClient constructs a message to create a new client state (tendermint or solomachine).
