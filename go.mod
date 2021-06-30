@@ -1,4 +1,4 @@
-module github.com/datachainlab/fabric-ibc
+module github.com/hyperledger-labs/yui-fabric-ibc
 
 go 1.15
 
@@ -7,7 +7,7 @@ require (
 	github.com/confio/ics23/go v0.6.3
 	github.com/cosmos/cosmos-sdk v0.40.0-rc3
 	github.com/fsouza/go-dockerclient v1.6.5 // indirect
-	github.com/gogo/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/gorilla/mux v1.8.0
@@ -17,6 +17,7 @@ require (
 	github.com/hyperledger/fabric-chaincode-go v0.0.0-20200511190512-bcfeb58dd83a
 	github.com/hyperledger/fabric-contract-api-go v1.0.0
 	github.com/hyperledger/fabric-protos-go v0.0.0-20200506201313-25f6564b9ac4
+	github.com/regen-network/cosmos-proto v0.3.1 // indirect
 	github.com/spf13/cobra v1.1.1
 	github.com/stretchr/testify v1.6.1
 	github.com/sykesm/zap-logfmt v0.0.3 // indirect

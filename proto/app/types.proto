@@ -1,7 +1,7 @@
 syntax = "proto3";
 package app;
 
-option go_package = "github.com/datachainlab/fabric-ibc/app";
+option go_package = "github.com/hyperledger-labs/yui-fabric-ibc/app";
 
 import "gogoproto/gogo.proto";
 

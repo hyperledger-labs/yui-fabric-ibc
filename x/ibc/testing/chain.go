@@ -52,15 +52,15 @@ import (
 	tmdb "github.com/tendermint/tm-db"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/chaincode"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/example"
-	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
-	fabricauthante "github.com/datachainlab/fabric-ibc/x/auth/ante"
-	"github.com/datachainlab/fabric-ibc/x/compat"
-	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
-	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/app"
+	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
+	"github.com/hyperledger-labs/yui-fabric-ibc/example"
+	testsstub "github.com/hyperledger-labs/yui-fabric-ibc/tests/stub"
+	fabricauthante "github.com/hyperledger-labs/yui-fabric-ibc/x/auth/ante"
+	"github.com/hyperledger-labs/yui-fabric-ibc/x/compat"
+	fabrictests "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 )
 
 const (

@@ -1,5 +1,5 @@
 package types
 
-import "github.com/datachainlab/fabric-ibc/commitment"
+import "github.com/hyperledger-labs/yui-fabric-ibc/commitment"
 
 var MakeSequenceCommitmentEntryKey = commitment.MakeSequenceCommitmentEntryKey

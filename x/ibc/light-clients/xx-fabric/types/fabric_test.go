@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	"github.com/golang/protobuf/proto"
+	fabrictests "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	"github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/common/policydsl"

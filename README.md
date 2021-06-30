@@ -1,7 +1,7 @@
 # Fabric-IBC
 
-![Test](https://github.com/datachainlab/fabric-ibc/workflows/Test/badge.svg)
-[![GoDoc](https://godoc.org/github.com/datachainlab/fabric-ibc?status.svg)](https://pkg.go.dev/github.com/datachainlab/fabric-ibc?tab=doc)
+![Test](https://github.com/hyperledger-labs/yui-fabric-ibc/workflows/Test/badge.svg)
+[![GoDoc](https://godoc.org/github.com/hyperledger-labs/yui-fabric-ibc?status.svg)](https://pkg.go.dev/github.com/hyperledger-labs/yui-fabric-ibc?tab=doc)
 
 ## What's this?
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
+	testsstub "github.com/hyperledger-labs/yui-fabric-ibc/tests/stub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	db "github.com/tendermint/tm-db"
