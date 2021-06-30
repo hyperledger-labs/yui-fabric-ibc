@@ -13,8 +13,8 @@ import (
 	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
 	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
 
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/commitment"
+	"github.com/hyperledger-labs/yui-fabric-ibc/app"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"

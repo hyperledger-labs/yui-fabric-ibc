@@ -9,10 +9,10 @@ import (
 	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
 	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
 	ibctesting "github.com/cosmos/cosmos-sdk/x/ibc/testing"
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/chaincode"
-	fabrictesting "github.com/datachainlab/fabric-ibc/x/ibc/testing"
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger-labs/yui-fabric-ibc/app"
+	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode"
+	fabrictesting "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/testing"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/stretchr/testify/suite"
 )

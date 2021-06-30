@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	fabrictests "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	"github.com/golang/protobuf/proto"
+	fabrictests "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/tests"
 	"github.com/stretchr/testify/require"
 )
 

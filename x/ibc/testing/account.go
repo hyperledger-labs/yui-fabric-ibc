@@ -3,7 +3,7 @@ package testing
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	fabricauthtypes "github.com/datachainlab/fabric-ibc/x/auth/types"
+	fabricauthtypes "github.com/hyperledger-labs/yui-fabric-ibc/x/auth/types"
 	"github.com/hyperledger/fabric-protos-go/msp"
 )
 
