@@ -31,5 +31,5 @@ Mgoogle/protobuf/any.proto=github.com/cosmos/cosmos-sdk/codec/types:. \
 
 done
 
-cp -r github.com/datachainlab/fabric-ibc/* ./
+cp -r github.com/hyperledger-labs/yui-fabric-ibc/* ./
 rm -rf github.com

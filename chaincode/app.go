@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/x/compat"
+	"github.com/hyperledger-labs/yui-fabric-ibc/app"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
+	"github.com/hyperledger-labs/yui-fabric-ibc/x/compat"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"

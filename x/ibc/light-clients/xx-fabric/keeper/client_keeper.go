@@ -8,9 +8,9 @@ import (
 	connectiontypes "github.com/cosmos/ibc-go/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
 	"github.com/cosmos/ibc-go/modules/core/exported"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	authtypes "github.com/datachainlab/fabric-ibc/x/auth/types"
-	"github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
+	authtypes "github.com/hyperledger-labs/yui-fabric-ibc/x/auth/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 )
 
 var _ connectiontypes.ClientKeeper = (*ClientKeeper)(nil)

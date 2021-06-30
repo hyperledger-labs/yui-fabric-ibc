@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	baseapp "github.com/datachainlab/fabric-ibc/app"
+	baseapp "github.com/hyperledger-labs/yui-fabric-ibc/app"
 )
 
 func TestGRPCGatewayRouter(t *testing.T) {

@@ -15,8 +15,8 @@ import (
 	commitmenttypes "github.com/cosmos/ibc-go/modules/core/23-commitment/types"
 	host "github.com/cosmos/ibc-go/modules/core/24-host"
 	"github.com/cosmos/ibc-go/modules/core/exported"
-	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
 )
 
 const (

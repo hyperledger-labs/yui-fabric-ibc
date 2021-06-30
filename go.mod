@@ -1,4 +1,4 @@
-module github.com/datachainlab/fabric-ibc
+module github.com/hyperledger-labs/yui-fabric-ibc
 
 go 1.16
 

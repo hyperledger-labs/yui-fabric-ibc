@@ -8,10 +8,10 @@ import (
 	transfertypes "github.com/cosmos/ibc-go/modules/apps/transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
 	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/chaincode"
-	fabrictesting "github.com/datachainlab/fabric-ibc/x/ibc/testing"
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger-labs/yui-fabric-ibc/app"
+	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode"
+	fabrictesting "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/testing"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/stretchr/testify/suite"
 )

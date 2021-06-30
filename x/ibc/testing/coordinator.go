@@ -10,7 +10,7 @@ import (
 	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
 	host "github.com/cosmos/ibc-go/modules/core/24-host"
 	"github.com/cosmos/ibc-go/testing/simapp"
-	"github.com/datachainlab/fabric-ibc/example"
+	"github.com/hyperledger-labs/yui-fabric-ibc/example"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

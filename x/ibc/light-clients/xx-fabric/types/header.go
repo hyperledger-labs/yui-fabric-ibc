@@ -7,8 +7,8 @@ import (
 
 	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
 	"github.com/cosmos/ibc-go/modules/core/exported"
-	"github.com/datachainlab/fabric-ibc/commitment"
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
 	"github.com/hyperledger/fabric-protos-go/peer"
 )
 

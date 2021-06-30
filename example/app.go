@@ -50,10 +50,10 @@ import (
 	// unnamed import of statik for swagger UI support
 	_ "github.com/cosmos/cosmos-sdk/client/docs/statik"
 
-	"github.com/datachainlab/fabric-ibc/app"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/x/compat"
-	fabric "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric"
+	"github.com/hyperledger-labs/yui-fabric-ibc/app"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
+	"github.com/hyperledger-labs/yui-fabric-ibc/x/compat"
+	fabric "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric"
 )
 
 var (

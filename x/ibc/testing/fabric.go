@@ -7,10 +7,10 @@ import (
 
 	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
 	host "github.com/cosmos/ibc-go/modules/core/24-host"
-	"github.com/datachainlab/fabric-ibc/chaincode"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	"github.com/datachainlab/fabric-ibc/tests"
-	fabrictypes "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
+	"github.com/hyperledger-labs/yui-fabric-ibc/tests"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/types"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 

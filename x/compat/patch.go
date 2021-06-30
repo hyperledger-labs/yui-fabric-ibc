@@ -6,8 +6,8 @@ import (
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	connectionkeeper "github.com/cosmos/ibc-go/modules/core/03-connection/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/modules/core/keeper"
-	"github.com/datachainlab/fabric-ibc/commitment"
-	fabrickeeper "github.com/datachainlab/fabric-ibc/x/ibc/light-clients/xx-fabric/keeper"
+	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
+	fabrickeeper "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/keeper"
 )
 
 // ApplyPatchToIBCKeeper applies patches to ibc keeper

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	commitmenttypes "github.com/cosmos/ibc-go/modules/core/23-commitment/types"
-	testsstub "github.com/datachainlab/fabric-ibc/tests/stub"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	testsstub "github.com/hyperledger-labs/yui-fabric-ibc/tests/stub"
 	"github.com/stretchr/testify/require"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )

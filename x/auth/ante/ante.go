@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/datachainlab/fabric-ibc/x/auth/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/x/auth/types"
 )
 
 // Verify a transaction using Identity given from fabric stub and return an error if it is invalid. Note,
