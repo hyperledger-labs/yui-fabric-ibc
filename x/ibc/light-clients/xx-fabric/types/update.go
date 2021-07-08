@@ -4,8 +4,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
-	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
+	"github.com/cosmos/ibc-go/modules/core/exported"
 )
 
 // CheckHeaderAndUpdateState checks if the provided header is valid and updates
@@ -15,7 +15,7 @@ import (
 // - the header timestamp is less than the consensus state timestamp
 // - the currently registered public key did not provide the update signature
 func (cs ClientState) CheckHeaderAndUpdateState(
-	ctx sdk.Context, cdc codec.BinaryMarshaler, clientStore sdk.KVStore,
+	ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore,
 	header exported.Header,
 ) (exported.ClientState, exported.ConsensusState, error) {
 	fabHeader, ok := header.(*Header)
@@ -58,10 +58,10 @@ func checkValidity(
 
 		h := clienttypes.NewHeight(0, header.ChaincodeHeader.Sequence.Value)
 		// TODO use Increment function instead of creating a new instance
-		if lh := clientState.GetLatestHeight(); !h.EQ(clienttypes.NewHeight(lh.GetVersionNumber(), lh.GetVersionHeight()+1)) {
+		if lh := clientState.GetLatestHeight(); !h.EQ(clienttypes.NewHeight(lh.GetRevisionNumber(), lh.GetRevisionHeight()+1)) {
 			return sdkerrors.Wrapf(
 				clienttypes.ErrInvalidHeader,
-				"header sequence != expected client state sequence (%d != %d)", header.ChaincodeHeader.Sequence, lh.GetVersionHeight()+1,
+				"header sequence != expected client state sequence (%d != %d)", header.ChaincodeHeader.Sequence, lh.GetRevisionHeight()+1,
 			)
 		}
 

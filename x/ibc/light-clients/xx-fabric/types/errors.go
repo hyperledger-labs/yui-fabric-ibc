@@ -1,5 +1,5 @@
 package types
 
 const (
-	ModuleName = "fabric"
+	ModuleName = "hyperledgerfabric"
 )

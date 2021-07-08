@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
+	commitmenttypes "github.com/cosmos/ibc-go/modules/core/23-commitment/types"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	testsstub "github.com/hyperledger-labs/yui-fabric-ibc/tests/stub"
 	"github.com/stretchr/testify/require"

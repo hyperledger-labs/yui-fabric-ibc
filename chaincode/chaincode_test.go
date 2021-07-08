@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
+	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger-labs/yui-fabric-ibc/app"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode"

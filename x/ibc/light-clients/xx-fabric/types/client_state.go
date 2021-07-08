@@ -3,25 +3,24 @@ package types
 import (
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 
 	ics23 "github.com/confio/ics23/go"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	clienttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/02-client/types"
-	connectiontypes "github.com/cosmos/cosmos-sdk/x/ibc/core/03-connection/types"
-	channeltypes "github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
-	commitmenttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/23-commitment/types"
-	host "github.com/cosmos/cosmos-sdk/x/ibc/core/24-host"
-	"github.com/cosmos/cosmos-sdk/x/ibc/core/exported"
+	clienttypes "github.com/cosmos/ibc-go/modules/core/02-client/types"
+	connectiontypes "github.com/cosmos/ibc-go/modules/core/03-connection/types"
+	channeltypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
+	commitmenttypes "github.com/cosmos/ibc-go/modules/core/23-commitment/types"
+	host "github.com/cosmos/ibc-go/modules/core/24-host"
+	"github.com/cosmos/ibc-go/modules/core/exported"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger-labs/yui-fabric-ibc/commitment"
 )
 
 const (
-	Fabric string = "fabric"
+	Fabric string = "hyperledgerfabric"
 )
 
 var _ exported.ClientState = (*ClientState)(nil)
@@ -83,12 +82,6 @@ func (cs ClientState) Validate() error {
 	return host.ClientIdentifierValidator(cs.Id)
 }
 
-// GetFrozenHeight returns the frozen sequence of the client.
-// Return exported.Height to satisfy interface
-func (cs ClientState) GetFrozenHeight() exported.Height {
-	return clienttypes.NewHeight(0, math.MaxUint64)
-}
-
 // GetProofSpecs returns the format the client expects for proof verification
 // as a string array specifying the proof type for each position in chained proof
 func (cs ClientState) GetProofSpecs() []*ics23.ProofSpec {
@@ -103,24 +96,43 @@ func (cs ClientState) ZeroCustomFields() exported.ClientState {
 	)
 }
 
-// VerifyUpgrade returns an error since solomachine client does not support upgrades
-func (cs ClientState) VerifyUpgrade(
-	_ sdk.Context, _ codec.BinaryMarshaler, _ sdk.KVStore,
-	_ exported.ClientState, _ exported.Height, _ []byte,
-) error {
-	return sdkerrors.Wrap(clienttypes.ErrInvalidUpgradeClient, "cannot upgrade fabric client")
+// ExportMetadata exports all the consensus metadata in the client store so they can be included in clients genesis
+// and imported by a ClientKeeper
+func (cs ClientState) ExportMetadata(store sdk.KVStore) []exported.GenesisMetadata {
+	return nil
 }
 
-func (cs ClientState) CheckProposedHeaderAndUpdateState(
-	ctx sdk.Context, cdc codec.BinaryMarshaler, clientStore sdk.KVStore,
-	header exported.Header,
+// Status returns the status of the fabric client.
+func (cs ClientState) Status(
+	ctx sdk.Context,
+	clientStore sdk.KVStore,
+	cdc codec.BinaryCodec,
+) exported.Status {
+	// NOTE: Currently, fabric client doesn't support other statuses
+	return exported.Active
+}
+
+// Initialize will check that initial consensus state is a Fabric consensus state
+func (cs ClientState) Initialize(ctx sdk.Context, _ codec.BinaryCodec, clientStore sdk.KVStore, consState exported.ConsensusState) error {
+	if _, ok := consState.(*ConsensusState); !ok {
+		return sdkerrors.Wrapf(clienttypes.ErrInvalidConsensus, "invalid initial consensus state. expected type: %T, got: %T",
+			&ConsensusState{}, consState)
+	}
+	return nil
+}
+
+// VerifyUpgradeAndUpdateState returns an error since solomachine client does not support upgrades
+func (cs ClientState) VerifyUpgradeAndUpdateState(
+	ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore,
+	upgradedClient exported.ClientState, upgradedConsState exported.ConsensusState,
+	proofUpgradeClient, proofUpgradeConsState []byte,
 ) (exported.ClientState, exported.ConsensusState, error) {
-	panic("unsupported operation")
+	return nil, nil, sdkerrors.Wrap(clienttypes.ErrInvalidUpgradeClient, "cannot upgrade fabric client")
 }
 
 func (cs ClientState) CheckMisbehaviourAndUpdateState(
 	ctx sdk.Context,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	clientStore sdk.KVStore,
 	misbehaviour exported.Misbehaviour,
 ) (exported.ClientState, error) {
@@ -131,7 +143,7 @@ func (cs ClientState) CheckMisbehaviourAndUpdateState(
 // stored on the target machine
 func (cs ClientState) VerifyClientState(
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
 	prefix exported.Prefix,
 	counterpartyClientIdentifier string,
@@ -170,7 +182,7 @@ func (cs ClientState) VerifyClientState(
 // fabric client stored on the target machine.
 func (cs ClientState) VerifyClientConsensusState(
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
 	counterpartyClientIdentifier string,
 	consensusHeight exported.Height,
@@ -206,7 +218,7 @@ func (cs ClientState) VerifyClientConsensusState(
 // specified connection end stored locally.
 func (cs ClientState) VerifyConnectionState(
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
 	prefix exported.Prefix,
 	proof []byte,
@@ -225,7 +237,7 @@ func (cs ClientState) VerifyConnectionState(
 		return sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "invalid connection type %T", connectionEnd)
 	}
 
-	bz, err := cdc.MarshalBinaryBare(&connection)
+	bz, err := cdc.Marshal(&connection)
 	if err != nil {
 		return err
 	}
@@ -247,7 +259,7 @@ func (cs ClientState) VerifyConnectionState(
 // channel end, under the specified port, stored on the target machine.
 func (cs ClientState) VerifyChannelState(
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
 	prefix exported.Prefix,
 	proof []byte,
@@ -266,7 +278,7 @@ func (cs ClientState) VerifyChannelState(
 		return sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "invalid channel type %T", channel)
 	}
 
-	bz, err := cdc.MarshalBinaryBare(&channelEnd)
+	bz, err := cdc.Marshal(&channelEnd)
 	if err != nil {
 		return err
 	}
@@ -287,9 +299,12 @@ func (cs ClientState) VerifyChannelState(
 // VerifyPacketCommitment verifies a proof of an outgoing packet commitment at
 // the specified port, specified channel, and specified sequence.
 func (cs ClientState) VerifyPacketCommitment(
+	ctx sdk.Context,
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
+	delayTimePeriod uint64,
+	delayBlockPeriod uint64,
 	prefix exported.Prefix,
 	proof []byte,
 	portID,
@@ -319,9 +334,12 @@ func (cs ClientState) VerifyPacketCommitment(
 // VerifyPacketAcknowledgement verifies a proof of an incoming packet
 // acknowledgement at the specified port, specified channel, and specified sequence.
 func (cs ClientState) VerifyPacketAcknowledgement(
+	ctx sdk.Context,
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
+	delayTimePeriod uint64,
+	delayBlockPeriod uint64,
 	prefix exported.Prefix,
 	proof []byte,
 	portID,
@@ -353,9 +371,12 @@ func (cs ClientState) VerifyPacketAcknowledgement(
 // incoming packet acknowledgement at the specified port, specified channel, and
 // specified sequence.
 func (cs ClientState) VerifyPacketReceiptAbsence(
+	ctx sdk.Context,
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
+	delayTimePeriod uint64,
+	delayBlockPeriod uint64,
 	prefix exported.Prefix,
 	proof []byte,
 	portID,
@@ -384,9 +405,12 @@ func (cs ClientState) VerifyPacketReceiptAbsence(
 // VerifyNextSequenceRecv verifies a proof of the next sequence number to be
 // received of the specified channel at the specified port.
 func (cs ClientState) VerifyNextSequenceRecv(
+	ctx sdk.Context,
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	height exported.Height,
+	delayTimePeriod uint64,
+	delayBlockPeriod uint64,
 	prefix exported.Prefix,
 	proof []byte,
 	portID,
@@ -418,7 +442,7 @@ func (cs ClientState) VerifyNextSequenceRecv(
 // merkle proof, the consensus state and an error if one occurred.
 func produceVerificationArgs(
 	store sdk.KVStore,
-	cdc codec.BinaryMarshaler,
+	cdc codec.BinaryCodec,
 	cs ClientState,
 	height exported.Height,
 	prefix exported.Prefix,
@@ -448,7 +472,7 @@ func produceVerificationArgs(
 		return CommitmentProof{}, nil, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "proof cannot be empty")
 	}
 
-	if err = cdc.UnmarshalBinaryBare(proof, &commitmentProof); err != nil {
+	if err = cdc.Unmarshal(proof, &commitmentProof); err != nil {
 		return CommitmentProof{}, nil, sdkerrors.Wrap(commitmenttypes.ErrInvalidProof, "failed to unmarshal proof into commitment merkle proof")
 	}
 
