@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	ics23 "github.com/confio/ics23/go"
-	// "github.com/cosmos/cosmos-sdk/x/ibc/23-commitment/exported"
 	"github.com/cosmos/ibc-go/modules/core/exported"
 	"github.com/hyperledger/fabric/protoutil"
 )

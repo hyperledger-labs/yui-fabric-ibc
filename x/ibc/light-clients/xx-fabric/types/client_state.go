@@ -82,12 +82,6 @@ func (cs ClientState) Validate() error {
 	return host.ClientIdentifierValidator(cs.Id)
 }
 
-// // GetFrozenHeight returns the frozen sequence of the client.
-// // Return exported.Height to satisfy interface
-// func (cs ClientState) GetFrozenHeight() exported.Height {
-// 	return clienttypes.NewHeight(0, math.MaxUint64)
-// }
-
 // GetProofSpecs returns the format the client expects for proof verification
 // as a string array specifying the proof type for each position in chained proof
 func (cs ClientState) GetProofSpecs() []*ics23.ProofSpec {
