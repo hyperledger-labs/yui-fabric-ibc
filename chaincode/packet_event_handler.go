@@ -222,9 +222,9 @@ func assertIndex(actual, expected int) error {
 }
 
 func strToUint64(s string) uint64 {
-	v, err := strconv.Atoi(s)
+	v, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
 		panic(err)
 	}
-	return uint64(v)
+	return v
 }
