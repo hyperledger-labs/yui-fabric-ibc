@@ -393,8 +393,8 @@ func (cs ClientState) VerifyPacketReceiptAbsence(
 		return err
 	}
 
-	key := commitment.MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
-	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{}, configs); err != nil {
+	key := commitment.MakePacketReceiptAbsenceEntryKey(prefix, portID, channelID, sequence)
+	if ok, err := VerifyEndorsedCommitment(cs.LastChaincodeInfo.GetFabricChaincodeID(), cs.LastChaincodeInfo.EndorsementPolicy, fabProof, key, []byte{0}, configs); err != nil {
 		return err
 	} else if !ok {
 		return fmt.Errorf("unexpected value")

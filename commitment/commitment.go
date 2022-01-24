@@ -164,23 +164,23 @@ func MakePacketAcknowledgementEntryKey(
 	return MakeEntryKey(prefix, key)
 }
 
-/// PacketAcknowledgementAbsence
+/// PacketReceiptAbsence
 
-func MakePacketAcknowledgementAbsenceEntry(
+func MakePacketReceiptAbsenceEntry(
 	prefix exported.Prefix,
 	portID, channelID string, sequence uint64) (*Entry, error) {
-	key := MakePacketAcknowledgementAbsenceEntryKey(prefix, portID, channelID, sequence)
+	key := MakePacketReceiptAbsenceEntryKey(prefix, portID, channelID, sequence)
 	return &Entry{
 		Key:   key,
-		Value: []byte{},
+		Value: []byte{0},
 	}, nil
 }
 
-func MakePacketAcknowledgementAbsenceEntryKey(
+func MakePacketReceiptAbsenceEntryKey(
 	prefix exported.Prefix,
 	portID, channelID string, sequence uint64,
 ) string {
-	key := host.PacketAcknowledgementPath(portID, channelID, sequence)
+	key := host.PacketReceiptPath(portID, channelID, sequence)
 	return MakeEntryKey(prefix, key)
 }
 
