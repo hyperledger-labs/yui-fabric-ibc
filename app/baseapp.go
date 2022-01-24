@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -18,7 +19,6 @@ import (
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -178,7 +178,7 @@ func (app *BaseApp) getBlockHeader() tmproto.Header {
 	return tmproto.Header{
 		ChainID: app.name,
 		Height:  block.Height() + 1,
-		Time:    tmtime.Now(),
+		Time:    time.Unix(block.Timestamp(), 0),
 	}
 }
 
