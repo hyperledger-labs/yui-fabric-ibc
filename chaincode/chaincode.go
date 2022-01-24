@@ -296,15 +296,15 @@ func (c *IBCChaincode) EndorsePacketAcknowledgement(ctx contractapi.TransactionC
 	return entry.ToCommitment(), nil
 }
 
-func (c *IBCChaincode) EndorsePacketAcknowledgementAbsence(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
+func (c *IBCChaincode) EndorsePacketReceiptAbsence(ctx contractapi.TransactionContextInterface, portID, channelID string, sequence uint64) (*commitment.CommitmentEntry, error) {
 	var entry *commitment.Entry
 	if err := c.runner.RunFunc(ctx.GetStub(), func(app app.Application) error {
 		cctx, writer := app.MakeCacheContext(tmproto.Header{})
-		_, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketAcknowledgement(cctx, portID, channelID, sequence)
+		_, ok := app.GetIBCKeeper().ChannelKeeper.GetPacketReceipt(cctx, portID, channelID, sequence)
 		if ok {
-			return errors.New("acknowledgement packet found")
+			return errors.New("the packet receipt found")
 		}
-		e, err := commitment.MakePacketAcknowledgementAbsenceEntry(
+		e, err := commitment.MakePacketReceiptAbsenceEntry(
 			commitmenttypes.NewMerklePrefix([]byte(host.StoreKey)),
 			portID,
 			channelID,
