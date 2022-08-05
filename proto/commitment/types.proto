@@ -3,7 +3,7 @@ package commitment;
 
 import "gogoproto/gogo.proto";
 
-option go_package = "github.com/hyperledger-labs/yui-fabric-ibc/commitment";
+option go_package = "github.com/hyperledger-labs/yui-fabric-ibc/chaincode/commitment";
 
 message Sequence {
   uint64 value     = 1 [(gogoproto.jsontag) = "value"];
