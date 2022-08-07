@@ -1,6 +1,6 @@
 MODULES=chaincode light-client simapp relay
 
-all: test build rly
+all: test build yrly
 
 .PHONY: build
 build:
@@ -12,8 +12,8 @@ test:
 		FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./$$m/...;\
 	done
 
-rly:
-	@go build -o build/rly ./relay/bin
+yrly:
+	@go build -o build/yrly ./relay/bin
 
 ###############################################################################
 ###                                Protobuf                                 ###
