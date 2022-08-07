@@ -1,8 +1,17 @@
-build:
-	@go build ./cmd/fabibc
+MODULES=chaincode light-client simapp
 
-test:
-	FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./...
+all: test build
+
+go.work:
+	@go work init && go work use ${MODULES}
+
+build: go.work
+	@go build ./simapp/cmd/fabibc
+
+test: go.work
+	@for m in $(MODULES); do \
+		FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./$$m/...;\
+	done
 
 ###############################################################################
 ###                                Protobuf                                 ###
@@ -11,10 +20,7 @@ test:
 .PHONY: proto-gen
 proto-gen:
 	@echo "Generating Protobuf files"
-	docker run -v $(CURDIR):/workspace --workdir /workspace tendermintdev/sdk-proto-gen sh ./scripts/protocgen.sh
-
-proto-update-deps:
-	# Copy from https://github.com/cosmos/cosmos-sdk/blob/65ea305336c0da689ecf5f8c864d0f2e0370c71e/Makefile#L291
+	docker run -v $(CURDIR):/workspace --workdir /workspace tendermintdev/sdk-proto-gen:v0.3 sh ./scripts/protocgen.sh
 
 .PHONY: cryptogen
 cryptogen:
