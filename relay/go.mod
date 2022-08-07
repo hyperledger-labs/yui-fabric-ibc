@@ -9,7 +9,7 @@ require (
 	github.com/hyperledger-labs/yui-fabric-ibc/chaincode v0.0.0
 	github.com/hyperledger-labs/yui-fabric-ibc/light-client v0.0.0
 	github.com/hyperledger-labs/yui-fabric-ibc/simapp v0.0.0
-	github.com/hyperledger-labs/yui-relayer v0.2.0-rc0
+	github.com/hyperledger-labs/yui-relayer v0.2.0-rc1
 	github.com/hyperledger/fabric v1.4.0-rc1.0.20200416031218-eff2f9306191
 	github.com/hyperledger/fabric-protos-go v0.0.0-20200707132912-fee30f3ccd23
 	github.com/hyperledger/fabric-sdk-go v1.0.0-beta2.0.20200715151216-87f5eb8a655f
@@ -40,7 +40,7 @@ require (
 	github.com/cosmos/ledger-cosmos-go v0.11.1 // indirect
 	github.com/cosmos/ledger-go v0.9.2 // indirect
 	github.com/danieljoos/wincred v1.0.2 // indirect
-	github.com/datachainlab/ibc-mock-client v0.0.0-20220113022533-5baf3f100d16 // indirect
+	github.com/datachainlab/ibc-mock-client v0.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
