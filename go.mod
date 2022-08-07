@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0
-	github.com/hyperledger-labs/yui-relayer v0.1.3
+	github.com/hyperledger-labs/yui-relayer v0.2.0-rc1
 	github.com/hyperledger/fabric v1.4.0-rc1.0.20200416031218-eff2f9306191
 	github.com/hyperledger/fabric-chaincode-go v0.0.0-20200511190512-bcfeb58dd83a
 	github.com/hyperledger/fabric-contract-api-go v1.0.0
@@ -53,7 +53,7 @@ require (
 	github.com/cosmos/ledger-cosmos-go v0.11.1 // indirect
 	github.com/cosmos/ledger-go v0.9.2 // indirect
 	github.com/danieljoos/wincred v1.0.2 // indirect
-	github.com/datachainlab/ibc-mock-client v0.0.0-20220113022533-5baf3f100d16 // indirect
+	github.com/datachainlab/ibc-mock-client v0.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
