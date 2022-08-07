@@ -1,0 +1,4 @@
+github.com/datachainlab/ibc-mock-client v0.1.1 h1:cnjYQUJQ8epBsBHf7MJr3KiNr39x8Mf2pJDJqYBE6qM=
+github.com/datachainlab/ibc-mock-client v0.1.1/go.mod h1:TllaTo5x9vUoqYXFbxGPLGDPP11f4rhehch3dm2Yc1Y=
+github.com/hyperledger-labs/yui-relayer v0.2.0-rc1 h1:WJ31xkCrxnfgEkRfASc2lm8AYMF8/3bqN4tuKFpi8MQ=
+github.com/hyperledger-labs/yui-relayer v0.2.0-rc1/go.mod h1:YsahaO71lXQNqogt+kvHfBlceQaRPzRBd6xVHV3szU4=
