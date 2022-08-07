@@ -2,20 +2,17 @@ MODULES=chaincode light-client simapp relay
 
 all: test build rly
 
-go.work:
-	@go work init && go work use ${MODULES}
-
 .PHONY: build
-build: go.work
+build:
 	@go build -o build/fabibc ./simapp/cmd/fabibc
 
 .PHONY: test
-test: go.work
+test:
 	@for m in $(MODULES); do \
 		FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./$$m/...;\
 	done
 
-rly: go.work
+rly:
 	@go build -o build/rly ./relay/bin
 
 ###############################################################################
