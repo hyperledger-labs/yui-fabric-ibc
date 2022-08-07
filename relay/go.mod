@@ -6,9 +6,8 @@ require (
 	github.com/cosmos/cosmos-sdk v0.43.0-beta1
 	github.com/cosmos/ibc-go v1.0.0-beta1
 	github.com/gogo/protobuf v1.3.3
-	github.com/hyperledger-labs/yui-fabric-ibc/chaincode v0.0.0
-	github.com/hyperledger-labs/yui-fabric-ibc/light-client v0.0.0
-	github.com/hyperledger-labs/yui-fabric-ibc/simapp v0.0.0
+	github.com/hyperledger-labs/yui-fabric-ibc/chaincode v0.0.0-00010101000000-000000000000
+	github.com/hyperledger-labs/yui-fabric-ibc/light-client v0.0.0-00010101000000-000000000000
 	github.com/hyperledger-labs/yui-relayer v0.2.0-rc1
 	github.com/hyperledger/fabric v1.4.0-rc1.0.20200416031218-eff2f9306191
 	github.com/hyperledger/fabric-protos-go v0.0.0-20200707132912-fee30f3ccd23
@@ -48,7 +47,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/dvsekhvalnov/jose2go v0.0.0-20200901110807-248326c1351b // indirect
 	github.com/enigmampc/btcutil v1.0.3-0.20200723161021-e2fb6adb2a25 // indirect
-	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
@@ -60,13 +58,11 @@ require (
 	github.com/gobuffalo/packd v0.3.0 // indirect
 	github.com/gobuffalo/packr v1.30.1 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
-	github.com/gogo/gateway v1.1.0 // indirect
 	github.com/golang/mock v1.4.4 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
-	github.com/gorilla/handlers v1.5.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
@@ -105,7 +101,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.23.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
-	github.com/rakyll/statik v0.1.7 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0 // indirect
 	github.com/regen-network/cosmos-proto v0.3.1 // indirect
 	github.com/rogpeppe/go-internal v1.3.0 // indirect
