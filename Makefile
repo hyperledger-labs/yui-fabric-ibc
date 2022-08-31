@@ -1,5 +1,3 @@
-MODULES=chaincode light-client simapp relay
-
 all: test build yrly
 
 .PHONY: build
@@ -8,9 +6,7 @@ build:
 
 .PHONY: test
 test:
-	@for m in $(MODULES); do \
-		FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./$$m/...;\
-	done
+	FABRIC_IBC_MSPS_DIR=${PWD}/tests/fixtures/organizations/peerOrganizations go test ./...
 
 yrly:
 	@go build -o build/yrly ./relay/bin

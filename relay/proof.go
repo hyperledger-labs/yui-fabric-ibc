@@ -10,7 +10,7 @@ import (
 	"github.com/cosmos/ibc-go/modules/core/exported"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode/commitment"
-	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 )
 
 const (

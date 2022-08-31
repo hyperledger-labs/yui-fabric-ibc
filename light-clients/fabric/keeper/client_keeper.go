@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/ibc-go/modules/core/exported"
 	ibckeeper "github.com/cosmos/ibc-go/modules/core/keeper"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode/commitment"
-	"github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 )
 
 var _ connectiontypes.ClientKeeper = (*ClientKeeper)(nil)

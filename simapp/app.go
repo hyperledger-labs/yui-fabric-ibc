@@ -52,8 +52,8 @@ import (
 
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode/app"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode/commitment"
-	fabric "github.com/hyperledger-labs/yui-fabric-ibc/light-client"
-	fabrickeeper "github.com/hyperledger-labs/yui-fabric-ibc/light-client/keeper"
+	"github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric"
+	fabrickeeper "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/keeper"
 )
 
 var (

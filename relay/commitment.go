@@ -1,7 +1,7 @@
 package relay
 
 import (
-	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 	protocommon "github.com/hyperledger/fabric-protos-go/common"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"

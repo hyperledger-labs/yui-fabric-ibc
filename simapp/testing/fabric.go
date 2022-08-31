@@ -9,7 +9,7 @@ import (
 	host "github.com/cosmos/ibc-go/modules/core/24-host"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode/commitment"
-	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 

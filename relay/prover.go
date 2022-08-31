@@ -13,7 +13,7 @@ import (
 	chantypes "github.com/cosmos/ibc-go/modules/core/04-channel/types"
 	ibcexported "github.com/cosmos/ibc-go/modules/core/exported"
 	"github.com/gogo/protobuf/proto"
-	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 	"github.com/hyperledger-labs/yui-relayer/core"
 	msppb "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"

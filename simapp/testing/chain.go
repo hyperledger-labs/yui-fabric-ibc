@@ -57,7 +57,7 @@ import (
 	testsstub "github.com/hyperledger-labs/yui-fabric-ibc/chaincode/tests/stub"
 	fabricauthante "github.com/hyperledger-labs/yui-fabric-ibc/chaincode/x/auth/ante"
 	"github.com/hyperledger-labs/yui-fabric-ibc/chaincode/x/compat"
-	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 	"github.com/hyperledger-labs/yui-fabric-ibc/simapp"
 )
 

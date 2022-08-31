@@ -9,7 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	"github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 	"github.com/spf13/cobra"
 )
 

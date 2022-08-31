@@ -2,7 +2,7 @@ package relay
 
 import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-client/types"
+	fabrictypes "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types"
 	"github.com/hyperledger-labs/yui-relayer/core"
 )
 
