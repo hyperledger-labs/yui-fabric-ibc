@@ -4,7 +4,7 @@ package ibc.lightclients.fabric.v1;
 import "gogoproto/gogo.proto";
 import "commitment/types.proto";
 
-option go_package = "github.com/hyperledger-labs/yui-fabric-ibc/x/ibc/light-clients/xx-fabric/types";
+option go_package = "github.com/hyperledger-labs/yui-fabric-ibc/light-clients/fabric/types";
 option (gogoproto.goproto_getters_all)  = false;
 
 message ClientState {
